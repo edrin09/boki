@@ -64,11 +64,6 @@ const rules: FormRules = {
   ],
 }
 
-function fillAccount(username: string, password: string) {
-  form.username = username
-  form.password = password
-}
-
 async function onSubmit() {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return

@@ -119,9 +119,15 @@ financial-bs/
 │       ├── stores/             # Pinia
 │       ├── styles/
 │       ├── utils/              # 金额/日期格式化、Excel 导出
-│       └── views/              # 22 个业务页面
-├── DEVELOPMENT_PLAN.md         # 开发计划表
-└── README.md
+│       └── views/              # 38 个业务页面
+├── desktop/                    # Electron 桌面壳（免环境安装包）
+│   ├── src/                    # 主进程：sidecar 拉起 / 窗口 / 托盘
+│   ├── scripts/build-package.mjs   # 一键打包编排
+│   ├── electron-builder.yml    # NSIS 安装包配置
+│   └── release/                # 安装包产物（不入版本库）
+├── 产品介绍.md                  # 交付对象看的成品说明
+├── 打包与更新指南.md             # 维护者看的打包与升级流程
+└── README.md                   # 开发与部署技术说明
 ```
 
 ---
@@ -158,6 +164,21 @@ financial-bs/
 
 ## 六、生产部署
 
+### 方式一：免环境安装包（推荐，内部办公场景）
+
+产出一个 `Setup.exe`，在**未装 Node、未装数据库、不能联网**的 Windows 机器上装完即用；那台机器同时充当局域网服务器，同事用浏览器访问即可。
+
+```bash
+cd desktop
+npm run pack          # 产物：desktop/release/FinancialApp-Setup-1.0.0.exe
+```
+
+架构：Electron 壳负责窗口与托盘，后端以 `node.exe` 子进程方式拉起（sidecar），后端同时托管前端静态文件，因此**前后端同源、单端口 9300**，不需要 Nginx、不需要处理跨域。
+
+数据落在 `C:\ProgramData\FinancialApp\`（安装目录对普通用户只读，SQLite 必须写可写目录）。完整流程、升级方式与排障见 [`打包与更新指南.md`](./打包与更新指南.md)。
+
+### 方式二：传统服务器部署（自备 Linux/云主机）
+
 ```bash
 # 1. 构建
 cd backend  && npm install && npm run build
@@ -172,6 +193,12 @@ pm2 save && pm2 startup
 # 3. 托管前端静态文件
 #    将 frontend/dist 交由 Nginx / Caddy 等静态服务器
 #    并把 /api 反向代理到 http://127.0.0.1:3000
+```
+
+也可以让后端直接托管前端（与安装包同源模型一致），只需设 `WEB_DIST_DIR`：
+
+```bash
+WEB_DIST_DIR=../frontend/dist APP_PORT=3000 node dist/main.js
 ```
 
 Nginx 参考配置：
@@ -200,10 +227,11 @@ server {
 
 | 项 | 建议 |
 |:--|:--|
-| `JWT_SECRET` | **必须**改为随机强密钥，不要使用示例值 |
-| `DB_SYNCHRONIZE` | 设为 `false`，改用迁移，避免误改表结构 |
-| `CORS_ORIGIN` | 设为具体域名，不要用 `*` |
-| 数据备份 | 建议定期使用「数据备份」页面或直接复制 `backend/data/financial.db` |
+| `JWT_SECRET` | **必须**改为随机强密钥。安装包由 Electron 首次启动自动生成并持久化，无需手工设置；方式二请自行配置 |
+| `DB_SYNCHRONIZE` | 安装包固定为 `true`（升级后自动同步新增表/字段）；方式二建议设 `false` 并改用迁移 |
+| `CORS_ORIGIN` | 同源部署（安装包）用 `*` 即可；方式二请设为具体域名 |
+| `APP_PORT` | 安装包默认 `9300`（避开开发常用 3000），可在 `config.json` 中修改 |
+| 数据备份 | 使用「系统管理 → 数据备份」页面，或直接复制数据库文件 |
 | 恢复数据 | SQLite 运行中无法删除 WAL 文件，恢复后请**重启服务**使数据完全生效 |
 
 ---

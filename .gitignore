@@ -43,5 +43,11 @@ npm-shrinkwrap.json
 backend/models/ocr/*.onnx
 backend/models/ocr/*.txt
 
+# 桌面壳（Electron）：依赖、打包暂存区与安装包产物
+desktop/node_modules/
+desktop/stage/
+desktop/release/
+desktop/build/icon.ico
+
 # 验证脚本产物
 backend/test/output/
