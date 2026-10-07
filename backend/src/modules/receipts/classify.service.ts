@@ -1,0 +1,290 @@
+import { Injectable } from '@nestjs/common'
+import { InjectRepository } from '@nestjs/typeorm'
+import { Repository } from 'typeorm'
+import { ClassifyRule } from '../../entities/classify-rule.entity'
+import { Receipt } from '../../entities/receipt.entity'
+import { Account } from '../../entities/account.entity'
+import { SystemService } from '../system/system.service'
+
+/** 凭证模板类型：进项/销项/费用/银行手续费 */
+export type ReceiptKind = 'input_vat' | 'output_vat' | 'expense' | 'bank_fee' | 'unknown'
+
+export const KIND_LABELS: Record<ReceiptKind, string> = {
+  input_vat: '进项发票',
+  output_vat: '销项发票',
+  expense: '费用票据',
+  bank_fee: '银行手续费',
+  unknown: '无法自动归类',
+}
+
+/** 分录模板：金额取哪个字段 */
+export type AmountSource =
+  | 'total_amount' // 价税合计
+  | 'amount' // 不含税金额
+  | 'tax_amount' // 税额
+  | 'fixed' // 固定金额（由 partner 模板兜底时使用）
+
+export interface DraftEntryTemplate {
+  summary: string
+  /** 科目编码（缺省由默认模板兜底） */
+  accountCode: string
+  direction: 'debit' | 'credit'
+  amountSource: AmountSource
+  /** 交易对手字段：进项/费用取销售方，销项取购买方 */
+  partnerField: 'seller_name' | 'buyer_name' | null
+}
+
+export interface HitInfo {
+  ruleName: string
+  matchType: string
+  matchValue: string
+  priority: number
+  targetAccountCode: string
+  kind: string
+}
+
+export interface ClassifySuggestion {
+  kind: ReceiptKind
+  kindLabel: string
+  /** 进项/销项方向（用于台账与展示） */
+  direction: 'input' | 'output' | null
+  docType: string
+  confidence: number
+  /** 命中链：按优先级排序的全部命中规则 */
+  hitChain: HitInfo[]
+  /** 主科目（费用/收入） */
+  account: { code: string; name: string } | null
+  /** 交易对手（销售方或购买方名称） */
+  counterparty: string | null
+  /** 分录模板（含科目编码） */
+  entries: DraftEntryTemplate[]
+  message?: string
+}
+
+/** 银行手续费关键词：命中则按手续费模板 */
+const BANK_FEE_KEYWORDS = ['手续费', '工本费', '年费', '账户管理费', '汇费', '短信服务费', '网银服务费']
+
+/** 进项发票默认费用科目（未命中规则时） */
+const DEFAULT_EXPENSE_CODE = '6602' // 管理费用
+/** 销项发票默认收入科目 */
+const DEFAULT_INCOME_CODE = '6001' // 营业收入
+/** 进项税科目 */
+const VAT_INPUT_CODE = '2221.01' // 应交税费-应交增值税
+/** 销项税科目 */
+const VAT_OUTPUT_CODE = '2221.01'
+/** 应付账款 / 应收账款 / 其他应付款 / 财务费用-手续费 / 银行存款 */
+const PAYABLE_CODE = '2202'
+const RECEIVABLE_CODE = '1122'
+const OTHER_PAYABLE_CODE = '2241'
+const FEE_CODE = '6701.03'
+const BANK_CODE = '1002'
+
+@Injectable()
+export class ClassifyService {
+  constructor(
+    @InjectRepository(ClassifyRule) private readonly ruleRepo: Repository<ClassifyRule>,
+    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
+    private readonly systemService: SystemService,
+  ) {}
+
+  /**
+   * 归类一张票据：方向判定（本公司税号比对）+ 规则命中 + 分录模板生成。
+   * 纯计算，不落库。opts.countHit=false 时不递增规则命中次数（供修正回写等内部复用）。
+   */
+  async suggest(receipt: Receipt, opts?: { countHit?: boolean }): Promise<ClassifySuggestion> {
+    const fields = this.parseFields(receipt)
+    const text = receipt.rawText ?? ''
+    const docType = receipt.receiptType
+
+    const company = await this.systemService.getCompanyInfo()
+    const buyerTaxNo = this.str(fields.buyer_tax_no)
+    const sellerTaxNo = this.str(fields.seller_tax_no)
+    const buyerName = this.str(fields.buyer_name)
+    const sellerName = this.str(fields.seller_name)
+
+    let kind: ReceiptKind = 'unknown'
+    let direction: 'input' | 'output' | null = null
+    if (docType === 'invoice') {
+      // 方向判定：以本公司纳税人识别号比对购销方
+      if (company.taxNo && sellerTaxNo === company.taxNo) {
+        kind = 'output_vat'
+        direction = 'output'
+      } else if (company.taxNo && buyerTaxNo === company.taxNo) {
+        kind = 'input_vat'
+        direction = 'input'
+      } else if (company.companyName && sellerName.includes(company.companyName)) {
+        kind = 'output_vat'
+        direction = 'output'
+      } else if (company.companyName && buyerName.includes(company.companyName)) {
+        kind = 'input_vat'
+        direction = 'input'
+      } else {
+        // 未配置公司信息时，小规模公司以接收发票为主，默认进项
+        kind = 'input_vat'
+        direction = 'input'
+      }
+    } else if (docType === 'train_ticket' || docType === 'receipt') {
+      if (BANK_FEE_KEYWORDS.some((k) => text.includes(k))) {
+        kind = 'bank_fee'
+      } else {
+        kind = 'expense'
+      }
+    }
+
+    const confidence = receipt.confidence
+    if (kind === 'unknown') {
+      return {
+        kind,
+        kindLabel: KIND_LABELS[kind],
+        direction,
+        docType,
+        confidence,
+        hitChain: [],
+        account: null,
+        counterparty: null,
+        entries: [],
+        message: '当前票据类型无法自动归类，请人工处理或完善公司信息（进项/销项判定）',
+      }
+    }
+
+    // 规则命中：按优先级排序，keyword 规则匹配全文，partner 规则匹配交易对手
+    const rules = await this.ruleRepo.find({
+      where: { enabled: 1 },
+      order: { priority: 'DESC', createdAt: 'ASC' },
+    })
+    const counterparty =
+      kind === 'output_vat' ? buyerName : sellerName || buyerName
+    const hitChain: HitInfo[] = []
+    let targetAccountCode = kind === 'output_vat' ? DEFAULT_INCOME_CODE : DEFAULT_EXPENSE_CODE
+    let matched: ClassifyRule | null = null
+
+    for (const rule of rules) {
+      let ok = false
+      if (rule.matchType === 'keyword') {
+        const keywords = rule.matchValue.split(/[,，;；\s]+/).filter(Boolean)
+        ok = keywords.some((k) => text.includes(k))
+      } else if (rule.matchType === 'partner') {
+        ok = Boolean(counterparty && counterparty.includes(rule.matchValue))
+      }
+      if (!ok) continue
+      hitChain.push({
+        ruleName: rule.ruleName,
+        matchType: rule.matchType,
+        matchValue: rule.matchValue,
+        priority: rule.priority,
+        targetAccountCode: rule.targetAccountCode,
+        kind: rule.kind,
+      })
+      if (!matched && this.kindCompatible(rule.kind, kind)) {
+        matched = rule
+        targetAccountCode = rule.targetAccountCode
+      }
+    }
+
+    // 命中计数（仅统计最终采用的规则；内部复用时可不计数）
+    if (matched && opts?.countHit !== false) {
+      await this.ruleRepo.increment({ id: matched.id }, 'hitCount', 1)
+    }
+
+    const account = await this.resolveAccountName(targetAccountCode)
+
+    // 按模板类型生成分录（金额在草稿生成时再解析）
+    let entries: DraftEntryTemplate[] = []
+    const summaryBase = counterparty || receipt.fileName.replace(/\.[^.]+$/, '')
+    if (kind === 'input_vat') {
+      const tax = this.num(fields.tax_amount)
+      if (tax !== null && tax > 0) {
+        entries = [
+          { summary: `${summaryBase} 采购费用`, accountCode: targetAccountCode, direction: 'debit', amountSource: 'amount', partnerField: 'seller_name' },
+          { summary: `${summaryBase} 进项税额`, accountCode: VAT_INPUT_CODE, direction: 'debit', amountSource: 'tax_amount', partnerField: null },
+          { summary: `${summaryBase} 应付货款`, accountCode: PAYABLE_CODE, direction: 'credit', amountSource: 'total_amount', partnerField: 'seller_name' },
+        ]
+      } else {
+        entries = [
+          { summary: `${summaryBase} 采购费用`, accountCode: targetAccountCode, direction: 'debit', amountSource: 'total_amount', partnerField: 'seller_name' },
+          { summary: `${summaryBase} 应付货款`, accountCode: PAYABLE_CODE, direction: 'credit', amountSource: 'total_amount', partnerField: 'seller_name' },
+        ]
+      }
+    } else if (kind === 'output_vat') {
+      const tax = this.num(fields.tax_amount)
+      if (tax !== null && tax > 0) {
+        entries = [
+          { summary: `${summaryBase} 销售货款`, accountCode: RECEIVABLE_CODE, direction: 'debit', amountSource: 'total_amount', partnerField: 'buyer_name' },
+          { summary: `${summaryBase} 销售收入`, accountCode: targetAccountCode, direction: 'credit', amountSource: 'amount', partnerField: 'buyer_name' },
+          { summary: `${summaryBase} 销项税额`, accountCode: VAT_OUTPUT_CODE, direction: 'credit', amountSource: 'tax_amount', partnerField: null },
+        ]
+      } else {
+        entries = [
+          { summary: `${summaryBase} 销售货款`, accountCode: RECEIVABLE_CODE, direction: 'debit', amountSource: 'total_amount', partnerField: 'buyer_name' },
+          { summary: `${summaryBase} 销售收入`, accountCode: targetAccountCode, direction: 'credit', amountSource: 'total_amount', partnerField: 'buyer_name' },
+        ]
+      }
+    } else if (kind === 'bank_fee') {
+      entries = [
+        { summary: `银行手续费（${summaryBase}）`, accountCode: FEE_CODE, direction: 'debit', amountSource: 'total_amount', partnerField: null },
+        { summary: `银行手续费（${summaryBase}）`, accountCode: BANK_CODE, direction: 'credit', amountSource: 'total_amount', partnerField: null },
+      ]
+    } else {
+      // expense：借费用 贷其他应付款
+      entries = [
+        { summary: `${summaryBase} 费用`, accountCode: targetAccountCode, direction: 'debit', amountSource: 'total_amount', partnerField: 'seller_name' },
+        { summary: `${summaryBase} 应付款项`, accountCode: OTHER_PAYABLE_CODE, direction: 'credit', amountSource: 'total_amount', partnerField: 'seller_name' },
+      ]
+    }
+
+    const message = matched
+      ? `命中规则「${matched.ruleName}」，费用计入 ${targetAccountCode}`
+      : `未命中自定义规则，按默认模板归为${KIND_LABELS[kind]}`
+
+    return {
+      kind,
+      kindLabel: KIND_LABELS[kind],
+      direction,
+      docType,
+      confidence,
+      hitChain,
+      account,
+      counterparty,
+      entries,
+      message,
+    }
+  }
+
+  /** 规则模板与票据类别是否兼容（进项/费用归 expense 模板，销项归 income 模板） */
+  private kindCompatible(ruleKind: string, receiptKind: ReceiptKind): boolean {
+    if (ruleKind === 'income') return receiptKind === 'output_vat'
+    if (ruleKind === 'expense') {
+      return receiptKind === 'input_vat' || receiptKind === 'expense' || receiptKind === 'bank_fee'
+    }
+    return true
+  }
+
+  private parseFields(receipt: Receipt): Record<string, string | number | null> {
+    const map: Record<string, string | number | null> = {}
+    if (receipt.structured) {
+      try {
+        const parsed = JSON.parse(receipt.structured)
+        for (const f of parsed.fields ?? []) map[f.key] = f.value
+      } catch {
+        // ignore
+      }
+    }
+    return map
+  }
+
+  private async resolveAccountName(code: string): Promise<{ code: string; name: string } | null> {
+    const account = await this.accountRepo.findOne({ where: { code } })
+    return account ? { code: account.code, name: account.name } : { code, name: code }
+  }
+
+  private str(v: string | number | null | undefined): string {
+    if (v === null || v === undefined) return ''
+    return String(v).trim()
+  }
+
+  private num(v: string | number | null | undefined): number | null {
+    if (v === null || v === undefined) return null
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
+  }
+}

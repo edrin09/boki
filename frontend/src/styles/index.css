@@ -1,0 +1,172 @@
+/* ================= 全局样式 ================= */
+
+:root {
+  --app-primary: #2563eb;
+  --app-bg: #f2f4f7;
+  --app-border: #e5e7eb;
+  --app-sider-bg: #1f2937;
+  --app-text-secondary: #6b7280;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei',
+    'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  color: #1f2937;
+  background: var(--app-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ================= 通用页面容器 ================= */
+
+.page {
+  padding: 12px;
+}
+
+.page-card {
+  background: #fff;
+  border-radius: 6px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.page-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.page-toolbar__spacer {
+  flex: 1;
+}
+
+.page-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+/* ================= 金额显示 ================= */
+
+.amount {
+  font-variant-numeric: tabular-nums;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+.amount--debit {
+  color: #059669;
+}
+
+.amount--credit {
+  color: #dc2626;
+}
+
+.amount--total {
+  font-weight: 600;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-center {
+  text-align: center;
+}
+
+/* ================= 报表表格 ================= */
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.report-table th,
+.report-table td {
+  border: 1px solid var(--app-border);
+  padding: 6px 10px;
+}
+
+.report-table th {
+  background: #f8fafc;
+  font-weight: 600;
+  text-align: center;
+}
+
+.report-table__indent-1 {
+  padding-left: 24px;
+}
+
+.report-table__indent-2 {
+  padding-left: 42px;
+}
+
+.report-table__total {
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+/* ================= 凭证录入 ================= */
+
+.voucher-entries {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.voucher-entries th {
+  background: #f8fafc;
+  font-weight: 600;
+  font-size: 13px;
+  color: #374151;
+}
+
+.voucher-entries td,
+.voucher-entries th {
+  border: 1px solid var(--app-border);
+  padding: 0;
+}
+
+.voucher-entries .cell {
+  padding: 12px 6px 0;
+}
+
+.voucher-entries .cell:last-child {
+  padding-bottom: 12px;
+}
+
+/* ================= Element Plus 微调 ================= */
+
+.el-table .cell {
+  word-break: break-word;
+}
+
+.el-menu {
+  border-right: none;
+}
+
+.el-table__header th.el-table__cell {
+  background: #f8fafc !important;
+  font-weight: 600;
+}
+
+.el-card {
+  border-radius: 6px;
+}
+
+.el-descriptions__label {
+  color: var(--app-text-secondary);
+}

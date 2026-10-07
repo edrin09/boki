@@ -1,0 +1,87 @@
+{
+  "name": "financial-bs-backend",
+  "version": "1.0.0",
+  "description": "简易财务软件 B/S 版 - 后端 API (NestJS + TypeORM + SQLite)",
+  "author": "financial-bs",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "nest build",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "db:reset": "ts-node -r tsconfig-paths/register scripts/reset-db.ts",
+    "test:smoke": "node test/smoke.mjs",
+    "test:smoke2": "node test/smoke2.mjs",
+    "test:smoke3": "node test/smoke3.mjs",
+    "test:ocr": "node test/ocr-verify.mjs",
+    "test:receipts": "node test/receipts-verify.mjs http://127.0.0.1:3000/api",
+    "test:parsers": "node test/parsers-verify.mjs",
+    "test:extract": "node test/extract-verify.mjs",
+    "test:reports": "node test/reports-verify.mjs http://127.0.0.1:3000/api",
+    "models:fetch": "node scripts/fetch-ocr-models.mjs"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.10",
+    "@nestjs/common": "^11.0.1",
+    "@nestjs/config": "^4.0.0",
+    "@nestjs/core": "^11.0.1",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/typeorm": "^11.0.0",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^12.11.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "dayjs": "^1.11.13",
+    "onnxruntime-node": "^1.30.0",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "passport-local": "^1.0.0",
+    "pdfjs-dist": "^6.4.299",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "sharp": "^0.35.5",
+    "typeorm": "^0.3.20",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/express": "^5.0.0",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^22.10.2",
+    "@types/passport-jwt": "^4.0.1",
+    "@types/passport-local": "^1.0.38",
+    "pdfkit": "^0.20.2",
+    "prettier": "^3.4.2",
+    "source-map-support": "^0.5.21",
+    "ts-loader": "^9.5.1",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.7.2"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
+  }
+}
