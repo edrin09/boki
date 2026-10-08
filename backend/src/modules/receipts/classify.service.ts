@@ -5,6 +5,7 @@ import { Account } from '../../entities/account.entity'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
 import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { SystemService } from '../system/system.service'
+import { recoverFilename } from '../../common/utils/filename.util'
 
 /** 凭证模板类型：进项/销项/费用/银行手续费/工资 */
 export type ReceiptKind = 'input_vat' | 'output_vat' | 'expense' | 'bank_fee' | 'payroll' | 'unknown'
@@ -134,9 +135,11 @@ export class ClassifyService {
         kind = 'input_vat'
         direction = 'input'
       } else {
-        // 未配置公司信息时，小规模公司以接收发票为主，默认进项
-        kind = 'input_vat'
-        direction = 'input'
+        // 公司信息未配置或与购销双方均不匹配时，无法判定进项/销项方向。
+        // 宁可标 unknown 交由人工处理，也不能默认猜成进项——猜错会使
+        // 对方单位取错一侧、借贷记账方向全反（财务基础错误）。
+        kind = 'unknown'
+        direction = null
       }
     } else if (docType === 'payroll') {
       kind = 'payroll'
@@ -210,7 +213,8 @@ export class ClassifyService {
 
     // 按模板类型生成分录（金额在草稿生成时再解析）
     let entries: DraftEntryTemplate[] = []
-    const summaryBase = counterparty || receipt.fileName.replace(/\.[^.]+$/, '')
+    const summaryBase =
+      counterparty || ((recoverFilename(receipt.fileName) ?? receipt.fileName).replace(/\.[^.]+$/, ''))
     if (kind === 'input_vat') {
       const tax = this.num(fields.tax_amount)
       if (tax !== null && tax > 0) {

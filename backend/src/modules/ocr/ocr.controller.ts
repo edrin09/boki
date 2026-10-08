@@ -38,6 +38,8 @@ export class OcrController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
+      // 中文文件名按 UTF-8 解码，避免默认 latin1 导致乱码
+      defParamCharset: 'utf8',
       limits: { fileSize: MAX_UPLOAD_BYTES },
     }),
   )

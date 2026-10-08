@@ -49,6 +49,11 @@ export class CreateUserDto {
   roleIds?: string[]
 
   @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  companyIds?: string[]
+
+  @IsOptional()
   @IsString()
   @MaxLength(200)
   remark?: string
@@ -79,6 +84,11 @@ export class UpdateUserDto {
   @IsArray()
   @IsString({ each: true })
   roleIds?: string[]
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  companyIds?: string[]
 
   @IsOptional()
   @IsString()

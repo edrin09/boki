@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Post,
   Put,
+  Query,
   Req,
 } from '@nestjs/common'
 import type { Request } from 'express'
@@ -61,12 +62,16 @@ export class CompaniesController {
     return this.companiesService.update(id, dto)
   }
 
-  /** 删除公司（无业务数据时才允许） */
+  /** 删除公司。无业务数据可直接删除；force=true 时连同全部业务数据一并删除（不可恢复） */
   @Delete(':id')
   @RequireRoles('admin')
   @Operation('删除记账公司')
-  remove(@Param('id', new ParseUUIDPipe()) id: string, @Req() req: Request) {
-    return this.companiesService.remove(id, getCurrentUser(req).sub)
+  remove(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Req() req: Request,
+    @Query('force') force?: string,
+  ) {
+    return this.companiesService.remove(id, getCurrentUser(req).sub, force === 'true')
   }
 
   // ==================== 成员授权 ====================

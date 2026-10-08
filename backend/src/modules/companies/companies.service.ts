@@ -184,8 +184,12 @@ export class CompaniesService {
     return saved
   }
 
-  /** 删除公司：必须无业务数据，且不能是唯一公司 */
-  async remove(id: string, operatorId: string): Promise<{ message: string }> {
+  /**
+   * 删除公司。
+   * 默认要求无业务数据；force=true 时（前端二次确认后）连同该公司全部业务数据一并
+   * 级联删除，删除后不可恢复。
+   */
+  async remove(id: string, operatorId: string, force = false): Promise<{ message: string }> {
     // 先校验存在性（不存在时给出明确错误）
     await this.getEntity(id)
     const total = await this.companyRepo.count()
@@ -193,9 +197,11 @@ export class CompaniesService {
 
     const stats = await this.countBusinessData(id)
     const dirty = Object.entries(stats).filter(([, n]) => n > 0)
-    if (dirty.length) {
+    if (dirty.length && !force) {
       throw new BadRequestException(
-        `该公司已有账务数据（${dirty.map(([k, n]) => `${k} ${n} 条`).join('，')}），请先清理后再删除`,
+        '该公司已有账务数据（' +
+          dirty.map(([k, n]) => k + ' ' + n + ' 条').join('，') +
+          '），请先清理后再删除',
       )
     }
 
@@ -209,15 +215,21 @@ export class CompaniesService {
     await this.linkRepo.delete({ companyId: id })
     await this.companyRepo.delete(id)
     invalidateCompanyCache(id)
-    return { message: '删除成功' }
+    return {
+      message: dirty.length
+        ? '删除成功，该公司全部业务数据已清除（不可恢复）'
+        : '删除成功',
+    }
   }
 
   /**
-   * 删除公司下残留的附属数据（科目/往来单位等）。
-   * 仅在公司无凭证等核心业务数据时调用。
+   * 删除该公司名下的全部数据（凭证、分录、票据、报销、工资、往来、科目等）。
+   * 无论是否强制删除都会执行：公司删除后这些数据一并清除，不可恢复。
    */
   private async purgeCompanyData(companyId: string): Promise<void> {
     const tables = [
+      'fin_voucher_entry',
+      'fin_voucher',
       'fin_receipt',
       'fin_payroll_item',
       'fin_payroll',

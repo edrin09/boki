@@ -375,15 +375,40 @@ async function onSave() {
 async function onRemove(row: CompanyRow) {
   try {
     await ElMessageBox.confirm(
-      `确定删除记账公司「${row.name}」吗？仅当该公司没有任何业务数据时才能删除。`,
+      '确定删除记账公司「' + row.name + '」吗？仅当该公司没有任何业务数据时才能删除。',
       '提示',
       { type: 'warning', confirmButtonText: '确定删除', cancelButtonText: '取消' },
     )
   } catch {
     return
   }
-  await companyApi.remove(row.id)
-  ok('公司已删除')
+
+  let force = false
+  try {
+    await companyApi.remove(row.id)
+  } catch (err: any) {
+    // 后端提示已有账务数据 → 二次确认后强制删除；其余错误已由请求层统一提示
+    const msg = (err as { message?: string } | null)?.message ?? ''
+    if (!/已有账务数据|请先清理后再删除/.test(msg)) return
+    try {
+      await ElMessageBox.confirm(
+        '「' + row.name + '」已有账务数据（凭证/分录/票据等）。\n强制删除将连同该公司的全部业务数据一并清除，此操作不可恢复。确定继续吗？',
+        '确认强制删除',
+        {
+          type: 'error',
+          confirmButtonText: '强制删除并清空数据',
+          cancelButtonText: '取消',
+          distinguishCancelAndClose: true,
+        },
+      )
+    } catch {
+      return
+    }
+    force = true
+  }
+
+  await companyApi.remove(row.id, force)
+  ok(force ? '公司及全部业务数据已删除（不可恢复）' : '公司已删除')
   await load()
 }
 

@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { Account } from '../entities/account.entity'
 import { Permission } from '../entities/permission.entity'
 import { Role } from '../entities/role.entity'
@@ -44,6 +46,7 @@ export class SeedService {
     await this.seedAccounts(company.id)
     await this.seedUsers()
     await this.ensureUserCompanyAccess(company.id)
+    await this.restoreCompanyBackup(company)
   }
 
   /** 初始化权限树 */
@@ -191,6 +194,48 @@ export class SeedService {
     )
     this.logger.log(`已创建默认记账公司「${company.name}」`)
     return company
+  }
+
+  /**
+   * cleanup.bat 删库前会导出公司信息到 data/company-backup.json，
+   * 重建后在此回填，避免公司配置（名称/税号等）随删库丢失。
+   */
+  private async restoreCompanyBackup(company: Company): Promise<void> {
+    const backupPath = path.resolve(process.cwd(), 'data/company-backup.json')
+    if (!fs.existsSync(backupPath)) return
+    try {
+      const saved = JSON.parse(fs.readFileSync(backupPath, 'utf8')) as Record<string, unknown>
+      const patch: Record<string, unknown> = {}
+      const pick = (col: string, field: string, allowNull = false) => {
+        if (saved[col] !== undefined) {
+          const v = saved[col]
+          if (!(v === null && !allowNull)) patch[field] = v
+        }
+      }
+      pick('name', 'name')
+      pick('tax_no', 'taxNo', true)
+      pick('taxpayer_type', 'taxpayerType', true)
+      pick('vat_rate', 'vatRate', true)
+      pick('tax_declare_cycle', 'taxDeclareCycle', true)
+      pick('auto_post_threshold', 'autoPostThreshold', true)
+      pick('auto_post_enabled', 'autoPostEnabled', true)
+      pick('legal_person', 'legalPerson', true)
+      pick('industry', 'industry', true)
+      pick('address', 'address', true)
+      pick('bank_name', 'bankName', true)
+      pick('bank_account', 'bankAccount', true)
+      pick('fiscal_start_month', 'fiscalStartMonth', true)
+      if (Object.keys(patch).length === 0) {
+        fs.rmSync(backupPath, { force: true })
+        return
+      }
+      Object.assign(company, patch)
+      await this.companyRepo.save(company)
+      fs.rmSync(backupPath, { force: true })
+      this.logger.log(`已从备份恢复公司信息「${company.name}」`)
+    } catch (err) {
+      this.logger.warn(`公司信息备份恢复失败: ${(err as Error).message}`)
+    }
   }
 
   /**

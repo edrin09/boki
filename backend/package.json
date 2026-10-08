@@ -14,6 +14,7 @@
     "start:prod": "node dist/main",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "db:reset": "ts-node -r tsconfig-paths/register scripts/reset-db.ts",
+    "db:fix-filenames": "node scripts/fix-filename-mojibake.cjs",
     "test:smoke": "node test/smoke.mjs",
     "test:smoke2": "node test/smoke2.mjs",
     "test:smoke3": "node test/smoke3.mjs",

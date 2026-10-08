@@ -15,6 +15,7 @@ import { DocumentParseService } from './document-parse.service'
 import { ClassifyService } from './classify.service'
 import { ClassifyRulesService } from './classify-rules.service'
 import { ReceiptWorkbenchService } from './workbench.service'
+import { PartySyncService } from './party-sync.service'
 
 @Module({
   imports: [
@@ -31,7 +32,7 @@ import { ReceiptWorkbenchService } from './workbench.service'
     VouchersModule,
   ],
   controllers: [ReceiptsController],
-  providers: [ReceiptsService, DocumentParseService, ClassifyService, ClassifyRulesService, ReceiptWorkbenchService],
+  providers: [ReceiptsService, DocumentParseService, ClassifyService, ClassifyRulesService, ReceiptWorkbenchService, PartySyncService],
   exports: [DocumentParseService, ClassifyService],
 })
 export class ReceiptsModule {}

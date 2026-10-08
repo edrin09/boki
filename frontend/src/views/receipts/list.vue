@@ -42,11 +42,17 @@
             <span class="amount amount--total">{{ formatAmount(row.amount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="销售方" min-width="160" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.sellerName || '-' }}</template>
+        <el-table-column label="销售方" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">
+            <div>{{ row.sellerName || '-' }}</div>
+            <div v-if="row.sellerTaxNo" class="cell-sub">{{ row.sellerTaxNo }}</div>
+          </template>
         </el-table-column>
-        <el-table-column label="购买方" min-width="160" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.buyerName || '-' }}</template>
+        <el-table-column label="购买方" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">
+            <div>{{ row.buyerName || '-' }}</div>
+            <div v-if="row.buyerTaxNo" class="cell-sub">{{ row.buyerTaxNo }}</div>
+          </template>
         </el-table-column>
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
@@ -157,7 +163,9 @@
           <el-descriptions-item label="金额">{{ formatAmount(detail.amount) }}</el-descriptions-item>
           <el-descriptions-item label="税额">{{ formatAmount(detail.taxAmount) }}</el-descriptions-item>
           <el-descriptions-item label="销售方">{{ detail.sellerName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="销售方税号">{{ detail.sellerTaxNo || '-' }}</el-descriptions-item>
           <el-descriptions-item label="购买方">{{ detail.buyerName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="购买方税号">{{ detail.buyerTaxNo || '-' }}</el-descriptions-item>
           <el-descriptions-item label="发票代码">{{ detail.invoiceCode || '-' }}</el-descriptions-item>
           <el-descriptions-item label="发票号码">{{ detail.invoiceNo || '-' }}</el-descriptions-item>
           <el-descriptions-item v-if="detail.confirmedByName" label="确认人">{{ detail.confirmedByName }}</el-descriptions-item>
@@ -350,6 +358,11 @@ async function onRemove(row: any) {
   color: var(--el-color-danger);
 }
 .text-muted {
+  color: var(--el-text-color-secondary);
+}
+.cell-sub {
+  margin-top: 2px;
+  font-size: 12px;
   color: var(--el-text-color-secondary);
 }
 .text-danger {

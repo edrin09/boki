@@ -10,6 +10,12 @@ import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import type { PageResult, PaginationQueryDto } from '../../common/dto/pagination.dto'
 import type { CreatePartnerDto, UpdatePartnerDto } from './dto/partner.dto'
 
+/** 纳税人识别号归一化：去空白 + 大写（同一机构只允许一条记录） */
+function normalizeTaxNo(value?: string | null): string | null {
+  const t = (value ?? '').trim().toUpperCase().replace(/[\s\u3000]+/g, '')
+  return t || null
+}
+
 export interface BatchCreateItemResult {
   index: number
   success: boolean
@@ -80,6 +86,13 @@ export class PartnersService {
     const code = (dto.code ?? '').trim() || (await this.getNextCode())
     const exists = await this.repo.findOne({ where: { code } })
     if (exists) throw new ConflictException(`编码「${code}」已存在`)
+    const taxNo = normalizeTaxNo(dto.taxNo)
+    if (taxNo) {
+      const dup = await this.repo.findOne({ where: { taxNo } })
+      if (dup) {
+        throw new ConflictException(`纳税人识别号「${taxNo}」已存在（${dup.name}），请勿重复建档`)
+      }
+    }
     const entity = this.repo.create({
       code,
       name: dto.name,
@@ -88,7 +101,7 @@ export class PartnersService {
       phone: dto.phone ?? null,
       email: dto.email ?? null,
       address: dto.address ?? null,
-      taxNo: dto.taxNo ?? null,
+      taxNo,
       legalPerson: dto.legalPerson ?? null,
       bankName: dto.bankName ?? null,
       bankAccount: dto.bankAccount ?? null,
@@ -126,7 +139,16 @@ export class PartnersService {
     if (dto.phone !== undefined) partner.phone = dto.phone || null
     if (dto.email !== undefined) partner.email = dto.email || null
     if (dto.address !== undefined) partner.address = dto.address || null
-    if (dto.taxNo !== undefined) partner.taxNo = dto.taxNo || null
+    if (dto.taxNo !== undefined) {
+      const taxNo = normalizeTaxNo(dto.taxNo)
+      if (taxNo) {
+        const dup = await this.repo.findOne({ where: { taxNo } })
+        if (dup && dup.id !== id) {
+          throw new ConflictException(`纳税人识别号「${taxNo}」已存在（${dup.name}），请勿重复建档`)
+        }
+      }
+      partner.taxNo = taxNo
+    }
     if (dto.legalPerson !== undefined) partner.legalPerson = dto.legalPerson || null
     if (dto.bankName !== undefined) partner.bankName = dto.bankName || null
     if (dto.bankAccount !== undefined) partner.bankAccount = dto.bankAccount || null

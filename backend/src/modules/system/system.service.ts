@@ -87,7 +87,7 @@ export class SystemService {
     const company = await this.companyRepo.findOne({ where: { id: companyId } })
     if (!company) throw new NotFoundException('当前记账公司不存在')
     if (dto.companyName !== undefined) company.name = dto.companyName
-    if (dto.taxNo !== undefined) company.taxNo = dto.taxNo || null
+    if (dto.taxNo !== undefined) company.taxNo = (dto.taxNo || '').trim().toUpperCase() || null
     if (dto.taxpayerType !== undefined) company.taxpayerType = dto.taxpayerType
     if (dto.vatRate !== undefined) company.vatRate = dto.vatRate
     if (dto.taxDeclareCycle !== undefined) company.taxDeclareCycle = dto.taxDeclareCycle

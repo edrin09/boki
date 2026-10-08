@@ -20,6 +20,14 @@
             <el-tag v-for="r in row.roles" :key="r.id" size="small" class="role-tag">{{ r.name }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="所属公司" min-width="220" show-overflow-tooltip>
+          <template #default="{ row }">
+            <template v-if="(row.companyNames ?? []).length">
+              <el-tag v-for="n in row.companyNames" :key="n" size="small" class="role-tag">{{ n }}</el-tag>
+            </template>
+            <span v-else class="cm-empty">-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="phone" label="手机号" width="140">
           <template #default="{ row }">{{ row.phone || '-' }}</template>
         </el-table-column>
@@ -93,6 +101,15 @@
           </el-select>
         </el-form-item>
 
+        <el-form-item label="记账公司" prop="companyIds">
+          <el-checkbox-group v-model="form.companyIds" class="company-access">
+            <el-checkbox v-for="c in companyOptions" :key="c.id" :value="c.id" :disabled="c.disabled">
+              {{ c.name }}
+            </el-checkbox>
+          </el-checkbox-group>
+          <div class="cm-tip">勾选后该用户可登录并进入对应记账公司；灰色的为公司所有者/其他管理员维护的公司，仅展示不可修改。</div>
+        </el-form-item>
+
         <el-row :gutter="12">
           <el-col :span="12">
             <el-form-item label="手机号">
@@ -127,7 +144,7 @@
 import { nextTick, onMounted, reactive, ref } from 'vue'
 import { ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
-import { roleApi, userApi } from '@/api'
+import { companyApi, roleApi, userApi, type CompanyBrief } from '@/api'
 import { confirmDelete, ok, usePagedList } from '@/composables/useList'
 import { formatDateTime } from '@/utils/format'
 
@@ -137,6 +154,7 @@ const { list, total, loading, load, search, reset } = usePagedList({
 })
 
 const roles = ref<any[]>([])
+const companyOptions = ref<{ id: string; name: string; disabled?: boolean }[]>([])
 const dialogVisible = ref(false)
 const saving = ref(false)
 const formRef = ref<FormInstance>()
@@ -150,6 +168,7 @@ const initialForm = {
   phone: '',
   status: 1,
   roleIds: [] as string[],
+  companyIds: [] as string[],
   remark: '',
 }
 const form = reactive({ ...initialForm })
@@ -166,13 +185,35 @@ async function loadRoles() {
   roles.value = await roleApi.options()
 }
 
+/** 可勾选的记账公司列表；编辑时合并用户已有但当前管理员不可见的公司（只读） */
+async function loadCompanyOptions(extra: { id: string; name: string }[] = []) {
+  try {
+    const mine: CompanyBrief[] = await companyApi.mine()
+    const seen = new Set(mine.map((c) => c.id))
+    const orphan = extra.filter((c) => !seen.has(c.id))
+    companyOptions.value = [
+      ...mine.map((c) => ({ id: c.id, name: c.name, disabled: false })),
+      ...orphan.map((c) => ({ id: c.id, name: c.name, disabled: true })),
+    ]
+  } catch {
+    /* 接口异常时保留当前列表 */
+  }
+}
+
 function onCreate() {
   Object.assign(form, { ...initialForm })
+  loadCompanyOptions()
   dialogVisible.value = true
   nextTick(() => formRef.value?.clearValidate())
 }
 
-function onEdit(row: any) {
+async function onEdit(row: any) {
+  // 合并用户已有、但当前管理员不可见的公司（只读展示，避免保存时被误移除）
+  const extra = (row.companyIds ?? []).map((id: string, i: number) => ({
+    id,
+    name: (row.companyNames ?? [])[i] ?? id,
+  }))
+  await loadCompanyOptions(extra)
   Object.assign(form, {
     id: row.id,
     username: row.username,
@@ -182,6 +223,7 @@ function onEdit(row: any) {
     phone: row.phone ?? '',
     status: row.status,
     roleIds: [...(row.roleIds ?? [])],
+    companyIds: [...(row.companyIds ?? [])],
     remark: row.remark ?? '',
   })
   dialogVisible.value = true
@@ -240,6 +282,7 @@ async function onSubmit() {
         phone: form.phone || undefined,
         status: form.status,
         roleIds: form.roleIds,
+        companyIds: form.companyIds,
         remark: form.remark || undefined,
       })
     } else {
@@ -251,6 +294,7 @@ async function onSubmit() {
         phone: form.phone || undefined,
         status: form.status,
         roleIds: form.roleIds,
+        companyIds: form.companyIds,
         remark: form.remark || undefined,
       })
     }
@@ -264,6 +308,7 @@ async function onSubmit() {
 
 onMounted(async () => {
   await loadRoles()
+  await loadCompanyOptions()
   load()
 })
 </script>
@@ -271,5 +316,23 @@ onMounted(async () => {
 <style scoped lang="scss">
 .role-tag {
   margin-right: 4px;
+}
+.company-access {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  width: 100%;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.cm-tip {
+  width: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-placeholder);
+}
+.cm-empty {
+  color: var(--el-text-color-placeholder);
 }
 </style>

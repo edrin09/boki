@@ -44,7 +44,9 @@ export const companyApi = {
   detail: (id: string) => get<any>(`/companies/${id}`),
   create: (data: any) => post<any>('/companies', data),
   update: (id: string, data: any) => put(`/companies/${id}`, data),
-  remove: (id: string) => del(`/companies/${id}`),
+  /** 删除公司；force=true 时连同全部业务数据一并删除（不可恢复，需前端二次确认） */
+  remove: (id: string, force = false) =>
+    del(`/companies/${id}${force ? '?force=true' : ''}`),
   addMembers: (id: string, userIds: string[]) => post(`/companies/${id}/members`, { userIds }),
   setMembers: (id: string, data: { userIds: string[]; roleIds?: string[] }) =>
     put(`/companies/${id}/members`, data),

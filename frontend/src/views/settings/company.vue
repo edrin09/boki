@@ -5,7 +5,7 @@
       <el-alert type="info" :closable="false" show-icon class="mb12"
         :title="`此处维护的是当前记账公司「${companyName}」的信息。多公司记账时，各公司的信息相互独立；需要新建或切换公司请使用顶部公司切换器。`" />
       <el-alert type="info" :closable="false" show-icon class="mb12"
-        title="用于票据方向判定：系统用本公司的纳税人识别号比对发票购销方，从而区分「进项发票」与「销项发票」。未填写时进项/销项判断不精确，但仍可按默认模板生成费用凭证。" />
+        title="用于票据方向判定：系统用本公司的纳税人识别号比对发票购销方，从而区分「进项发票」与「销项发票」（本公司=销售方记销项、收到钱；本公司=购买方记进项、付出钱）。未填写时无法判断进项/销项方向，发票将无法自动生成凭证，请务必填写。" />
 
       <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
         <el-form-item label="公司名称" prop="companyName">

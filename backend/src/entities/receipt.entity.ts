@@ -108,6 +108,12 @@ export class Receipt extends BaseEntity {
   @Column({ name: 'buyer_name', length: 200, nullable: true, comment: '购买方名称' })
   buyerName: string | null
 
+  @Column({ name: 'seller_tax_no', length: 30, nullable: true, comment: '销售方纳税人识别号' })
+  sellerTaxNo: string | null
+
+  @Column({ name: 'buyer_tax_no', length: 30, nullable: true, comment: '购买方纳税人识别号' })
+  buyerTaxNo: string | null
+
   @Column({ name: 'related_id', type: 'varchar', nullable: true, comment: '关联单据ID（报销单/凭证等，P16+ 使用）' })
   relatedId: string | null
 

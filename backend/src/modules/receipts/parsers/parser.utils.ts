@@ -130,10 +130,15 @@ export function extractDate(text: string): string | null {
   return `${m[1]}-${String(+m[2]).padStart(2, '0')}-${String(+m[3]).padStart(2, '0')}`
 }
 
-/** 提取 18 位统一社会信用代码 / 纳税人识别号 */
+/** 提取 18 位统一社会信用代码 / 纳税人识别号（容忍数字间空格/全角空格） */
 export function extractTaxNo(text: string): string | null {
-  const m = text.match(/(?:^|[^0-9A-Za-z])([0-9A-HJ-NPQRTUWXY]{18})(?:$|[^0-9A-Za-z])/)
-  return m ? m[1].toUpperCase() : null
+  const re = /(?:^|[^0-9A-Za-z])([0-9A-HJ-NPQRTUWXY]{18})(?:$|[^0-9A-Za-z])/
+  const m = text.match(re)
+  if (m) return m[1].toUpperCase()
+  const compact = text.replace(/[\s\u3000]+/g, '')
+  if (compact === text) return null
+  const m2 = compact.match(re)
+  return m2 ? m2[1].toUpperCase() : null
 }
 
 /** 提取 18 位身份证号（末位可为 X） */

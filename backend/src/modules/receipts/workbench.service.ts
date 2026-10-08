@@ -1,24 +1,23 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { Receipt } from '../../entities/receipt.entity'
 import { ClassifyRule } from '../../entities/classify-rule.entity'
-import { Partner } from '../../entities/partner.entity'
 import { Account } from '../../entities/account.entity'
 import { Department } from '../../entities/department.entity'
 import { Voucher } from '../../entities/voucher.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
 import {
   AuxiliaryType,
-  PartnerType,
   ReceiptStatus,
   VoucherStatus,
   VoucherWord,
 } from '../../common/enums'
 import { toCents, fromCents } from '../../common/utils/money.util'
-import { CODE_PREFIX, nextCode } from '../../common/utils/code.util'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
 import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { VouchersService } from '../vouchers/vouchers.service'
+import { PartySyncService } from './party-sync.service'
 import { ClassifyService, ClassifySuggestion, DraftEntryTemplate } from './classify.service'
+import { recoverFilename } from '../../common/utils/filename.util'
 import type { RejectReceiptDto, UpdateDraftDto } from './dto/workbench.dto'
 
 export interface Operator {
@@ -39,13 +38,13 @@ export class ReceiptWorkbenchService {
   constructor(
     @InjectCompanyRepo(Receipt) private readonly receiptRepo: CompanyScopedRepository<Receipt>,
     @InjectCompanyRepo(ClassifyRule) private readonly ruleRepo: CompanyScopedRepository<ClassifyRule>,
-    @InjectCompanyRepo(Partner) private readonly partnerRepo: CompanyScopedRepository<Partner>,
     @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
     @InjectCompanyRepo(Department) private readonly deptRepo: CompanyScopedRepository<Department>,
     @InjectCompanyRepo(Voucher) private readonly voucherRepo: CompanyScopedRepository<Voucher>,
     @InjectCompanyRepo(VoucherEntry) private readonly entryRepo: CompanyScopedRepository<VoucherEntry>,
     private readonly classify: ClassifyService,
     private readonly vouchers: VouchersService,
+    private readonly partySync: PartySyncService,
   ) {}
 
   // ==================== 查询 ====================
@@ -68,7 +67,7 @@ export class ReceiptWorkbenchService {
 
     const items: any[] = []
     for (const r of rows) items.push(await this.enrich(r))
-    return { items, total, page, pageSize }
+    return { list: items, total, page, pageSize }
   }
 
   /** 工作台详情（含归类建议与凭证草稿） */
@@ -89,9 +88,16 @@ export class ReceiptWorkbenchService {
       throw new BadRequestException(suggestion.message ?? '该票据无法自动归类，请完善公司信息或归类规则')
     }
 
+    // 购销双方识别信息同步入库往来单位（按纳税人识别号去重；旧票重生成时也补齐），失败不阻断凭证
+    try {
+      await this.partySync.syncBoth(this.parseFields(receipt))
+    } catch (err) {
+      this.logger.warn(`票据 ${id} 往来单位同步失败: ${(err as Error).message}`)
+    }
+
     const entries = await this.buildEntries(receipt, suggestion)
     const voucherDate = receipt.issueDate ?? new Date().toISOString().slice(0, 10)
-    const remark = `票据自动生成（${receipt.fileName}）`
+    const remark = `票据自动生成（${recoverFilename(receipt.fileName) ?? receipt.fileName}）`
 
     if (receipt.voucherId) {
       const linked = await this.voucherRepo.findOne({ where: { id: receipt.voucherId } })
@@ -237,7 +243,7 @@ export class ReceiptWorkbenchService {
     for (const tpl of suggestion.entries) {
       const account = await this.requireLeafAccount(tpl.accountCode)
       const amount = this.resolveAmount(tpl.amountSource, fields, { total, net, tax })
-      const partnerId = await this.resolvePartner(suggestion, tpl)
+      const partnerId = await this.resolvePartner(suggestion, tpl, receipt)
       // 科目要求部门辅助核算时兜底填一个默认部门：
       // 票据本身通常不含部门信息，但缺少它会让整张凭证无法保存
       const departmentId = (account.auxiliaryTypes ?? []).includes(AuxiliaryType.DEPARTMENT)
@@ -297,29 +303,30 @@ export class ReceiptWorkbenchService {
     return ctx.total
   }
 
-  /** 解析分录上的往来单位：按名称命中则复用，否则自动建档（编码后端生成） */
+  /** 解析分录上的往来单位：按纳税人识别号优先命中去重，命中只回填空字段，不覆盖手工填写 */
   private async resolvePartner(
     suggestion: ClassifySuggestion,
     tpl: DraftEntryTemplate,
+    receipt: Receipt,
   ): Promise<string | null> {
     if (!tpl.partnerField) return null
     const name = (suggestion.counterparty ?? '').trim()
     if (!name) return null
-    const key = name.slice(0, 100)
 
-    const existed = await this.partnerRepo.findOne({ where: { name: key } })
-    if (existed) return existed.id
-
-    const code = await nextCode(this.partnerRepo, CODE_PREFIX.partner)
-    const saved = await this.partnerRepo.save(
-      this.partnerRepo.create({
-        code,
-        name: key,
-        type: tpl.partnerField === 'buyer_name' ? PartnerType.CUSTOMER : PartnerType.SUPPLIER,
-        status: 1,
-      }),
+    const isBuyer = tpl.partnerField === 'buyer_name'
+    const p = this.parseFields(receipt)
+    const pfx = isBuyer ? 'buyer_' : 'seller_'
+    return this.partySync.syncParty(
+      {
+        name: this.str(p[pfx + 'name']) || name,
+        taxNo: p[pfx + 'tax_no'],
+        address: p[pfx + 'address'],
+        phone: p[pfx + 'phone'],
+        bank: p[pfx + 'bank'],
+        bankAccount: p[pfx + 'bank_account'],
+      },
+      isBuyer ? 'buyer' : 'seller',
     )
-    return saved.id
   }
 
   /**
@@ -447,7 +454,7 @@ export class ReceiptWorkbenchService {
 
     return {
       id: receipt.id,
-      fileName: receipt.fileName,
+      fileName: recoverFilename(receipt.fileName) ?? receipt.fileName,
       mimeType: receipt.mimeType,
       receiptType: receipt.receiptType,
       receiptTypeName: receipt.receiptTypeName,
@@ -463,6 +470,8 @@ export class ReceiptWorkbenchService {
       invoiceNo: receipt.invoiceNo,
       sellerName: receipt.sellerName,
       buyerName: receipt.buyerName,
+      sellerTaxNo: receipt.sellerTaxNo,
+      buyerTaxNo: receipt.buyerTaxNo,
       rejectReason: receipt.rejectReason,
       confirmedByName: receipt.confirmedByName,
       confirmedAt: receipt.confirmedAt,
@@ -500,6 +509,11 @@ export class ReceiptWorkbenchService {
     if (v === null || v === undefined) return null
     const n = Number(v)
     return Number.isFinite(n) ? n : null
+  }
+
+  private str(v: string | number | null | undefined): string {
+    if (v === null || v === undefined) return ''
+    return String(v).trim()
   }
 
   private async findEntity(id: string): Promise<Receipt> {

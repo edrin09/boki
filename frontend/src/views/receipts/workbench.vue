@@ -136,7 +136,7 @@
             <span v-else class="text-muted">未生成</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="230" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <el-tooltip v-if="row.bookable === false" content="该单据无法自动生成凭证，请查看左侧原因" placement="top">
               <span class="disabled-hint">不可自动入账</span>
@@ -144,6 +144,8 @@
             <el-button v-if="row.status === 'parsed' && row.bookable !== false" v-permission="'receipt:confirm'" link type="primary"
               :loading="draftingId === row.id" @click="onGenerateDraft(row)">生成草稿</el-button>
             <template v-if="row.status === 'drafted'">
+              <el-button v-permission="'receipt:confirm'" link type="primary" :loading="draftingId === row.id"
+                @click="onGenerateDraft(row)">重新生成</el-button>
               <el-button v-permission="'receipt:confirm'" link type="primary" @click="openEditDraft(row)">修改草稿</el-button>
               <el-button v-permission="'receipt:confirm'" link type="success" @click="onConfirm(row)">确认入账</el-button>
               <el-button v-permission="'receipt:confirm'" link type="danger" @click="onReject(row)">驳回</el-button>
@@ -358,6 +360,17 @@ async function onConfirmBatch() {
 const draftingId = ref('')
 
 async function onGenerateDraft(row: any) {
+  if (row.status === 'drafted') {
+    try {
+      await ElMessageBox.confirm('将按最新识别与归类重新生成凭证草稿，现有草稿（含手工修改）会被覆盖。继续？', '重新生成草稿', {
+        type: 'warning',
+        confirmButtonText: '重新生成',
+        cancelButtonText: '取消',
+      })
+    } catch {
+      return
+    }
+  }
   draftingId.value = row.id
   try {
     const res = await receiptApi.generateDraft(row.id)
