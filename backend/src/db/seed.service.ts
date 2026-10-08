@@ -40,13 +40,17 @@ export class SeedService {
     await this.syncPermissions()
     await this.syncRolePermissions()
 
-    // 多公司：先建立默认公司（并把历史数据归入其中），再初始化其科目与用户授权
-    const company = await this.ensureDefaultCompany()
-    await this.adoptOrphanData(company.id)
-    await this.seedAccounts(company.id)
     await this.seedUsers()
-    await this.ensureUserCompanyAccess(company.id)
-    await this.restoreCompanyBackup(company)
+
+    // 多公司：全新库不预置「默认记账公司」，由用户在创建公司流程中自行建立；
+    // 仅当存在 company_id 为空的历史数据（老库升级）时才补建默认公司承接
+    const company = await this.ensureDefaultCompany()
+    if (company) {
+      await this.adoptOrphanData(company.id)
+      await this.seedAccounts(company.id)
+      await this.ensureUserCompanyAccess(company.id)
+      await this.restoreCompanyBackup(company)
+    }
   }
 
   /** 初始化权限树 */
@@ -172,10 +176,17 @@ export class SeedService {
     if (changed > 0) this.logger.log(`增量补齐角色权限 ${changed} 条`)
   }
 
-  /** 确保存在一家记账公司（升级老库时补建） */
-  private async ensureDefaultCompany(): Promise<Company> {
+  /**
+   * 确保存在记账公司。
+   *
+   * 已有公司直接返回最早创建的一家；全新库不预置公司（返回 null），
+   * 仅当存在未归属公司的历史数据（老库升级）时才补建默认公司承接。
+   */
+  private async ensureDefaultCompany(): Promise<Company | null> {
     const existing = await this.companyRepo.find({ order: { createdAt: 'ASC' } })
     if (existing.length) return existing[0]
+
+    if (!(await this.hasOrphanData())) return null
 
     const company = await this.companyRepo.save(
       this.companyRepo.create({
@@ -189,11 +200,24 @@ export class SeedService {
         bankAccount: null,
         fiscalStartMonth: 1,
         status: 1,
-        remark: '系统初始化创建',
+        remark: '系统升级自动创建（承接历史数据）',
       }),
     )
-    this.logger.log(`已创建默认记账公司「${company.name}」`)
+    this.logger.log(`检测到历史数据，已创建默认记账公司「${company.name}」承接`)
     return company
+  }
+
+  /** 是否存在 company_id 为空的历史数据行 */
+  private async hasOrphanData(): Promise<boolean> {
+    for (const repo of this.orphanRepos()) {
+      try {
+        const count = await repo.count({ where: { companyId: '' } } as any)
+        if (count > 0) return true
+      } catch {
+        // 个别表可能尚未建表，跳过
+      }
+    }
+    return false
   }
 
   /**
@@ -246,31 +270,9 @@ export class SeedService {
    */
   private async adoptOrphanData(companyId: string): Promise<void> {
     let total = 0
-    // 仅处理本文件中已知的业务表，逐表容错以免个别表结构差异导致中断
-    const tables: Array<() => Promise<any>> = [
-      () => this.accountRepo.update({ companyId: '' }, { companyId } as any),
-      () => this.partnerRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.bankRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.deptRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.projectRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.voucherRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.entryRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.receiptRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.employeeRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.claimRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.claimItemRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.payrollRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.payrollItemRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.initialBalanceRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.cashFlowRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.writeOffRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.incomeExpenseRepoSafe().update({ companyId: '' }, { companyId } as any),
-      () => this.classifyRuleRepoSafe().update({ companyId: '' }, { companyId } as any),
-    ]
-
-    for (const run of tables) {
+    for (const repo of this.orphanRepos()) {
       try {
-        const res = await run()
+        const res = await repo.update({ companyId: '' }, { companyId } as any)
         total += res?.affected ?? 0
       } catch (err) {
         this.logger.warn(`历史数据归入默认公司时跳过一张表: ${(err as Error).message}`)
@@ -278,6 +280,30 @@ export class SeedService {
     }
 
     if (total > 0) this.logger.log(`已将 ${total} 条历史数据归入默认记账公司`)
+  }
+
+  /** 涉及历史数据归属的表（容错访问，个别表缺失不影响其余表） */
+  private orphanRepos(): Repository<any>[] {
+    return [
+      this.accountRepo as Repository<any>,
+      this.partnerRepoSafe(),
+      this.bankRepoSafe(),
+      this.deptRepoSafe(),
+      this.projectRepoSafe(),
+      this.voucherRepoSafe(),
+      this.entryRepoSafe(),
+      this.receiptRepoSafe(),
+      this.employeeRepoSafe(),
+      this.claimRepoSafe(),
+      this.claimItemRepoSafe(),
+      this.payrollRepoSafe(),
+      this.payrollItemRepoSafe(),
+      this.initialBalanceRepoSafe(),
+      this.cashFlowRepoSafe(),
+      this.writeOffRepoSafe(),
+      this.incomeExpenseRepoSafe(),
+      this.classifyRuleRepoSafe(),
+    ]
   }
 
   /** 初始化会计科目（默认公司） */

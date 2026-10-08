@@ -13,6 +13,12 @@ export const constantRoutes: RouteRecordRaw[] = [
     meta: { title: '登录', public: true },
   },
   {
+    path: '/setup-company',
+    name: 'SetupCompany',
+    component: () => import('@/views/setup-company/index.vue'),
+    meta: { title: '创建记账公司' },
+  },
+  {
     path: '/403',
     name: 'Forbidden',
     component: () => import('@/views/error/403.vue'),

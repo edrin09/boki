@@ -104,6 +104,16 @@ router.beforeEach(async (to, _from, next) => {
     return next({ path: to.path, query: to.query, hash: to.hash, replace: true })
   }
 
+  // 未持有任何记账公司（如 cleanup 删库后首次使用）：强制先进入创建公司流程
+  const profile = userStore.profile
+  const hasCompany = !!profile?.companyId || (profile?.companies?.length ?? 0) > 0
+  if (!hasCompany && to.path !== '/setup-company') {
+    return next('/setup-company')
+  }
+  if (hasCompany && to.path === '/setup-company') {
+    return next(firstAccessiblePath(profile?.permissions ?? []))
+  }
+
   // 权限校验
   const required = to.meta?.permission as string | undefined
   if (required && !userStore.hasPermission(required)) {

@@ -60,11 +60,9 @@ export class AuthService {
     })
 
     const companies = await this.listCompanies(user.id)
-    if (!companies.length) {
-      throw new ForbiddenException('该账号尚未分配记账公司，请联系管理员')
-    }
-
-    return this.buildResult(user, companies, companies[0].id)
+    // 无可访问公司时也允许登录（company 为 null、令牌不带 companyId），
+    // 前端会引导进入「创建记账公司」流程
+    return this.buildResult(user, companies, companies[0]?.id ?? null)
   }
 
   /**
@@ -142,14 +140,14 @@ export class AuthService {
   private async buildResult(
     user: User,
     companies: Record<string, any>[],
-    companyId: string,
+    companyId: string | null,
   ): Promise<AuthResult> {
     const { roles, permissions } = this.extractIdentity(user)
     const payload: JwtPayload = {
       sub: user.id,
       username: user.username,
       nickname: user.nickname,
-      companyId,
+      companyId: companyId ?? undefined,
       roles,
       permissions,
     }
