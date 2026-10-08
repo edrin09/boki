@@ -4,6 +4,7 @@ import { PartnerType } from '../../common/enums'
 import { CODE_PREFIX, nextCode } from '../../common/utils/code.util'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
 import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
+import { SystemService } from '../system/system.service'
 
 /** 发票一侧的识别字段（字段名与往来单位一致） */
 export interface PartyFields {
@@ -21,6 +22,10 @@ function str(v: string | number | null | undefined): string {
 function cut(s: string, max: number): string | null {
   return s ? s.slice(0, max) : null
 }
+/** 名称归一化：去掉全部空白，规避 OCR 把公司名称识别出多余空格导致的比对失配 */
+function normName(s: string): string {
+  return s.replace(/\s+/g, '')
+}
 
 /**
  * 往来单位建档/回填（购买方/销售方共用）：
@@ -28,7 +33,10 @@ function cut(s: string, max: number): string | null {
  */
 @Injectable()
 export class PartySyncService {
-  constructor(@InjectCompanyRepo(Partner) private readonly partnerRepo: CompanyScopedRepository<Partner>) {}
+  constructor(
+    @InjectCompanyRepo(Partner) private readonly partnerRepo: CompanyScopedRepository<Partner>,
+    private readonly systemService: SystemService,
+  ) {}
 
   /** 单边同步：识别出名称即入库；返回往来单位 id（未识别名称返回 null） */
   async syncParty(f: PartyFields, side: 'buyer' | 'seller'): Promise<string | null> {
@@ -39,6 +47,10 @@ export class PartySyncService {
     const phone = str(f.phone)
     const bank = str(f.bank)
     const bankAcct = str(f.bankAccount)
+
+    // 本公司（当前记账公司）是票据的购/销一方时不能建档为客户/供应商：
+    // 它是账套主体本身，不是交易对手（销项票的销售方、进项票的购买方都是自己）
+    if (await this.isSelfCompany(taxNo, name)) return null
 
     let partner: Partner | null = taxNo ? await this.partnerRepo.findOne({ where: { taxNo } }) : null
     if (!partner) partner = await this.partnerRepo.findOne({ where: { name: name.slice(0, 100) } })
@@ -103,5 +115,22 @@ export class PartySyncService {
       'seller',
     )
     return { buyerId, sellerId }
+  }
+
+  /**
+   * 判断票据一侧是否是本公司（当前记账公司）自身。
+   * 优先按纳税人识别号比对；识别号缺失时按归一化名称互相包含比对
+   * （与 ClassifyService 的方向判定口径一致，兼容 OCR 产生的空格差异）。
+   */
+  private async isSelfCompany(taxNo: string, name: string): Promise<boolean> {
+    const company = await this.systemService.getCompanyInfo().catch(() => null)
+    if (!company) return false // 无公司上下文时无法判定，保持原有建档行为
+    if (taxNo && company.taxNo && taxNo.toUpperCase() === company.taxNo.toUpperCase()) {
+      return true
+    }
+    const partyName = normName(name)
+    const companyName = normName(company.companyName ?? '')
+    if (!partyName || !companyName) return false
+    return partyName.includes(companyName) || companyName.includes(partyName)
   }
 }

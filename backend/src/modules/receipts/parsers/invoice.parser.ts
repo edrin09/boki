@@ -320,6 +320,17 @@ export const invoiceParser: DocumentParser = {
       if (v) f.push(field('invoice_no', '发票号码', v, fallback * 0.9))
     }
 
+    // 红字发票识别：票面含「红字」字样（如「红字发票信息表编号」），或发票号码带负数后缀（如 12345678-01）
+    const noValue = f.find((x) => x.key === 'invoice_no')?.value
+    if (t.includes('红字') || /-\d{1,2}$/.test(String(noValue ?? ''))) {
+      f.push(field('is_red', '红字发票', 1, fallback))
+      // 被冲销的原蓝字发票号码（数电红票票面「对应蓝字发票号码」等标签）
+      const orig = t.match(
+        /(?:对应蓝字发票号码|被冲销蓝字发票号码|原蓝字发票号码|蓝字发票号码|被冲销发票号码|原发票号码):?(\d{8,12}(?:-\d{1,2})?)/,
+      )
+      if (orig) f.push(field('original_invoice_no', '原蓝字发票号码', orig[1], fallback * 0.9))
+    }
+
     const dateLine = findLine(lines, ['开票日期'])
     const belowDate = dateLine ? findBelowDate(dateLine, lines) : null
     const issueDate = dateLine

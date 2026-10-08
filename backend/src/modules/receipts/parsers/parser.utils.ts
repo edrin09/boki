@@ -103,22 +103,23 @@ export function findRight(lines: OcrBox[], anchor: OcrBox, maxDx: number): OcrBo
   return best
 }
 
-/** 提取行内首个金额（支持 ¥、￥、千分位、最多两位小数） */
+/** 提取行内首个金额（支持 ¥、￥、千分位、最多两位小数；支持负数金额——红字/红冲发票票面金额为负） */
 export function extractMoney(text: string): number | null {
-  const m = text.match(/(?:¥|￥|\$)?\s*(\d{1,12}(?:,\d{3})*(?:\.\d{1,2})?)/)
+  const m = text.match(/(?:¥|￥|\$)?\s*(-|－)?\s*(\d{1,12}(?:,\d{3})*(?:\.\d{1,2})?)/)
   if (!m) return null
-  const n = parseFloat(m[1].replace(/,/g, ''))
-  return Number.isFinite(n) ? n : null
+  const n = parseFloat(m[2].replace(/,/g, ''))
+  if (!Number.isFinite(n)) return null
+  return m[1] ? -n : n
 }
 
-/** 提取行内全部金额（按出现顺序） */
+/** 提取行内全部金额（按出现顺序，支持负数金额） */
 export function extractAllMoney(text: string): number[] {
   const out: number[] = []
-  const re = /(?:¥|￥|\$)?(\d{1,12}(?:,\d{3})*(?:\.\d{1,2})?)/g
+  const re = /(?:¥|￥|\$)?\s*(-|－)?\s*(\d{1,12}(?:,\d{3})*(?:\.\d{1,2})?)/g
   let m: RegExpExecArray | null
   while ((m = re.exec(text)) !== null) {
-    const n = parseFloat(m[1].replace(/,/g, ''))
-    if (Number.isFinite(n)) out.push(n)
+    const n = parseFloat(m[2].replace(/,/g, ''))
+    if (Number.isFinite(n)) out.push(m[1] ? -n : n)
   }
   return out
 }

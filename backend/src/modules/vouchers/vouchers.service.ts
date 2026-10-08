@@ -105,8 +105,30 @@ export class VouchersService {
     // 批量加载分录
     const entriesMap = await this.loadEntriesByVoucher(list.map((v) => v.id))
 
+    // 批量加载辅助核算名称：列表页按名称渲染辅助核算，只有 ID 会导致该列显示为空
+    const allEntries = list.flatMap((v) => entriesMap.get(v.id) ?? [])
+    const { partnerMap, deptMap, projectMap } = await this.loadAuxNames(allEntries)
+
     return {
-      list: list.map((v) => this.toVo(v, entriesMap.get(v.id) ?? [])),
+      list: list.map((v) => ({
+        ...this.toVo(v, entriesMap.get(v.id) ?? []),
+        entries: (entriesMap.get(v.id) ?? []).map((e) => ({
+          id: e.id,
+          summary: e.summary,
+          accountId: e.accountId,
+          accountCode: e.accountCode,
+          accountName: e.accountName,
+          partnerId: e.partnerId,
+          partnerName: partnerMap.get(e.partnerId) ?? null,
+          departmentId: e.departmentId,
+          departmentName: deptMap.get(e.departmentId) ?? null,
+          projectId: e.projectId,
+          projectName: projectMap.get(e.projectId) ?? null,
+          debit: e.debit,
+          credit: e.credit,
+          sort: e.sort,
+        })),
+      })),
       total,
       page,
       pageSize,

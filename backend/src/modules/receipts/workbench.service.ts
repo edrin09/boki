@@ -95,9 +95,17 @@ export class ReceiptWorkbenchService {
       this.logger.warn(`票据 ${id} 往来单位同步失败: ${(err as Error).message}`)
     }
 
-    const entries = await this.buildEntries(receipt, suggestion)
+    const { rows: entries, isRed } = await this.buildEntries(receipt, suggestion)
     const voucherDate = receipt.issueDate ?? new Date().toISOString().slice(0, 10)
-    const remark = `票据自动生成（${recoverFilename(receipt.fileName) ?? receipt.fileName}）`
+    const fileName = recoverFilename(receipt.fileName) ?? receipt.fileName
+    // 冲销原因写入 remark（凭证列表「备注/补充信息」展示）：
+    // 能取到被冲销的原蓝字发票号码时关联原发票，否则保持「红字发票红冲（文件名）」文案
+    const origNo = isRed ? this.str(this.parseFields(receipt).original_invoice_no) : ''
+    const remark = isRed
+      ? origNo
+        ? `红冲原发票：原发票号码 ${origNo}`
+        : `红字发票红冲（${fileName}）`
+      : `票据自动生成（${fileName}）`
 
     if (receipt.voucherId) {
       const linked = await this.voucherRepo.findOne({ where: { id: receipt.voucherId } })
@@ -117,6 +125,11 @@ export class ReceiptWorkbenchService {
         false,
       )
       receipt.voucherId = voucher.id
+    }
+
+    // 红字发票 → 红冲凭证：标记 isReversal，与手工红字冲销口径一致（列表展示「红冲」标记）
+    if (isRed && receipt.voucherId) {
+      await this.voucherRepo.update({ id: receipt.voucherId }, { isReversal: true })
     }
 
     receipt.status = ReceiptStatus.DRAFTED
@@ -225,11 +238,22 @@ export class ReceiptWorkbenchService {
   private async buildEntries(
     receipt: Receipt,
     suggestion: ClassifySuggestion,
-  ): Promise<Array<{ summary: string; accountId: string; partnerId?: string; debit?: number; credit?: number }>> {
+  ): Promise<{
+    rows: Array<{ summary: string; accountId: string; partnerId?: string; debit?: number; credit?: number }>
+    isRed: boolean
+  }> {
     const fields = this.parseFields(receipt)
-    const total = this.num(fields.total_amount)
+    let total = this.num(fields.total_amount)
       ?? ((this.num(fields.amount) ?? 0) + (this.num(fields.tax_amount) ?? 0))
-    const tax = this.num(fields.tax_amount) ?? 0
+    let tax = this.num(fields.tax_amount) ?? 0
+
+    // 红字发票（红冲）：票面金额为负数。按系统红冲凭证口径处理：
+    // 金额取绝对值、借贷方向整体对调（凭证由调用方标记 isReversal）。
+    const isRed = this.isRedInvoice(fields, total)
+    if (isRed) {
+      total = Math.abs(total)
+      tax = Math.abs(tax)
+    }
     const net = total - tax
 
     const rows: Array<{
@@ -243,6 +267,9 @@ export class ReceiptWorkbenchService {
     for (const tpl of suggestion.entries) {
       const account = await this.requireLeafAccount(tpl.accountCode)
       const amount = this.resolveAmount(tpl.amountSource, fields, { total, net, tax })
+      const direction: 'debit' | 'credit' = isRed
+        ? tpl.direction === 'debit' ? 'credit' : 'debit'
+        : tpl.direction
       const partnerId = await this.resolvePartner(suggestion, tpl, receipt)
       // 科目要求部门辅助核算时兜底填一个默认部门：
       // 票据本身通常不含部门信息，但缺少它会让整张凭证无法保存
@@ -254,8 +281,8 @@ export class ReceiptWorkbenchService {
         accountId: account.id,
         partnerId,
         departmentId,
-        amount: fromCents(toCents(amount)),
-        direction: tpl.direction,
+        amount: fromCents(toCents(Math.abs(amount))),
+        direction,
       })
     }
 
@@ -276,14 +303,27 @@ export class ReceiptWorkbenchService {
       target.amount = fromCents(Math.max(0, next))
     }
 
-    return rows.map((r) => ({
-      summary: r.summary,
-      accountId: r.accountId,
-      partnerId: r.partnerId ?? undefined,
-      departmentId: r.departmentId ?? undefined,
-      debit: r.direction === 'debit' ? r.amount : undefined,
-      credit: r.direction === 'credit' ? r.amount : undefined,
-    }))
+    return {
+      rows: rows.map((r) => ({
+        summary: r.summary,
+        accountId: r.accountId,
+        partnerId: r.partnerId ?? undefined,
+        departmentId: r.departmentId ?? undefined,
+        debit: r.direction === 'debit' ? r.amount : undefined,
+        credit: r.direction === 'credit' ? r.amount : undefined,
+      })),
+      isRed,
+    }
+  }
+
+  /** 红字发票判定：识别字段 is_red=1（票面含「红字」/号码带负数后缀），或价税合计为负数 */
+  private isRedInvoice(
+    fields: Record<string, string | number | null>,
+    total: number,
+  ): boolean {
+    const flag = fields.is_red
+    if (flag !== null && flag !== undefined && String(flag) === '1') return true
+    return total < 0
   }
 
   /**

@@ -290,14 +290,15 @@ export class ReceiptsService {
         }
       }
 
-      // 只要有一条分录能取到正数金额，就认为可自动入账。
+      // 只要有一条分录能取到非零金额，就认为可自动入账。
       // 各单据的金额字段不同（发票 total_amount / 工资 gross_amount /
       // 对账单 fee_amount），按归类模板实际用到的字段判断，
       // 避免出现"识别对了却判定不可记账"。
+      // 红字发票金额为负数（红冲），同样可入账，因此只排除 0。
       const fields = fieldMap(this.parseFieldArray(receipt))
       const hasAmount = suggestion.entries.some((tpl) => {
         const v = numberOf(fields[tpl.amountSource])
-        return v !== null && v > 0
+        return v !== null && v !== 0
       })
       if (!hasAmount) {
         return { bookable: false, reason: '未识别到有效金额，请人工补录金额后再生成凭证', kind, kindLabel }
