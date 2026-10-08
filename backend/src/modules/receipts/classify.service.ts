@@ -6,6 +6,7 @@ import { CompanyScopedRepository } from '../../common/company/company.repository
 import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { SystemService } from '../system/system.service'
 import { recoverFilename } from '../../common/utils/filename.util'
+import { nameContains, normName, sameTaxNo } from './parsers/parser.utils'
 
 /** 凭证模板类型：进项/销项/费用/银行手续费/工资 */
 export type ReceiptKind = 'input_vat' | 'output_vat' | 'expense' | 'bank_fee' | 'payroll' | 'unknown'
@@ -121,17 +122,27 @@ export class ClassifyService {
     let kind: ReceiptKind = 'unknown'
     let direction: 'input' | 'output' | null = null
     if (docType === 'invoice') {
-      // 方向判定：以本公司纳税人识别号比对购销方
-      if (company.taxNo && sellerTaxNo === company.taxNo) {
+      // 人工修正的方向优先：用户已在工作台纠正过进项/销项，不再依赖税号比对
+      if (receipt.directionOverride === 'input' || receipt.directionOverride === 'output') {
+        direction = receipt.directionOverride
+        kind = direction === 'input' ? 'input_vat' : 'output_vat'
+      } else {
+      // 方向判定：以本公司纳税人识别号比对购销方。
+      // 税号比对带 I/O→1/0 归一化容错（OCR 可能把 1/0 误读成 I/O）；
+      // 名称比对与 party-sync 的 isSelfCompany 同口径：去空白后互相包含
+      // （票面名可能缺「(个体工商户)」等后缀，单向包含会漏配）。
+      const companyTax = this.str(company.taxNo)
+      const companyName = normName(this.str(company.companyName))
+      const sellerIsSelf =
+        sameTaxNo(sellerTaxNo, companyTax) ||
+        (companyName !== '' && nameContains(normName(sellerName), companyName))
+      const buyerIsSelf =
+        sameTaxNo(buyerTaxNo, companyTax) ||
+        (companyName !== '' && nameContains(normName(buyerName), companyName))
+      if (sellerIsSelf) {
         kind = 'output_vat'
         direction = 'output'
-      } else if (company.taxNo && buyerTaxNo === company.taxNo) {
-        kind = 'input_vat'
-        direction = 'input'
-      } else if (company.companyName && sellerName.includes(company.companyName)) {
-        kind = 'output_vat'
-        direction = 'output'
-      } else if (company.companyName && buyerName.includes(company.companyName)) {
+      } else if (buyerIsSelf) {
         kind = 'input_vat'
         direction = 'input'
       } else {
@@ -140,6 +151,7 @@ export class ClassifyService {
         // 对方单位取错一侧、借贷记账方向全反（财务基础错误）。
         kind = 'unknown'
         direction = null
+      }
       }
     } else if (docType === 'payroll') {
       kind = 'payroll'

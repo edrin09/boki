@@ -6,6 +6,7 @@ import {
 import { DataSource, EntityManager, In } from 'typeorm'
 import { Voucher } from '../../entities/voucher.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
+import { Receipt } from '../../entities/receipt.entity'
 import { Account } from '../../entities/account.entity'
 import { Partner } from '../../entities/partner.entity'
 import { Department } from '../../entities/department.entity'
@@ -13,6 +14,7 @@ import { Project } from '../../entities/project.entity'
 import { VoucherSource, VoucherStatus } from '../../common/enums'
 import { toCents, fromCents } from '../../common/utils/money.util'
 import { toPeriod } from '../../common/utils/date.util'
+import { recoverFilename } from '../../common/utils/filename.util'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
 import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { requireCompanyId } from '../../common/company/company-context'
@@ -41,6 +43,7 @@ export class VouchersService {
     @InjectCompanyRepo(Partner) private readonly partnerRepo: CompanyScopedRepository<Partner>,
     @InjectCompanyRepo(Department) private readonly deptRepo: CompanyScopedRepository<Department>,
     @InjectCompanyRepo(Project) private readonly projectRepo: CompanyScopedRepository<Project>,
+    @InjectCompanyRepo(Receipt) private readonly receiptRepo: CompanyScopedRepository<Receipt>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -105,6 +108,9 @@ export class VouchersService {
     // 批量加载分录
     const entriesMap = await this.loadEntriesByVoucher(list.map((v) => v.id))
 
+    // 批量加载来源票据（票据自动生成的凭证可回看原始 PDF/图片）
+    const sourceReceipts = await this.loadSourceReceipts(list.map((v) => v.id))
+
     // 批量加载辅助核算名称：列表页按名称渲染辅助核算，只有 ID 会导致该列显示为空
     const allEntries = list.flatMap((v) => entriesMap.get(v.id) ?? [])
     const { partnerMap, deptMap, projectMap } = await this.loadAuxNames(allEntries)
@@ -112,6 +118,7 @@ export class VouchersService {
     return {
       list: list.map((v) => ({
         ...this.toVo(v, entriesMap.get(v.id) ?? []),
+        sourceReceipt: sourceReceipts.get(v.id) ?? null,
         entries: (entriesMap.get(v.id) ?? []).map((e) => ({
           id: e.id,
           summary: e.summary,
@@ -151,6 +158,29 @@ export class VouchersService {
     return result
   }
 
+  /**
+   * 批量加载来源票据：fin_receipt.voucher_id 指向凭证（generateDraft 写入），
+   * 凭证侧经此反查即可展示原始票据文件，存量数据同样生效。
+   */
+  private async loadSourceReceipts(
+    voucherIds: string[],
+  ): Promise<Map<string, { id: string; fileName: string; mimeType: string; receiptType: string; receiptTypeName: string }>> {
+    const map = new Map<string, { id: string; fileName: string; mimeType: string; receiptType: string; receiptTypeName: string }>()
+    if (!voucherIds.length) return map
+    const receipts = await this.receiptRepo.find({ where: { voucherId: In(voucherIds) } })
+    for (const r of receipts) {
+      if (!r.voucherId || map.has(r.voucherId)) continue
+      map.set(r.voucherId, {
+        id: r.id,
+        fileName: recoverFilename(r.fileName) ?? r.fileName,
+        mimeType: r.mimeType,
+        receiptType: r.receiptType,
+        receiptTypeName: r.receiptTypeName,
+      })
+    }
+    return map
+  }
+
   /** 凭证详情（含分录与辅助核算名称） */
   async findOne(id: string): Promise<any> {
     const voucher = await this.voucherRepo.findOne({ where: { id } })
@@ -161,9 +191,11 @@ export class VouchersService {
       order: { sort: 'ASC' },
     })
     const { partnerMap, deptMap, projectMap } = await this.loadAuxNames(entries)
+    const sourceReceipts = await this.loadSourceReceipts([id])
 
     return {
       ...this.toVo(voucher, entries),
+      sourceReceipt: sourceReceipts.get(id) ?? null,
       entries: entries.map((e) => ({
         id: e.id,
         summary: e.summary,

@@ -138,9 +138,10 @@
         </el-table-column>
         <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
-            <el-tooltip v-if="row.bookable === false" content="该单据无法自动生成凭证，请查看左侧原因" placement="top">
+            <el-tooltip v-if="row.bookable === false" content="该单据无法自动生成凭证，请查看左侧原因；可先「修正识别」纠正类型或方向" placement="top">
               <span class="disabled-hint">不可自动入账</span>
             </el-tooltip>
+            <el-button v-if="row.status === 'parsed'" link type="primary" @click="openCorrect(row)">修正识别</el-button>
             <el-button v-if="row.status === 'parsed' && row.bookable !== false" v-permission="'receipt:confirm'" link type="primary"
               :loading="draftingId === row.id" @click="onGenerateDraft(row)">生成草稿</el-button>
             <template v-if="row.status === 'drafted'">
@@ -150,6 +151,8 @@
               <el-button v-permission="'receipt:confirm'" link type="success" @click="onConfirm(row)">确认入账</el-button>
               <el-button v-permission="'receipt:confirm'" link type="danger" @click="onReject(row)">驳回</el-button>
             </template>
+            <el-button v-if="row.status === 'parsed' || row.status === 'drafted'" v-permission="'receipt:delete'"
+              link type="danger" @click="onRemove(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -230,9 +233,34 @@
       </template>
     </el-dialog>
 
+    <!-- 修正识别弹窗 -->
+    <el-dialog v-model="correctVisible" title="修正识别结果" width="460px" destroy-on-close>
+      <el-form label-position="top">
+        <el-form-item label="票据类型">
+          <el-select v-model="correctForm.receiptType" style="width: 100%" @change="onCorrectTypeChange">
+            <el-option v-for="t in TYPE_OPTIONS" :key="t.type" :label="t.typeName" :value="t.type" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="进项 / 销项方向（增值税发票适用）">
+          <el-select v-model="correctForm.direction" style="width: 100%" clearable placeholder="跟随识别（默认）">
+            <el-option label="进项（本公司为购买方）" value="input" />
+            <el-option label="销项（本公司为销售方）" value="output" />
+          </el-select>
+          <div class="text-muted" style="font-size: 12px; line-height: 1.6">
+            方向判定错误（进项/销项颠倒或无法判定）时可在此人工指定，保存后重新参与自动记账。
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="correctVisible = false">取消</el-button>
+        <el-button type="primary" :loading="correcting" @click="onCorrectSave">保存修正</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 原图预览 -->
-    <el-dialog v-model="imageVisible" :title="imageName" width="640px" destroy-on-close>
-      <el-image v-if="imageUrl" :src="imageUrl" fit="contain" style="width: 100%; max-height: 70vh" :preview-src-list="[imageUrl]" />
+    <el-dialog v-model="imageVisible" :title="imageName" width="720px" destroy-on-close>
+      <iframe v-if="isPdf && imageUrl" :src="imageUrl" style="width: 100%; height: 70vh; border: none" />
+      <el-image v-else-if="imageUrl" :src="imageUrl" fit="contain" style="width: 100%; max-height: 70vh" :preview-src-list="[imageUrl]" />
     </el-dialog>
   </div>
 </template>
@@ -474,15 +502,81 @@ async function onRejectConfirm() {
   }
 }
 
+// ============ 修正识别 ============
+const TYPE_OPTIONS = [
+  { type: 'invoice', typeName: '增值税发票' },
+  { type: 'payroll', typeName: '工资表' },
+  { type: 'bank_statement', typeName: '银行对账单' },
+  { type: 'train_ticket', typeName: '火车票' },
+  { type: 'receipt', typeName: '通用收据' },
+  { type: 'unknown', typeName: '未识别' },
+]
+
+const correctVisible = ref(false)
+const correcting = ref(false)
+const correctingRow = ref<any>(null)
+const correctForm = reactive<{ receiptType: string; direction: 'input' | 'output' | null }>({
+  receiptType: '',
+  direction: null,
+})
+
+function openCorrect(row: any) {
+  correctingRow.value = row
+  correctForm.receiptType = row.receiptType || 'unknown'
+  correctForm.direction = row.directionOverride ?? null
+  correctVisible.value = true
+}
+
+/** 类型改为非发票时清空方向（方向仅对增值税发票有意义） */
+function onCorrectTypeChange(type: string) {
+  if (type !== 'invoice') correctForm.direction = null
+}
+
+async function onCorrectSave() {
+  if (!correctingRow.value) return
+  correcting.value = true
+  try {
+    await receiptApi.update(correctingRow.value.id, {
+      receiptType: correctForm.receiptType,
+      direction: correctForm.direction ?? undefined,
+    })
+    ok('识别结果已修正，已重新评估能否自动入账')
+    correctVisible.value = false
+    await load()
+  } finally {
+    correcting.value = false
+  }
+}
+
+// ============ 删除未入账票据 ============
+async function onRemove(row: any) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除票据「${row.fileName}」？删除后识别记录与原文件不可恢复。`,
+      '删除票据',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  await receiptApi.remove(row.id)
+  ok('票据已删除')
+  await load()
+}
+
 // ============ 原图预览 ============
 const imageVisible = ref(false)
 const imageUrl = ref('')
 const imageName = ref('')
+const isPdf = ref(false)
 
 async function openImage(row: any) {
   try {
     const res = await service.get(receiptApi.fileUrl(row.id), { responseType: 'blob' })
-    imageUrl.value = URL.createObjectURL(new Blob([res.data]))
+    // axios responseType:'blob' 返回 Blob，自带后端 Content-Type
+    const blob = res.data instanceof Blob ? res.data : new Blob([res.data])
+    isPdf.value = blob.type === 'application/pdf' || /\.pdf$/i.test(row.fileName ?? '')
+    imageUrl.value = URL.createObjectURL(blob)
     imageName.value = row.fileName
     imageVisible.value = true
   } catch {

@@ -8,7 +8,7 @@ import { CODE_PREFIX, nextCode } from '../../common/utils/code.util'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
 import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import type { PageResult, PaginationQueryDto } from '../../common/dto/pagination.dto'
-import type { CreatePartnerDto, UpdatePartnerDto } from './dto/partner.dto'
+import type { CreatePartnerDto, UpdatePartnerDto, BatchPartnerItemDto } from './dto/partner.dto'
 
 /** 纳税人识别号归一化：去空白 + 大写（同一机构只允许一条记录） */
 function normalizeTaxNo(value?: string | null): string | null {
@@ -111,8 +111,8 @@ export class PartnersService {
     return this.repo.save(entity)
   }
 
-  /** 批量新增：逐条独立入库，返回每条结果（部分失败不影响其他行） */
-  async createBatch(items: CreatePartnerDto[]): Promise<{
+  /** 批量新增：逐条独立入库，返回每条结果（部分失败不影响其他行）。批量条目税号可空（证件识别不到时） */
+  async createBatch(items: BatchPartnerItemDto[]): Promise<{
     created: number
     failed: number
     results: BatchCreateItemResult[]
@@ -121,7 +121,8 @@ export class PartnersService {
     for (let index = 0; index < items.length; index++) {
       const dto = items[index]
       try {
-        const saved = await this.create(dto)
+        // normalizeTaxNo 会把空税号归一化为 null，运行时安全
+        const saved = await this.create(dto as CreatePartnerDto)
         results.push({ index, success: true, id: saved.id, code: saved.code, name: saved.name })
       } catch (err) {
         results.push({ index, success: false, name: dto.name, message: (err as Error).message })

@@ -143,4 +143,12 @@ export class Receipt extends BaseEntity {
 
   @Column({ length: 200, nullable: true })
   remark: string | null
+
+  @Column({
+    name: 'direction_override',
+    length: 10,
+    nullable: true,
+    comment: '人工修正的进销项方向：input 进项 / output 销项（归类时优先于税号比对）',
+  })
+  directionOverride: 'input' | 'output' | null
 }

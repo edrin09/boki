@@ -64,7 +64,7 @@
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button v-if="row.status === 'parsed' || row.status === 'drafted'" link type="primary"
               @click="goWorkbench(row)">待确认</el-button>
-            <el-button v-if="row.status === 'confirmed' || row.status === 'rejected' || row.status === 'parsed' || row.status === 'drafted'"
+            <el-button v-if="row.status !== 'confirmed'"
               v-permission="'receipt:delete'" link type="danger" @click="onRemove(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -187,8 +187,9 @@
     </el-dialog>
 
     <!-- 原图预览 -->
-    <el-dialog v-model="imageVisible" :title="imageName" width="640px" destroy-on-close>
-      <el-image v-if="imageUrl" :src="imageUrl" fit="contain" style="width: 100%; max-height: 70vh" :preview-src-list="[imageUrl]" />
+    <el-dialog v-model="imageVisible" :title="imageName" width="720px" destroy-on-close>
+      <iframe v-if="isPdf && imageUrl" :src="imageUrl" style="width: 100%; height: 70vh; border: none" />
+      <el-image v-else-if="imageUrl" :src="imageUrl" fit="contain" style="width: 100%; max-height: 70vh" :preview-src-list="[imageUrl]" />
     </el-dialog>
   </div>
 </template>
@@ -318,11 +319,15 @@ async function openDetail(row: any) {
 const imageVisible = ref(false)
 const imageUrl = ref('')
 const imageName = ref('')
+const isPdf = ref(false)
 
 async function openImage(row: any) {
   try {
     const res = await service.get(receiptApi.fileUrl(row.id), { responseType: 'blob' })
-    imageUrl.value = URL.createObjectURL(new Blob([res.data]))
+    // axios responseType:'blob' 返回 Blob，自带后端 Content-Type
+    const blob = res.data instanceof Blob ? res.data : new Blob([res.data])
+    isPdf.value = blob.type === 'application/pdf' || /\.pdf$/i.test(row.fileName ?? '')
+    imageUrl.value = URL.createObjectURL(blob)
     imageName.value = row.fileName
     imageVisible.value = true
   } catch {

@@ -32,17 +32,15 @@
       </div>
 
       <el-table v-loading="loading" :data="list" empty-text="暂无数据">
-        <el-table-column prop="code" label="编码" width="120" />
         <el-table-column prop="name" label="名称" min-width="180" />
         <el-table-column label="类型" width="130">
           <template #default="{ row }">
             <el-tag :type="typeTag(row.type)" size="small">{{ typeLabel(row.type) }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="taxNo" label="纳税人识别号" min-width="200" show-overflow-tooltip />
         <el-table-column prop="contact" label="联系人" width="100" />
         <el-table-column prop="phone" label="电话" width="130" />
-        <el-table-column prop="bankName" label="开户行" min-width="150" show-overflow-tooltip />
-        <el-table-column prop="bankAccount" label="银行账号" width="150" />
         <el-table-column label="状态" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">
@@ -123,7 +121,7 @@
 
         <el-row :gutter="12">
           <el-col :span="12">
-            <el-form-item label="纳税人识别号">
+            <el-form-item label="纳税人识别号" prop="taxNo">
               <el-input v-model="form.taxNo" />
             </el-form-item>
           </el-col>
@@ -217,6 +215,7 @@ const form = reactive({ ...initialForm })
 
 const rules: FormRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+  taxNo: [{ required: true, message: '请输入纳税人识别号', trigger: 'blur' }],
   email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }],
 }
 
@@ -293,14 +292,12 @@ function onExport() {
     filename: `往来单位_${new Date().toISOString().slice(0, 10)}.xlsx`,
     sheetName: '往来单位',
     columns: [
-      { title: '编码', prop: 'code', width: 12 },
       { title: '名称', prop: 'name', width: 26 },
       { title: '类型', prop: 'type', width: 14, format: (r) => typeLabel(r.type) },
+      { title: '纳税人识别号', prop: 'taxNo', width: 24 },
       { title: '联系人', prop: 'contact', width: 12 },
       { title: '电话', prop: 'phone', width: 16 },
-      { title: '法定代表人', prop: 'legalPerson', width: 14 },
-      { title: '开户行', prop: 'bankName', width: 22 },
-      { title: '银行账号', prop: 'bankAccount', width: 20 },
+      { title: '状态', prop: 'status', width: 8, format: (r) => (r.status === 1 ? '启用' : '禁用') },
     ],
     rows: list.value as any[],
   })

@@ -21,6 +21,17 @@ export function valueAfterLabel(text: string, label: string): string | null {
   return rest.trim() || null
 }
 
+/** 名称归一化：去全部空白（OCR 可能把公司名拆出多余空格），与 party-sync 同口径 */
+export function normName(s: string): string {
+  return s.replace(/\s+/g, '')
+}
+
+/** 归一化名称互相包含（票面名常缺「(个体工商户)」等后缀，单向包含会漏配） */
+export function nameContains(a: string, b: string): boolean {
+  if (!a || !b) return false
+  return a.includes(b) || b.includes(a)
+}
+
 /** 在行列表中找首个含任一关键词的行（关键词匹配去格式后文本） */
 export function findLine(lines: OcrBox[], keywords: string[]): OcrBox | null {
   const nk = keywords.map((k) => norm(k))
@@ -131,15 +142,48 @@ export function extractDate(text: string): string | null {
   return `${m[1]}-${String(+m[2]).padStart(2, '0')}-${String(+m[3]).padStart(2, '0')}`
 }
 
-/** 提取 18 位统一社会信用代码 / 纳税人识别号（容忍数字间空格/全角空格） */
+/** 统一社会信用代码合法字符集（不含 I/O，避免与 1/0 混淆） */
+const TAX_NO_CHARSET_RE = /^[0-9A-HJ-NPQRTUWXY]{18}$/
+
+/**
+ * 税号归一化（仅用于匹配/比对场景）：全角转半角、去空白、大写、I→1、O→0。
+ * 统一社会信用代码字符集本就不含 I/O，候选中出现的 I/O 只能是 OCR 误读，
+ * 替换后符合 18 位合法字符集才返回结果，否则返回 null（不误伤非税号文本）。
+ */
+export function normalizeTaxNo(raw: string): string | null {
+  let s = raw
+  for (let i = 0; i < FULL.length; i++) {
+    s = s.split(FULL[i]).join(HALF[i])
+  }
+  s = s.replace(/\s+/g, '').toUpperCase().replace(/I/g, '1').replace(/O/g, '0')
+  return TAX_NO_CHARSET_RE.test(s) ? s : null
+}
+
+/** 税号比对：先精确（忽略大小写），再归一化容错（兼容 OCR 把 1/0 误读成 I/O） */
+export function sameTaxNo(a: string, b: string): boolean {
+  if (!a || !b) return false
+  if (a.toUpperCase() === b.toUpperCase()) return true
+  const na = normalizeTaxNo(a)
+  const nb = normalizeTaxNo(b)
+  return na !== null && nb !== null && na === nb
+}
+
+/** 提取 18 位统一社会信用代码 / 纳税人识别号（容忍数字间空格/全角空格）。
+ * 严格字符集匹配失败时对含 I/O 的 18 位候选做归一化重试：
+ * OCR 可能把 1/0 误读成 I/O（如 92610112MAKL12AH6X → …MAKLI2AH6X），
+ * 替换后格式合法才采用，保证解析值与真实税号一致。 */
 export function extractTaxNo(text: string): string | null {
   const re = /(?:^|[^0-9A-Za-z])([0-9A-HJ-NPQRTUWXY]{18})(?:$|[^0-9A-Za-z])/
   const m = text.match(re)
   if (m) return m[1].toUpperCase()
   const compact = text.replace(/[\s\u3000]+/g, '')
-  if (compact === text) return null
-  const m2 = compact.match(re)
-  return m2 ? m2[1].toUpperCase() : null
+  if (compact !== text) {
+    const m2 = compact.match(re)
+    if (m2) return m2[1].toUpperCase()
+  }
+  // 宽松重试：候选允许含 I/O（含小写），归一化后符合合法字符集才采用
+  const loose = /(?:^|[^0-9A-Za-z])([0-9A-Za-z]{18})(?:$|[^0-9A-Za-z])/.exec(compact)
+  return loose ? normalizeTaxNo(loose[1]) : null
 }
 
 /** 提取 18 位身份证号（末位可为 X） */

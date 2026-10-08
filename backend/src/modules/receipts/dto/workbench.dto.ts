@@ -71,6 +71,17 @@ export class RejectReceiptDto {
   reason?: string
 }
 
+/** 修正识别结果 DTO（票据类型 / 进销项方向），仅未入账票据可修正 */
+export class UpdateReceiptDto {
+  @IsOptional()
+  @IsString()
+  receiptType?: string
+
+  @IsOptional()
+  @IsIn(['input', 'output'], { message: '方向只能是 input（进项）或 output（销项）' })
+  direction?: 'input' | 'output'
+}
+
 /** 批量确认 DTO */
 export class ConfirmBatchDto {
   @IsArray()

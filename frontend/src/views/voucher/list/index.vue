@@ -143,6 +143,12 @@
             <span>制单：{{ voucher.createdByName || '-' }}</span>
             <span v-if="voucher.approvedByName">审核：{{ voucher.approvedByName }}</span>
             <span v-if="voucher.remark" class="voucher-card__remark">备注：{{ voucher.remark }}</span>
+            <span v-if="voucher.sourceReceipt" class="voucher-card__receipt">
+              <el-icon><Paperclip /></el-icon>
+              <span class="link" @click="openReceiptPreview(voucher)">
+                原始票据：{{ voucher.sourceReceipt.fileName }}
+              </span>
+            </span>
             <div class="voucher-card__totals">
               <span>借方合计 <b class="amount amount--debit">{{ formatAmount(voucher.debitTotal) }}</b></span>
               <span>贷方合计 <b class="amount amount--credit">{{ formatAmount(voucher.creditTotal) }}</b></span>
@@ -163,6 +169,18 @@
         />
       </div>
     </div>
+
+    <!-- 原始票据预览（复用票据预览逻辑：PDF 用 iframe，图片用 el-image） -->
+    <el-dialog v-model="receiptVisible" :title="receiptName" width="720px" destroy-on-close @closed="onReceiptClosed">
+      <iframe v-if="receiptIsPdf && receiptUrl" :src="receiptUrl" style="width: 100%; height: 70vh; border: none" />
+      <el-image
+        v-else-if="receiptUrl"
+        :src="receiptUrl"
+        fit="contain"
+        style="width: 100%; max-height: 70vh"
+        :preview-src-list="[receiptUrl]"
+      />
+    </el-dialog>
   </div>
 </template>
 
@@ -170,8 +188,9 @@
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Download } from '@element-plus/icons-vue'
-import { voucherApi } from '@/api'
+import { Plus, Search, Download, Paperclip } from '@element-plus/icons-vue'
+import { voucherApi, receiptApi } from '@/api'
+import service from '@/api/http'
 import { confirmDelete, ok, usePagedList } from '@/composables/useList'
 import { exportExcel } from '@/utils/export'
 import { currentPeriod, formatAmount, formatDate, voucherStatusMeta } from '@/utils/format'
@@ -314,6 +333,35 @@ async function onRemove(voucher: any) {
   }
 }
 
+// ============ 原始票据预览（票据自动生成的凭证才有 sourceReceipt） ============
+const receiptVisible = ref(false)
+const receiptUrl = ref('')
+const receiptName = ref('')
+const receiptIsPdf = ref(false)
+
+async function openReceiptPreview(voucher: any) {
+  const receipt = voucher.sourceReceipt
+  if (!receipt) return
+  try {
+    const res = await service.get(receiptApi.fileUrl(receipt.id), { responseType: 'blob' })
+    const blob = res.data instanceof Blob ? res.data : new Blob([res.data])
+    receiptIsPdf.value = blob.type === 'application/pdf' || /\.pdf$/i.test(receipt.fileName ?? '')
+    receiptUrl.value = URL.createObjectURL(blob)
+    receiptName.value = receipt.fileName
+    receiptVisible.value = true
+  } catch {
+    ElMessage.error('无法加载原始票据文件')
+  }
+}
+
+/** 关闭预览时释放 blob URL */
+function onReceiptClosed() {
+  if (receiptUrl.value) {
+    URL.revokeObjectURL(receiptUrl.value)
+    receiptUrl.value = ''
+  }
+}
+
 function onExport() {
   const rows: any[] = []
   for (const v of list.value as any[]) {
@@ -408,6 +456,22 @@ onMounted(load)
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  &__receipt {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+
+    .link {
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--el-color-primary);
+      cursor: pointer;
+    }
   }
 
   &__totals {

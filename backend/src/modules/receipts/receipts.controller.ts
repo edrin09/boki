@@ -34,6 +34,7 @@ import {
   SaveClassifyRuleDto,
   ToggleRuleDto,
   UpdateDraftDto,
+  UpdateReceiptDto,
 } from './dto/workbench.dto'
 
 const ALLOWED_MIME = /^(image\/(jpeg|png|webp|bmp|tiff)|application\/pdf)$/
@@ -180,6 +181,13 @@ export class ReceiptsController {
     const receipt = await this.service.findOne(id)
     if (!receipt) throw new NotFoundException('票据不存在')
     return receipt
+  }
+
+  @Put(':id')
+  @RequirePermissions('receipt:confirm')
+  @Operation('修正识别结果（票据类型/进销项方向）')
+  update(@Param('id') id: string, @Body() dto: UpdateReceiptDto) {
+    return this.service.update(id, dto)
   }
 
   // ==================== 草稿与确认（P17.3/P17.4） ====================

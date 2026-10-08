@@ -162,6 +162,9 @@ export const receiptApi = {
     return post<any[]>('/receipts/upload', form)
   },
   remove: (id: string) => del(`/receipts/${id}`),
+  /** 修正识别结果（票据类型/进销项方向），仅未入账票据 */
+  update: (id: string, data: { receiptType?: string; direction?: 'input' | 'output' }) =>
+    put<any>(`/receipts/${id}`, data),
   /** 待确认工作台列表 */
   pending: (params?: Record<string, any>) => get<any>('/receipts/pending', params),
   /** 生成凭证草稿 */

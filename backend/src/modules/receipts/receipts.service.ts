@@ -2,7 +2,7 @@ import * as crypto from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common'
 import dayjs from 'dayjs'
 import { Receipt } from '../../entities/receipt.entity'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
@@ -13,8 +13,10 @@ import { ClassifyService } from './classify.service'
 import { ReceiptWorkbenchService } from './workbench.service'
 import { PartySyncService } from './party-sync.service'
 import { SystemService } from '../system/system.service'
+import { VouchersService } from '../vouchers/vouchers.service'
 import { recoverFilename } from '../../common/utils/filename.util'
 import type { ParseResult } from './parsers/parser.types'
+import { ReceiptType } from '../../common/enums'
 
 /** 上传根目录（相对 backend，与数据库同层） */
 export function resolveUploadDir(): string {
@@ -70,6 +72,7 @@ export class ReceiptsService {
     private readonly workbench: ReceiptWorkbenchService,
     private readonly systemService: SystemService,
     private readonly partySync: PartySyncService,
+    private readonly vouchers: VouchersService,
   ) {}
 
   async processUpload(
@@ -380,12 +383,61 @@ export class ReceiptsService {
     return r ? this.toView(r) : null
   }
 
+  /**
+   * 删除未入账票据：仅 parsed/drafted/rejected/failed 可删。
+   * 已确认入账（或关联凭证已审核）的票据拒绝删除，避免账簿与票据脱节。
+   * drafted 状态的关联草稿凭证（含分录）一并删除。
+   */
   async remove(id: string): Promise<void> {
     const r = await this.receiptRepo.findOne({ where: { id } })
     if (!r) throw new NotFoundException('票据不存在')
+    if (r.status === 'confirmed') {
+      throw new BadRequestException('该票据已确认入账，不能删除；如需调整请到凭证管理反审核或红冲处理')
+    }
+    if (r.voucherId) {
+      try {
+        await this.vouchers.remove(r.voucherId) // 仅草稿可删，已审核会抛错兜底
+      } catch (err) {
+        throw new BadRequestException(`关联凭证无法删除：${(err as Error).message}`)
+      }
+    }
     await this.receiptRepo.remove(r)
     const abs = path.join(resolveUploadDir(), '..', r.storagePath)
     fs.promises.unlink(abs).catch(() => undefined)
+  }
+
+  /**
+   * 修正识别结果（仅未入账票据）：票据类型、进项/销项方向。
+   * 方向修正写入 directionOverride，归类时优先采用；修正后重新评估能否自动入账。
+   */
+  async update(
+    id: string,
+    dto: { receiptType?: string; direction?: 'input' | 'output' | null },
+  ): Promise<Record<string, unknown>> {
+    const r = await this.receiptRepo.findOne({ where: { id } })
+    if (!r) throw new NotFoundException('票据不存在')
+    if (r.status === 'confirmed') {
+      throw new BadRequestException('该票据已确认入账，不能修正；如需调整请到凭证管理反审核后处理')
+    }
+
+    if (dto.receiptType) {
+      if (!Object.values(ReceiptType).includes(dto.receiptType as ReceiptType)) {
+        throw new BadRequestException(`未知票据类型: ${dto.receiptType}`)
+      }
+      r.receiptType = dto.receiptType
+      const parser = PARSERS.find((p) => p.type === dto.receiptType)
+      r.receiptTypeName = parser?.typeName ?? '未识别'
+    }
+    if (dto.direction !== undefined) {
+      r.directionOverride = dto.direction
+    }
+
+    // 修正后重新评估能否自动入账，让票据重新参与自动记账流程
+    const verdict = await this.evaluateBookable(r)
+    r.bookable = verdict.bookable ? 1 : 0
+    r.blockReason = verdict.reason
+    await this.receiptRepo.save(r)
+    return this.findOne(id) as Promise<Record<string, unknown>>
   }
 
   private toView(r: Receipt) {
@@ -423,6 +475,7 @@ export class ReceiptsService {
       sellerTaxNo: r.sellerTaxNo,
       buyerTaxNo: r.buyerTaxNo,
       voucherId: r.voucherId,
+      directionOverride: r.directionOverride ?? null,
       rejectReason: r.rejectReason,
       confirmedByName: r.confirmedByName,
       confirmedAt: r.confirmedAt,
