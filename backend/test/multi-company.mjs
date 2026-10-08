@@ -333,7 +333,7 @@ async function main() {
     const emptyC = await call('/companies', {
       method: 'POST',
       token: tokenA2,
-      body: { name: `待删除公司${stamp}`, copyAccountsFromCurrent: false },
+      body: { name: `待删除公司${stamp}`, taxNo: `91310000DEL${stamp}`, copyAccountsFromCurrent: false },
     })
     createdCompanies.push(emptyC.data?.id)
     const delEmpty = await call(`/companies/${emptyC.data.id}/members/${accountantUser.id}`, {

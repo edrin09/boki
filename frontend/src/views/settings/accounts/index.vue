@@ -94,18 +94,9 @@
       destroy-on-close
     >
       <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="科目编码" prop="code">
-              <el-input v-model="form.code" :disabled="!!form.id" placeholder="如 1003" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="科目名称" prop="name">
-              <el-input v-model="form.name" placeholder="如 其他货币资金" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <el-form-item label="科目名称" prop="name">
+          <el-input v-model="form.name" placeholder="如 其他货币资金" />
+        </el-form-item>
 
         <el-form-item label="上级科目">
           <el-tree-select
@@ -238,13 +229,11 @@ const tableKey = ref(0)
 const expandAll = ref(true)
 
 const rules: FormRules = {
-  code: [{ required: true, message: '请输入科目编码', trigger: 'blur' }],
   name: [{ required: true, message: '请输入科目名称', trigger: 'blur' }],
 }
 
 const initialForm = {
   id: '' as string,
-  code: '',
   name: '',
   parentId: null as string | null,
   category: 'asset' as string,
@@ -305,7 +294,6 @@ function onCreate() {
 function onEdit(row: AccountRow) {
   Object.assign(form, {
     id: row.id,
-    code: row.code,
     name: row.name,
     parentId: row.parentId,
     category: row.category,
@@ -349,7 +337,6 @@ async function onSubmit() {
   saving.value = true
   try {
     const payload: any = {
-      code: form.code,
       name: form.name,
       parentId: form.parentId || undefined,
       category: form.category,

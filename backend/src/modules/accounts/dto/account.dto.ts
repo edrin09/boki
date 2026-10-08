@@ -14,13 +14,13 @@ import {
   Min,
 } from 'class-validator'
 
-/** 新增会计科目 DTO */
+/** 新增会计科目 DTO（code 留空时后端自动生成） */
 export class CreateAccountDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: '请输入科目编码' })
   @MaxLength(20)
   @Matches(/^[0-9A-Za-z.\_-]+$/, { message: '科目编码只能包含数字、字母、点、下划线和中划线' })
-  code: string
+  code?: string
 
   @IsString()
   @IsNotEmpty({ message: '请输入科目名称' })

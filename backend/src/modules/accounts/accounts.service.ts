@@ -17,6 +17,15 @@ import type {
   UpdateAccountDto,
 } from './dto/account.dto'
 
+/** 类别 → 科目编码首位（与科目种子一致：1 资产 / 2 负债 / 3 权益 / 4 成本 / 6 损益） */
+const CATEGORY_CODE_HEAD: Record<string, string> = {
+  [AccountCategory.ASSET]: '1',
+  [AccountCategory.LIABILITY]: '2',
+  [AccountCategory.EQUITY]: '3',
+  [AccountCategory.COST]: '4',
+  [AccountCategory.PROFIT]: '6',
+}
+
 @Injectable()
 export class AccountsService {
   constructor(
@@ -99,9 +108,6 @@ export class AccountsService {
   // ==================== 写入 ====================
 
   async create(dto: CreateAccountDto): Promise<Account> {
-    const exists = await this.accountRepo.findOne({ where: { code: dto.code } })
-    if (exists) throw new ConflictException(`科目编码「${dto.code}」已存在`)
-
     let parent: Account | null = null
     if (dto.parentId) {
       parent = await this.accountRepo.findOne({ where: { id: dto.parentId } })
@@ -118,8 +124,13 @@ export class AccountsService {
         ? BalanceDirection.DEBIT
         : BalanceDirection.CREDIT)) as BalanceDirection
 
+    // 编码未填则自动生成（档案编码统一由后端分配，前端不再收集）
+    const code = (dto.code ?? '').trim() || (await this.generateCode(parent, category))
+    const exists = await this.accountRepo.findOne({ where: { code } })
+    if (exists) throw new ConflictException(`科目编码「${code}」已存在`)
+
     const account = this.accountRepo.create({
-      code: dto.code,
+      code,
       name: dto.name,
       fullName,
       category,
@@ -140,6 +151,43 @@ export class AccountsService {
       await this.accountRepo.update({ id: parent.id }, { isLeaf: false })
     }
     return saved
+  }
+
+  /**
+   * 科目编码自动生成（编码由后端统一分配，前端不再收集）：
+   * - 下级科目：上级编码 + 序号，如 2211.01、2211.02（取已有子科目最大序号 +1）
+   * - 一级科目：按类别首位递增，如资产类取现有 1xxx 最大编码 +1
+   */
+  private async generateCode(parent: Account | null, category: AccountCategory): Promise<string> {
+    if (parent) {
+      const rows: { code: string }[] = await this.accountRepo
+        .createQueryBuilder('a')
+        .select('a.code', 'code')
+        .where('a.parentId = :parentId', { parentId: parent.id })
+        .getRawMany()
+      let max = 0
+      for (const row of rows) {
+        const seq = parseInt(String(row.code ?? '').split('.').pop() ?? '', 10)
+        if (!Number.isNaN(seq) && seq > max) max = seq
+      }
+      return `${parent.code}.${String(max + 1).padStart(2, '0')}`
+    }
+
+    const head = CATEGORY_CODE_HEAD[category] ?? '1'
+    const rows: { code: string }[] = await this.accountRepo
+      .createQueryBuilder('a')
+      .select('a.code', 'code')
+      .where('a.code LIKE :like', { like: `${head}%` })
+      .getRawMany()
+    let max = 0
+    for (const row of rows) {
+      const code = String(row.code ?? '')
+      if (!/^\d{4}$/.test(code)) continue // 跳过下级科目（如 2211.01）
+      const seq = parseInt(code, 10)
+      if (seq > max) max = seq
+    }
+    if (max === 0) return `${head}001`
+    return String(max + 1)
   }
 
   async update(id: string, dto: UpdateAccountDto): Promise<Account> {

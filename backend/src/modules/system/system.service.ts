@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { LessThan, Repository } from 'typeorm'
 import { createReadStream, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
 import * as path from 'node:path'
 import * as fs from 'node:fs/promises'
@@ -160,21 +160,35 @@ export class SystemService {
     if (query.success !== undefined && query.success !== '') {
       qb.andWhere('l.success = :success', { success: query.success === 'true' || query.success === '1' })
     }
-    if (query.startDate) qb.andWhere('l.createdAt >= :startDate', { startDate: query.startDate })
-    if (query.endDate) qb.andWhere('l.createdAt <= :endDate', { endDate: `${query.endDate} 23:59:59` })
+    // created_at 由 SQLite datetime('now') 以 UTC 存储，筛选/排序统一按本地时间比较，否则错 8 小时
+    if (query.startDate) {
+      qb.andWhere(`datetime(l.createdAt, 'localtime') >= :startDate`, { startDate: query.startDate })
+    }
+    if (query.endDate) {
+      qb.andWhere(`datetime(l.createdAt, 'localtime') <= :endDate`, { endDate: `${query.endDate} 23:59:59` })
+    }
 
-    const [list, total] = await qb
-      .orderBy('l.createdAt', 'DESC')
+    const total = await qb.getCount()
+    const { entities, raw } = await qb
+      .addSelect(`datetime(l.createdAt, 'localtime')`, 'localCreatedAt')
+      .orderBy(`datetime(l.createdAt, 'localtime')`, 'DESC')
       .skip((page - 1) * pageSize)
       .take(pageSize)
-      .getManyAndCount()
+      .getRawAndEntities()
+
+    // 返回本地时间字符串：否则页面显示的时间比实际早 8 小时，刚产生的日志看起来像清理前的旧日志
+    const list = entities.map((e, i) => ({ ...e, createdAt: raw[i]?.localCreatedAt ?? e.createdAt }))
 
     return { list, total, page, pageSize }
   }
 
   async cleanLogs(keepDays = 30): Promise<{ message: string }> {
+    // created_at 为 UTC 字符串，cutoff 同样转成 UTC 再比较（原先用 Date 等值匹配，永远删不掉）
     const cutoff = new Date(Date.now() - keepDays * 86400000)
-    const result = await this.logRepo.delete({ createdAt: cutoff as any })
+      .toISOString()
+      .slice(0, 19)
+      .replace('T', ' ')
+    const result = await this.logRepo.delete({ createdAt: LessThan(cutoff) as any })
     return { message: `已清理 ${result.affected ?? 0} 条历史日志` }
   }
 

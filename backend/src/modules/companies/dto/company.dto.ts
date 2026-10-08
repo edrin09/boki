@@ -24,10 +24,10 @@ export class CreateCompanyDto {
   @Length(1, 30, { message: '公司编码长度 1-30' })
   code?: string
 
-  @IsOptional()
-  @IsString()
-  @Length(1, 50)
-  taxNo?: string
+  /** 纳税人识别号：新建时必填 —— 用于比对票面购销方、判定进项/销项方向 *//** 纳税人识别号：新建时必填 —— 用于比对票面购销方、判定进项/销项方向 */
+  @IsString({ message: '请填写纳税人识别号' })
+  @Length(1, 50, { message: '纳税人识别号长度 1-50' })
+  taxNo: string
 
   @IsOptional()
   @IsIn(['small_scale', 'general'], { message: '纳税人类型只能是 small_scale 或 general' })

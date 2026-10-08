@@ -62,18 +62,9 @@
     <!-- 新建 / 编辑公司 -->
     <el-dialog v-model="dialogVisible" :title="form.id ? '编辑公司' : '新建记账公司'" width="680px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="公司名称" prop="name">
-              <el-input v-model="form.name" maxlength="100" placeholder="营业执照上的公司全称" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="公司编码" prop="code">
-              <el-input v-model="form.code" maxlength="30" placeholder="留空自动生成" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <el-form-item label="公司名称" prop="name">
+          <el-input v-model="form.name" maxlength="100" placeholder="营业执照上的公司全称" />
+        </el-form-item>
 
         <el-row :gutter="12">
           <el-col :span="12">
@@ -279,7 +270,6 @@ const roleSelection = reactive<Record<string, string[]>>({})
 const emptyCompanyForm = {
   id: '' as string,
   name: '',
-  code: '',
   taxNo: '',
   taxpayerType: 'small_scale' as string,
   vatRate: 3 as number | null,
@@ -307,7 +297,19 @@ const rules: FormRules = {
     { required: true, message: '请输入公司名称', trigger: 'blur' },
     { max: 100, message: '公司名称过长', trigger: 'blur' },
   ],
-  code: [{ max: 30, message: '公司编码过长', trigger: 'blur' }],
+  taxNo: [
+    {
+      // 新建必填：税号用于比对票面购销方、判定进项/销项方向，缺失则票据无法自动生成凭证
+      validator: (_rule, value, callback) => {
+        if (!form.id && !String(value ?? '').trim()) {
+          callback(new Error('请输入纳税人识别号'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
 }
 
 async function load() {
@@ -329,7 +331,6 @@ function onEdit(row: CompanyRow) {
   Object.assign(form, emptyForm(emptyCompanyForm), {
     id: row.id,
     name: row.name,
-    code: row.code,
     taxNo: row.taxNo ?? '',
     taxpayerType: row.taxpayerType ?? 'small_scale',
     vatRate: row.vatRate ?? (row.taxpayerType === 'general' ? 0 : 3),
@@ -344,7 +345,6 @@ async function onSave() {
   try {
     const payload: Record<string, any> = {
       name: form.name,
-      code: form.code || undefined,
       taxNo: form.taxNo || undefined,
       taxpayerType: form.taxpayerType,
       vatRate: form.vatRate ?? undefined,
