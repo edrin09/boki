@@ -6,8 +6,12 @@ import { AccountCategory, AuxiliaryType, BalanceDirection } from '../common/enum
  * 会计科目（多级科目树）
  */
 @Entity('fin_account')
+@Index('uk_account_code', ['companyId', 'code'], { unique: true })
 export class Account extends BaseEntity {
-  @Index('uk_account_code', { unique: true })
+  @Index('idx_account_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ length: 20, comment: '科目编码' })
   code: string
 

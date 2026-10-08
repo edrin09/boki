@@ -1,11 +1,80 @@
 <template>
   <div class="page">
     <div class="page-card">
+      <!-- AI 上传区：主入口，上传即自动生成凭证 -->
+      <div class="ai-upload">
+        <el-upload drag multiple :auto-upload="false" :limit="20"
+          accept="image/jpeg,image/png,image/webp,image/bmp,image/tiff,application/pdf"
+          :on-change="onFileChange" :on-remove="onFileRemove" :file-list="fileList" :on-exceed="onExceed">
+          <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+          <div class="el-upload__text">
+            拖拽发票、工资表、银行对账单到此处，或<em>点击选择文件</em>
+          </div>
+          <template #tip>
+            <div class="el-upload__tip">
+              支持 jpg/png/webp/bmp/tiff/pdf，单文件 ≤ 20MB，一次最多 20 个。
+              AI 自动识别并生成借贷平衡的凭证，你只需核对后点一次「确认入账」。
+            </div>
+          </template>
+        </el-upload>
+        <el-button v-if="fileList.length" type="primary" class="ai-upload__go" :loading="uploading" @click="onUpload">
+          <el-icon><MagicStick /></el-icon>{{ uploading ? 'AI 识别中…' : `AI 识别并生成凭证（${fileList.length}）` }}
+        </el-button>
+      </div>
+
+      <div v-if="results.length" class="ai-result">
+        <div class="result-summary">
+          <el-tag type="success" size="small">凭证已就绪 {{ draftedResults.length }}</el-tag>
+          <el-tag type="warning" size="small">待人工 {{ pendingResults.length }}</el-tag>
+          <el-tag v-if="otherResults.length" type="info" size="small">其他 {{ otherResults.length }}</el-tag>
+          <el-button size="small" @click="clearResults">清空结果</el-button>
+        </div>
+        <el-table :data="results" size="small" max-height="240">
+          <el-table-column prop="fileName" label="文件" min-width="150" show-overflow-tooltip />
+          <el-table-column label="识别" width="110">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.drafted ? 'success' : row.status === 'duplicate' ? 'info' : 'warning'">
+                {{ row.receiptTypeName || '未识别' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="AI 判断" min-width="280">
+            <template #default="{ row }">
+              <template v-if="row.drafted && row.draft">
+                <div class="suggest-line">
+                  <el-tag size="small" type="success">凭证已生成</el-tag>
+                  <span class="text-muted">记{{ row.draft.voucherNo }} · {{ row.draft.voucherDate }}</span>
+                </div>
+                <div class="entry-line text-muted">
+                  {{ row.draft.entries.map((e: any) => `${Number(e.debit) ? '借' : '贷'} ${e.accountName} ${Number(e.debit || e.credit)}`).join('；') }}
+                </div>
+              </template>
+              <template v-else-if="row.suggestKindLabel">
+                <div class="suggest-line"><el-tag size="small" type="warning">{{ row.suggestKindLabel }}</el-tag></div>
+                <div class="entry-line text-muted">{{ row.draftMessage || row.blockReason }}</div>
+              </template>
+              <span v-else class="text-muted">{{ row.blockReason || row.message || '需人工处理' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="置信度" width="80" align="center">
+            <template #default="{ row }">
+              <span v-if="row.confidence != null">{{ (row.confidence * 100).toFixed(0) }}%</span>
+              <span v-else class="text-muted">-</span>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-button v-if="draftedResults.length" type="primary" size="small" class="mt8" @click="load">
+          <el-icon><Refresh /></el-icon>刷新下方列表，确认入账
+        </el-button>
+      </div>
+
       <div class="page-toolbar">
-        <el-alert type="info" :closable="false" show-icon class="page-toolbar__alert"
-          title="票据识别结果一律先到「待确认」：确认入账后才计入账簿与报表；确认前可修改分录科目与金额。" />
+        <div class="page-toolbar__hint">
+          <strong>待确认入账</strong>
+          <span class="text-muted">AI 已生成凭证草稿，核对科目与金额后点「确认入账」即可计入账簿。</span>
+        </div>
         <el-button type="primary" :disabled="!selectedDrafted.length" :loading="confirming" @click="onConfirmBatch">
-          <el-icon><Select /></el-icon>批量确认（{{ selectedDrafted.length }}）
+          <el-icon><Select /></el-icon>批量确认入账（{{ selectedDrafted.length }}）
         </el-button>
         <el-button @click="load"><el-icon><Refresh /></el-icon>刷新</el-button>
       </div>
@@ -49,6 +118,8 @@
               </div>
             </template>
             <span v-else class="text-muted">无法自动归类</span>
+            <!-- 不能自动入账时直接给出原因，避免用户点进去才报错 -->
+            <div v-if="row.blockReason" class="suggest-sub text-danger">{{ row.blockReason }}</div>
           </template>
         </el-table-column>
         <el-table-column label="凭证草稿" min-width="180">
@@ -67,7 +138,10 @@
         </el-table-column>
         <el-table-column label="操作" width="230" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="row.status === 'parsed'" v-permission="'receipt:confirm'" link type="primary"
+            <el-tooltip v-if="row.bookable === false" content="该单据无法自动生成凭证，请查看左侧原因" placement="top">
+              <span class="disabled-hint">不可自动入账</span>
+            </el-tooltip>
+            <el-button v-if="row.status === 'parsed' && row.bookable !== false" v-permission="'receipt:confirm'" link type="primary"
               :loading="draftingId === row.id" @click="onGenerateDraft(row)">生成草稿</el-button>
             <template v-if="row.status === 'drafted'">
               <el-button v-permission="'receipt:confirm'" link type="primary" @click="openEditDraft(row)">修改草稿</el-button>
@@ -163,8 +237,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Select, Refresh, Delete } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox, type UploadFile, type UploadFiles } from 'element-plus'
+import { Select, Refresh, Delete, UploadFilled, MagicStick } from '@element-plus/icons-vue'
 import { receiptApi } from '@/api'
 import service from '@/api/http'
 import { usePagedList, ok } from '@/composables/useList'
@@ -176,6 +250,7 @@ const SUGGEST_TAG: Record<string, 'success' | 'danger' | 'warning' | 'info'> = {
   output_vat: 'success',
   expense: 'warning',
   bank_fee: 'info',
+  payroll: 'success',
   unknown: 'info',
 }
 
@@ -183,6 +258,57 @@ const { list, total, loading, query, load, reset: onReset } = usePagedList({
   fetcher: (params) => receiptApi.pending(params),
   defaultParams: { page: 1, pageSize: 20 },
 })
+
+// ============ AI 上传 ============
+const fileList = ref<UploadFile[]>([])
+const uploading = ref(false)
+/** 识别结果：保留在页面内供逐条查看原因 */
+const results = ref<any[]>([])
+
+const draftedResults = computed(() => results.value.filter((r) => r.drafted))
+const pendingResults = computed(() => results.value.filter((r) => r.status === 'parsed' && !r.drafted))
+const otherResults = computed(() => results.value.filter((r) => r.status !== 'parsed'))
+
+function onFileChange(_f: UploadFile, files: UploadFiles) {
+  fileList.value = files
+  results.value = []
+}
+
+function onFileRemove(_f: UploadFile, files: UploadFiles) {
+  fileList.value = files
+  results.value = []
+}
+
+function onExceed() {
+  ElMessage.warning('一次最多上传 20 个文件')
+}
+
+function clearResults() {
+  results.value = []
+  fileList.value = []
+}
+
+async function onUpload() {
+  const raws: File[] = fileList.value.filter((f) => f.raw instanceof File).map((f) => f.raw as File)
+  if (!raws.length) return
+  uploading.value = true
+  try {
+    const res = await receiptApi.upload(raws)
+    results.value = res ?? []
+    const drafted = draftedResults.value.length
+    const pending = pendingResults.value.length
+    if (drafted > 0) {
+      ElMessage.success(`AI 已生成 ${drafted} 张凭证${pending ? `，${pending} 个需人工确认` : ''}`)
+    } else if (pending > 0) {
+      ElMessage.warning(`${pending} 个单据需人工确认，原因见上方`)
+    } else {
+      ElMessage.info('没有新增可记账的单据')
+    }
+    await load()
+  } finally {
+    uploading.value = false
+  }
+}
 
 const accountOptions = ref<any[]>([])
 async function loadAccounts() {
@@ -261,6 +387,10 @@ function openEditDraft(row: any) {
   draftForm.entries = (row.draft?.entries ?? []).map((e: any) => ({
     summary: e.summary ?? '',
     accountId: e.accountId,
+    // 辅助核算必须原样带出：应付账款/费用类科目缺往来单位或部门会被后端拒绝
+    partnerId: e.partnerId ?? null,
+    departmentId: e.departmentId ?? null,
+    projectId: e.projectId ?? null,
     debit: Number(e.debit) || 0,
     credit: Number(e.credit) || 0,
   }))
@@ -351,10 +481,59 @@ onMounted(loadAccounts)
 </script>
 
 <style scoped>
-.page-toolbar__alert {
+.page-toolbar__hint {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   margin-right: 12px;
-  min-width: 420px;
+  min-width: 320px;
+  font-size: 14px;
+}
+.page-toolbar__hint .text-muted {
+  font-size: 12px;
+}
+
+/* AI 上传区：作为页面主入口，视觉权重高于下方待确认表格 */
+.ai-upload {
+  padding: 16px 16px 8px;
+  margin-bottom: 12px;
+  border: 1px solid var(--el-color-primary-light-7);
+  border-radius: 6px;
+  background: var(--el-color-primary-light-9);
+}
+.ai-upload :deep(.el-upload-dragger) {
+  padding: 22px 12px;
+  background: var(--el-bg-color);
+}
+.ai-upload__go {
+  margin: 12px 0 6px;
+}
+.ai-result {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+}
+.result-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.suggest-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.entry-line {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.mt8 {
+  margin-top: 8px;
 }
 .link {
   color: var(--el-color-primary);
@@ -395,6 +574,14 @@ onMounted(loadAccounts)
 }
 .text-muted {
   color: var(--el-text-color-secondary);
+}
+.text-danger {
+  color: var(--el-color-danger);
+}
+.disabled-hint {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  cursor: help;
 }
 .balance-bar {
   padding: 8px 12px;

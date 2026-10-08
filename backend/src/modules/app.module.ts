@@ -1,15 +1,18 @@
 import { Module } from '@nestjs/common'
-import { APP_GUARD } from '@nestjs/core'
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { buildDatabaseOptions } from '../config/database.config'
 import { GlobalAuthGuard } from '../common/guards/global-auth.guard'
 import { PermissionsGuard } from '../common/guards/permissions.guard'
+import { RolesGuard } from '../common/guards/roles.guard'
 import { SeedService } from '../db/seed.service'
 import { Permission } from '../entities/permission.entity'
 import { Role } from '../entities/role.entity'
 import { User } from '../entities/user.entity'
 import { Account } from '../entities/account.entity'
+import { Company } from '../entities/company.entity'
+import { UserCompany } from '../entities/user-company.entity'
 import { AuthModule } from './auth/auth.module'
 import { UsersModule } from './users/users.module'
 import { RolesModule } from './roles/roles.module'
@@ -33,6 +36,9 @@ import { PayrollModule } from './payroll/payroll.module'
 import { OcrModule } from './ocr/ocr.module'
 import { ReceiptsModule } from './receipts/receipts.module'
 import { ExtractModule } from './extract/extract.module'
+import { CompaniesModule } from './companies/companies.module'
+import { CompanyReposModule } from '../common/company/company-repos.module'
+import { CompanyScopeInterceptor } from '../common/company/company-scope.interceptor'
 
 @Module({
   imports: [
@@ -46,7 +52,9 @@ import { ExtractModule } from './extract/extract.module'
       inject: [ConfigService],
       useFactory: () => buildDatabaseOptions(),
     }),
-    TypeOrmModule.forFeature([Permission, Role, User, Account]),
+    TypeOrmModule.forFeature([Permission, Role, User, Account, Company, UserCompany]),
+    CompanyReposModule,
+    CompaniesModule,
     AuthModule,
     UsersModule,
     RolesModule,
@@ -74,6 +82,10 @@ import { ExtractModule } from './extract/extract.module'
   providers: [
     { provide: APP_GUARD, useClass: GlobalAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    // 注意：RolesGuard 此前未注册，导致 @RequireRoles('admin') 形同虚设
+    { provide: APP_GUARD, useClass: RolesGuard },
+    // 多公司隔离：守卫通过后写入公司上下文
+    { provide: APP_INTERCEPTOR, useClass: CompanyScopeInterceptor },
     SeedService,
   ],
 })

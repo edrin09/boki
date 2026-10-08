@@ -17,6 +17,7 @@
     "test:smoke": "node test/smoke.mjs",
     "test:smoke2": "node test/smoke2.mjs",
     "test:smoke3": "node test/smoke3.mjs",
+    "test:companies": "node test/multi-company.mjs",
     "test:ocr": "node test/ocr-verify.mjs",
     "test:receipts": "node test/receipts-verify.mjs http://127.0.0.1:3000/api",
     "test:parsers": "node test/parsers-verify.mjs",

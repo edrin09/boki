@@ -43,7 +43,9 @@ npm-shrinkwrap.json
 backend/models/ocr/*.onnx
 backend/models/ocr/*.txt
 
-# 桌面壳（Electron）：依赖、打包暂存区与安装包产物
+# 桌面壳（Electron）中间产物 —— 逐项性质与删除代价见「打包与更新指南.md · 八、中间产物与目录说明」
+# 注意：安装包 FinancialApp-Setup-<version>.exe 也落在 desktop/release/ 下，
+# 因此同样不进版本库，交付件需另行归档。
 desktop/node_modules/
 desktop/stage/
 desktop/release/

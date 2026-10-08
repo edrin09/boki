@@ -1,13 +1,13 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
 import { Receipt } from '../../entities/receipt.entity'
 import { ClassifyRule } from '../../entities/classify-rule.entity'
 import { Partner } from '../../entities/partner.entity'
 import { Account } from '../../entities/account.entity'
+import { Department } from '../../entities/department.entity'
 import { Voucher } from '../../entities/voucher.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
 import {
+  AuxiliaryType,
   PartnerType,
   ReceiptStatus,
   VoucherStatus,
@@ -15,6 +15,8 @@ import {
 } from '../../common/enums'
 import { toCents, fromCents } from '../../common/utils/money.util'
 import { CODE_PREFIX, nextCode } from '../../common/utils/code.util'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { VouchersService } from '../vouchers/vouchers.service'
 import { ClassifyService, ClassifySuggestion, DraftEntryTemplate } from './classify.service'
 import type { RejectReceiptDto, UpdateDraftDto } from './dto/workbench.dto'
@@ -31,14 +33,17 @@ export interface Operator {
 @Injectable()
 export class ReceiptWorkbenchService {
   private readonly logger = new Logger('ReceiptWorkbenchService')
+  /** 兜底部门缓存（同一批次内复用，避免每条分录重复查询） */
+  private cachedDefaultDept: string | null | undefined
 
   constructor(
-    @InjectRepository(Receipt) private readonly receiptRepo: Repository<Receipt>,
-    @InjectRepository(ClassifyRule) private readonly ruleRepo: Repository<ClassifyRule>,
-    @InjectRepository(Partner) private readonly partnerRepo: Repository<Partner>,
-    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
-    @InjectRepository(Voucher) private readonly voucherRepo: Repository<Voucher>,
-    @InjectRepository(VoucherEntry) private readonly entryRepo: Repository<VoucherEntry>,
+    @InjectCompanyRepo(Receipt) private readonly receiptRepo: CompanyScopedRepository<Receipt>,
+    @InjectCompanyRepo(ClassifyRule) private readonly ruleRepo: CompanyScopedRepository<ClassifyRule>,
+    @InjectCompanyRepo(Partner) private readonly partnerRepo: CompanyScopedRepository<Partner>,
+    @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
+    @InjectCompanyRepo(Department) private readonly deptRepo: CompanyScopedRepository<Department>,
+    @InjectCompanyRepo(Voucher) private readonly voucherRepo: CompanyScopedRepository<Voucher>,
+    @InjectCompanyRepo(VoucherEntry) private readonly entryRepo: CompanyScopedRepository<VoucherEntry>,
     private readonly classify: ClassifyService,
     private readonly vouchers: VouchersService,
   ) {}
@@ -225,20 +230,24 @@ export class ReceiptWorkbenchService {
       summary: string
       accountId: string
       partnerId: string | null
+      departmentId: string | null
       amount: number
       direction: 'debit' | 'credit'
     }> = []
     for (const tpl of suggestion.entries) {
       const account = await this.requireLeafAccount(tpl.accountCode)
-      let amount: number
-      if (tpl.amountSource === 'tax_amount') amount = tax
-      else if (tpl.amountSource === 'amount') amount = net
-      else amount = total
+      const amount = this.resolveAmount(tpl.amountSource, fields, { total, net, tax })
       const partnerId = await this.resolvePartner(suggestion, tpl)
+      // 科目要求部门辅助核算时兜底填一个默认部门：
+      // 票据本身通常不含部门信息，但缺少它会让整张凭证无法保存
+      const departmentId = (account.auxiliaryTypes ?? []).includes(AuxiliaryType.DEPARTMENT)
+        ? await this.defaultDepartmentId()
+        : null
       rows.push({
         summary: (tpl.summary ?? '').slice(0, 200),
         accountId: account.id,
         partnerId,
+        departmentId,
         amount: fromCents(toCents(amount)),
         direction: tpl.direction,
       })
@@ -265,9 +274,27 @@ export class ReceiptWorkbenchService {
       summary: r.summary,
       accountId: r.accountId,
       partnerId: r.partnerId ?? undefined,
+      departmentId: r.departmentId ?? undefined,
       debit: r.direction === 'debit' ? r.amount : undefined,
       credit: r.direction === 'credit' ? r.amount : undefined,
     }))
+  }
+
+  /**
+   * 解析分录金额。
+   * 优先按 amountSource 直接取识别字段（支持工资表等业务字段）；
+   * 取不到时回落到发票口径：tax_amount→税额、amount→不含税、其余→价税合计。
+   */
+  private resolveAmount(
+    source: DraftEntryTemplate['amountSource'],
+    fields: Record<string, string | number | null>,
+    ctx: { total: number; net: number; tax: number },
+  ): number {
+    const direct = this.num(fields[source])
+    if (direct !== null) return direct
+    if (source === 'tax_amount') return ctx.tax
+    if (source === 'amount') return ctx.net
+    return ctx.total
   }
 
   /** 解析分录上的往来单位：按名称命中则复用，否则自动建档（编码后端生成） */
@@ -293,6 +320,22 @@ export class ReceiptWorkbenchService {
       }),
     )
     return saved.id
+  }
+
+  /**
+   * 兜底部门：取当前公司第一个启用中的部门。
+   * 票据识别不出部门，但「销售费用/研发费用」等科目要求按部门辅助核算，
+   * 缺部门会导致整张凭证保存失败，因此这里给一个默认值。
+   */
+  private async defaultDepartmentId(): Promise<string | null> {
+    if (this.cachedDefaultDept !== undefined) return this.cachedDefaultDept
+    try {
+      const dept = await this.deptRepo.findOne({ where: { status: 1 }, order: { code: 'ASC' } })
+      this.cachedDefaultDept = dept?.id ?? null
+    } catch {
+      this.cachedDefaultDept = null
+    }
+    return this.cachedDefaultDept
   }
 
   private async requireLeafAccount(code: string): Promise<Account> {
@@ -411,6 +454,8 @@ export class ReceiptWorkbenchService {
       storagePath: receipt.storagePath,
       confidence: receipt.confidence,
       status: receipt.status,
+      bookable: receipt.bookable === null ? null : Boolean(receipt.bookable),
+      blockReason: receipt.blockReason ?? null,
       issueDate: receipt.issueDate,
       amount: receipt.amount,
       taxAmount: receipt.taxAmount,

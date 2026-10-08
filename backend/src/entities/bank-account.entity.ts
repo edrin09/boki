@@ -6,8 +6,12 @@ import { BankAccountType } from '../common/enums'
  * 资金账户（库存现金 / 银行存款）
  */
 @Entity('fin_bank_account')
+@Index('uk_bank_code', ['companyId', 'code'], { unique: true })
 export class BankAccount extends BaseEntity {
-  @Index('uk_bank_code', { unique: true })
+  @Index('idx_bank_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ length: 30, comment: '编码' })
   code: string
 

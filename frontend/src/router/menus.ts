@@ -21,12 +21,22 @@ export const MENUS: MenuNode[] = [
     permission: 'dashboard',
   },
   {
+    title: 'AI 智能记账',
+    icon: 'MagicStick',
+    permission: 'receipts',
+    children: [
+      { title: '上传记账', path: '/receipts/workbench', permission: 'receipts:workbench' },
+      { title: '票据列表', path: '/receipts/list', permission: 'receipt:list' },
+      { title: '归类规则', path: '/receipts/rules', permission: 'receipts:rules' },
+    ],
+  },
+  {
     title: '凭证管理',
     icon: 'Tickets',
     permission: 'voucher',
     children: [
       { title: '凭证列表', path: '/voucher/list', permission: 'voucher:list' },
-      { title: '凭证录入', path: '/voucher/create', permission: 'voucher:create' },
+      { title: '手动录入', path: '/voucher/create', permission: 'voucher:create' },
     ],
   },
   {
@@ -61,16 +71,6 @@ export const MENUS: MenuNode[] = [
     ],
   },
   {
-    title: '票据智能记账',
-    icon: 'Camera',
-    permission: 'receipts',
-    children: [
-      { title: '票据列表', path: '/receipts/list', permission: 'receipt:list' },
-      { title: '待确认工作台', path: '/receipts/workbench', permission: 'receipts:workbench' },
-      { title: '归类规则', path: '/receipts/rules', permission: 'receipts:rules' },
-    ],
-  },
-  {
     title: '财务报表',
     icon: 'DataAnalysis',
     permission: 'reports',
@@ -95,6 +95,7 @@ export const MENUS: MenuNode[] = [
       { title: '项目管理', path: '/settings/projects', permission: 'settings:project' },
       { title: '期初余额', path: '/settings/initial-balance', permission: 'settings:initial-balance' },
       { title: '公司信息', path: '/settings/company', permission: 'settings:company' },
+      { title: '记账公司管理', path: '/settings/companies', permission: 'settings:company-manage' },
     ],
   },
   {
@@ -102,6 +103,7 @@ export const MENUS: MenuNode[] = [
     icon: 'Setting',
     permission: 'system',
     children: [
+      { title: '记账公司', path: '/system/companies', permission: 'system:company' },
       { title: '用户管理', path: '/system/users', permission: 'system:user' },
       { title: '角色管理', path: '/system/roles', permission: 'system:role' },
       { title: '权限管理', path: '/system/permissions', permission: 'system:permission' },

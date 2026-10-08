@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { In, Repository } from 'typeorm'
+import { In } from 'typeorm'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { Account } from '../../entities/account.entity'
 import { Voucher } from '../../entities/voucher.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
@@ -48,13 +49,14 @@ const emptyCategory = (key: CashCategoryKey, title: string): CategoryAgg => ({
 @Injectable()
 export class AnalysisService {
   constructor(
-    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
-    @InjectRepository(Voucher) private readonly voucherRepo: Repository<Voucher>,
-    @InjectRepository(VoucherEntry) private readonly entryRepo: Repository<VoucherEntry>,
-    @InjectRepository(Receipt) private readonly receiptRepo: Repository<Receipt>,
-    @InjectRepository(Partner) private readonly partnerRepo: Repository<Partner>,
-    @InjectRepository(Payroll) private readonly payrollRepo: Repository<Payroll>,
-    @InjectRepository(ExpenseClaim) private readonly expenseClaimRepo: Repository<ExpenseClaim>,
+    @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
+    @InjectCompanyRepo(Voucher) private readonly voucherRepo: CompanyScopedRepository<Voucher>,
+    @InjectCompanyRepo(VoucherEntry) private readonly entryRepo: CompanyScopedRepository<VoucherEntry>,
+    @InjectCompanyRepo(Receipt) private readonly receiptRepo: CompanyScopedRepository<Receipt>,
+    @InjectCompanyRepo(Partner) private readonly partnerRepo: CompanyScopedRepository<Partner>,
+    @InjectCompanyRepo(Payroll) private readonly payrollRepo: CompanyScopedRepository<Payroll>,
+    @InjectCompanyRepo(ExpenseClaim)
+    private readonly expenseClaimRepo: CompanyScopedRepository<ExpenseClaim>,
     private readonly booksService: BooksService,
     private readonly reportsService: ReportsService,
   ) {}

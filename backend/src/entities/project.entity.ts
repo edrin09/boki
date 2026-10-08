@@ -5,8 +5,12 @@ import { BaseEntity } from './base.entity'
  * 项目（辅助核算维度）
  */
 @Entity('fin_project')
+@Index('uk_project_code', ['companyId', 'code'], { unique: true })
 export class Project extends BaseEntity {
-  @Index('uk_project_code', { unique: true })
+  @Index('idx_project_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ length: 30, comment: '编码' })
   code: string
 

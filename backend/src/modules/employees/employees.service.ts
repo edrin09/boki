@@ -1,10 +1,11 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Brackets, Repository } from 'typeorm'
+import { Brackets } from 'typeorm'
 import { Employee, ExpenseClaim, PayrollItem } from '../../entities/hr.entity'
 import { Department } from '../../entities/department.entity'
 import { EmployeeStatus } from '../../common/enums'
 import { CODE_PREFIX, nextCode } from '../../common/utils/code.util'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import type { PageResult, PaginationQueryDto } from '../../common/dto/pagination.dto'
 import type { CreateEmployeeDto, UpdateEmployeeDto } from './dto/employee.dto'
 
@@ -20,10 +21,11 @@ export interface BatchCreateItemResult {
 @Injectable()
 export class EmployeesService {
   constructor(
-    @InjectRepository(Employee) private readonly repo: Repository<Employee>,
-    @InjectRepository(Department) private readonly deptRepo: Repository<Department>,
-    @InjectRepository(ExpenseClaim) private readonly claimRepo: Repository<ExpenseClaim>,
-    @InjectRepository(PayrollItem) private readonly payrollItemRepo: Repository<PayrollItem>,
+    @InjectCompanyRepo(Employee) private readonly repo: CompanyScopedRepository<Employee>,
+    @InjectCompanyRepo(Department) private readonly deptRepo: CompanyScopedRepository<Department>,
+    @InjectCompanyRepo(ExpenseClaim) private readonly claimRepo: CompanyScopedRepository<ExpenseClaim>,
+    @InjectCompanyRepo(PayrollItem)
+    private readonly payrollItemRepo: CompanyScopedRepository<PayrollItem>,
   ) {}
 
   async findAll(
@@ -174,7 +176,7 @@ export class EmployeesService {
       throw new ConflictException(`该员工存在 ${usedPayroll} 条工资记录，无法删除。可改为「离职」`)
     }
 
-    await this.repo.delete(id)
+    await this.repo.delete({ id } as any)
     return { message: '删除成功' }
   }
 

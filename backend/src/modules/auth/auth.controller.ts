@@ -1,7 +1,7 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req } from '@nestjs/common'
 import type { Request } from 'express'
 import { AuthService } from './auth.service'
-import { LoginDto, ChangePasswordDto } from './dto/auth.dto'
+import { ChangePasswordDto, LoginDto, SwitchCompanyDto } from './dto/auth.dto'
 import { SkipWrap } from '../../common/decorators/skip-wrap.decorator'
 import { Operation } from '../../common/decorators/operation.decorator'
 import { Public } from '../../common/decorators/public.decorator'
@@ -13,6 +13,8 @@ export class AuthController {
 
   /**
    * 登录
+   *
+   * 返回可切换公司列表与默认公司；前端据此渲染公司切换器。
    */
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -36,7 +38,27 @@ export class AuthController {
   @Get('profile')
   @Operation('获取当前用户信息')
   profile(@Req() req: Request) {
-    return this.authService.profile(getCurrentUser(req).sub)
+    const user = getCurrentUser(req)
+    return this.authService.profile(user.sub, user.companyId ?? null)
+  }
+
+  /**
+   * 可管理的记账公司列表
+   */
+  @Get('companies')
+  @Operation('查询我可管理的公司')
+  companies(@Req() req: Request) {
+    return this.authService.profile(getCurrentUser(req).sub).then((p) => p.companies ?? [])
+  }
+
+  /**
+   * 切换记账公司：重新签发带 companyId 的令牌
+   */
+  @Post('switch-company')
+  @HttpCode(HttpStatus.OK)
+  @Operation('切换记账公司')
+  switchCompany(@Req() req: Request, @Body() dto: SwitchCompanyDto) {
+    return this.authService.switchCompany(getCurrentUser(req).sub, dto.companyId)
   }
 
   /**

@@ -7,10 +7,16 @@ import { decimalTransformer } from '../common/transformers/decimal.transformer'
  * 期初余额（按会计年度 + 科目 + 辅助核算组合）
  */
 @Entity('fin_initial_balance')
-@Index('uk_initial_balance', ['fiscalYear', 'accountId', 'partnerId', 'departmentId', 'projectId'], {
-  unique: true,
-})
+@Index(
+  'uk_initial_balance',
+  ['companyId', 'fiscalYear', 'accountId', 'partnerId', 'departmentId', 'projectId'],
+  { unique: true },
+)
 export class InitialBalance extends BaseEntity {
+  @Index('idx_initial_balance_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ name: 'fiscal_year', type: 'int', comment: '会计年度，如 2026' })
   fiscalYear: number
 

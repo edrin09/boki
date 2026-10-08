@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
 import { Account } from '../../entities/account.entity'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { BalanceDirection } from '../../common/enums'
 import { toCents, fromCents } from '../../common/utils/money.util'
 import {
@@ -54,7 +54,7 @@ const PL_STRUCTURE: Array<{
 @Injectable()
 export class ReportsService {
   constructor(
-    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
+    @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
     private readonly booksService: BooksService,
   ) {}
 

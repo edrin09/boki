@@ -4,6 +4,7 @@ import { Receipt } from '../../entities/receipt.entity'
 import { ClassifyRule } from '../../entities/classify-rule.entity'
 import { Partner } from '../../entities/partner.entity'
 import { Account } from '../../entities/account.entity'
+import { Department } from '../../entities/department.entity'
 import { Voucher } from '../../entities/voucher.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
 import { OcrModule } from '../ocr/ocr.module'
@@ -22,6 +23,7 @@ import { ReceiptWorkbenchService } from './workbench.service'
       ClassifyRule,
       Partner,
       Account,
+      Department,
       Voucher,
       VoucherEntry,
     ]),

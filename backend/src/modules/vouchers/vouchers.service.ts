@@ -3,8 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { DataSource, EntityManager, In, Repository } from 'typeorm'
+import { DataSource, EntityManager, In } from 'typeorm'
 import { Voucher } from '../../entities/voucher.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
 import { Account } from '../../entities/account.entity'
@@ -14,6 +13,9 @@ import { Project } from '../../entities/project.entity'
 import { VoucherSource, VoucherStatus } from '../../common/enums'
 import { toCents, fromCents } from '../../common/utils/money.util'
 import { toPeriod } from '../../common/utils/date.util'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
+import { requireCompanyId } from '../../common/company/company-context'
 import type { PageResult, PaginationQueryDto } from '../../common/dto/pagination.dto'
 import type { SaveVoucherDto, VoucherEntryDto } from './dto/voucher.dto'
 
@@ -33,12 +35,12 @@ interface NormalizedEntry {
 @Injectable()
 export class VouchersService {
   constructor(
-    @InjectRepository(Voucher) private readonly voucherRepo: Repository<Voucher>,
-    @InjectRepository(VoucherEntry) private readonly entryRepo: Repository<VoucherEntry>,
-    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
-    @InjectRepository(Partner) private readonly partnerRepo: Repository<Partner>,
-    @InjectRepository(Department) private readonly deptRepo: Repository<Department>,
-    @InjectRepository(Project) private readonly projectRepo: Repository<Project>,
+    @InjectCompanyRepo(Voucher) private readonly voucherRepo: CompanyScopedRepository<Voucher>,
+    @InjectCompanyRepo(VoucherEntry) private readonly entryRepo: CompanyScopedRepository<VoucherEntry>,
+    @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
+    @InjectCompanyRepo(Partner) private readonly partnerRepo: CompanyScopedRepository<Partner>,
+    @InjectCompanyRepo(Department) private readonly deptRepo: CompanyScopedRepository<Department>,
+    @InjectCompanyRepo(Project) private readonly projectRepo: CompanyScopedRepository<Project>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -73,10 +75,12 @@ export class VouchersService {
     if (query.word) qb.andWhere('v.word = :word', { word: query.word })
 
     // 按分录条件过滤：用子查询筛选凭证，避免关联带来的重复行
+    const companyId = requireCompanyId()
     if (query.accountId) {
       qb.andWhere(
-        `v.id IN (SELECT e.voucher_id FROM fin_voucher_entry e WHERE e.account_id = :accountId)`,
-        { accountId: query.accountId },
+        `v.id IN (SELECT e.voucher_id FROM fin_voucher_entry e
+                  WHERE e.account_id = :accountId AND e.company_id = :companyId)`,
+        { accountId: query.accountId, companyId },
       )
     }
     if (query.keyword) {
@@ -84,8 +88,9 @@ export class VouchersService {
       qb.andWhere(
         `(v.remark LIKE :kw
           OR v.id IN (SELECT e.voucher_id FROM fin_voucher_entry e
-                      WHERE e.summary LIKE :kw OR e.account_name LIKE :kw OR e.account_code LIKE :kw))`,
-        { kw },
+                      WHERE e.company_id = :companyId
+                        AND (e.summary LIKE :kw OR e.account_name LIKE :kw OR e.account_code LIKE :kw)))`,
+        { kw, companyId },
       )
     }
 
@@ -246,11 +251,11 @@ export class VouchersService {
     )
 
     // 建立双向关联
-    await this.voucherRepo.update(reversed.id, {
+    await this.voucherRepo.update({ id: reversed.id }, {
       isReversal: true,
       reversalOfId: id,
     })
-    await this.voucherRepo.update(id, { reversedById: reversed.id })
+    await this.voucherRepo.update({ id }, { reversedById: reversed.id })
 
     return {
       message: `已生成红字冲销凭证（${reversed.word}-${String(reversed.voucherNo).padStart(4, '0')}）`,
@@ -275,7 +280,9 @@ export class VouchersService {
 
     return this.dataSource.transaction(async (manager) => {
       const nextNo = await this.nextVoucherNoInTx(manager, period, dto.word)
+      const companyId = requireCompanyId()
       const voucher = manager.create(Voucher, {
+        companyId,
         voucherNo: nextNo,
         word: dto.word,
         period,
@@ -296,7 +303,9 @@ export class VouchersService {
       })
       const savedVoucher = await manager.save(Voucher, voucher)
 
-      const rows = entries.map((e) => manager.create(VoucherEntry, { ...e, voucherId: savedVoucher.id }))
+      const rows = entries.map((e) =>
+        manager.create(VoucherEntry, { ...e, companyId, voucherId: savedVoucher.id }),
+      )
       await manager.save(VoucherEntry, rows)
 
       return this.toVo(savedVoucher, rows)
@@ -334,7 +343,9 @@ export class VouchersService {
 
       await manager.delete(VoucherEntry, { voucherId: id })
 
-      const rows = entries.map((e) => manager.create(VoucherEntry, { ...e, voucherId: id }))
+      const rows = entries.map((e) =>
+        manager.create(VoucherEntry, { ...e, companyId: requireCompanyId(), voucherId: id }),
+      )
       await manager.save(VoucherEntry, rows)
 
       voucher.voucherNo = voucherNo
@@ -365,7 +376,7 @@ export class VouchersService {
       throw new BadRequestException('已审核凭证不可删除，请先反审核')
     }
     await this.entryRepo.delete({ voucherId: id })
-    await this.voucherRepo.delete(id)
+    await this.voucherRepo.delete({ id } as any)
     return { message: '删除成功' }
   }
 
@@ -463,6 +474,7 @@ export class VouchersService {
       .select('MAX(v.voucherNo)', 'max')
       .where('v.period = :period', { period })
       .andWhere('v.word = :word', { word })
+      .andWhere('v.company_id = :companyId', { companyId: requireCompanyId() })
       .getRawOne<{ max: number | null }>()
     return (row?.max ?? 0) + 1
   }

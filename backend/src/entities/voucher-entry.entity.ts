@@ -11,6 +11,10 @@ import { decimalTransformer } from '../common/transformers/decimal.transformer'
 @Index('idx_entry_voucher', ['voucherId'])
 @Index('idx_entry_account', ['accountId'])
 export class VoucherEntry extends BaseEntity {
+  @Index('idx_entry_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ name: 'voucher_id', type: 'varchar' })
   voucherId: string
 

@@ -1,27 +1,39 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { In, Repository } from 'typeorm'
 import { User } from '../../entities/user.entity'
+import { Company } from '../../entities/company.entity'
+import { UserCompany } from '../../entities/user-company.entity'
 import { comparePassword, hashPassword } from '../../common/utils/crypto.util'
 import type { JwtPayload } from '../../common/interfaces/jwt-payload.interface'
 import type { ChangePasswordDto, LoginDto } from './dto/auth.dto'
+
+/** 登录 / 切换公司统一返回结构 */
+export interface AuthResult {
+  accessToken: string
+  expiresIn: string
+  user: Record<string, any>
+  company: Record<string, any> | null
+  companies: Record<string, any>[]
+}
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(Company) private readonly companyRepo: Repository<Company>,
+    @InjectRepository(UserCompany) private readonly linkRepo: Repository<UserCompany>,
     private readonly jwtService: JwtService,
   ) {}
 
   /**
    * 账号密码登录
+   *
+   * 登录后默认进入「第一个可访问公司」，并把 companyId 写入令牌；
+   * 用户可通过 /auth/switch-company 切换，前端刷新令牌即可。
    */
-  async login(dto: LoginDto, ip?: string): Promise<{
-    accessToken: string
-    expiresIn: string
-    user: Record<string, any>
-  }> {
+  async login(dto: LoginDto, ip?: string): Promise<AuthResult> {
     const user = await this.userRepo
       .createQueryBuilder('u')
       .addSelect('u.password')
@@ -47,28 +59,18 @@ export class AuthService {
       lastLoginIp: ip ?? null,
     })
 
-    const { roles, permissions } = this.extractIdentity(user)
-    const payload: JwtPayload = {
-      sub: user.id,
-      username: user.username,
-      nickname: user.nickname,
-      roles,
-      permissions,
+    const companies = await this.listCompanies(user.id)
+    if (!companies.length) {
+      throw new ForbiddenException('该账号尚未分配记账公司，请联系管理员')
     }
 
-    const accessToken = await this.jwtService.signAsync(payload)
-
-    return {
-      accessToken,
-      expiresIn: process.env.JWT_EXPIRES_IN || '8h',
-      user: this.toProfile(user, roles, permissions),
-    }
+    return this.buildResult(user, companies, companies[0].id)
   }
 
   /**
-   * 获取当前登录用户信息（含权限与菜单）
+   * 获取当前登录用户信息（含权限、菜单与可切换公司）
    */
-  async profile(userId: string): Promise<Record<string, any>> {
+  async profile(userId: string, companyId?: string | null): Promise<Record<string, any>> {
     const user = await this.userRepo
       .createQueryBuilder('u')
       .leftJoinAndSelect('u.roles', 'roles')
@@ -80,8 +82,37 @@ export class AuthService {
       throw new UnauthorizedException('用户不存在或已被删除')
     }
 
-    const { roles, permissions } = this.extractIdentity(user)
-    return this.toProfile(user, roles, permissions)
+    const companies = await this.listCompanies(userId)
+    const profile = this.toProfile(user)
+    return {
+      ...profile,
+      companyId: companyId ?? null,
+      company: companies.find((c) => c.id === companyId) ?? null,
+      companies,
+    }
+  }
+
+  /**
+   * 切换记账公司：校验权限后重新签发带新 companyId 的令牌。
+   * 采用重签令牌而非请求头传参，保证隔离边界由服务端签名保证。
+   */
+  async switchCompany(userId: string, companyId: string): Promise<AuthResult> {
+    const user = await this.userRepo
+      .createQueryBuilder('u')
+      .leftJoinAndSelect('u.roles', 'roles')
+      .leftJoinAndSelect('roles.permissions', 'permissions')
+      .where('u.id = :id', { id: userId })
+      .getOne()
+    if (!user) throw new UnauthorizedException('用户不存在')
+
+    const companies = await this.listCompanies(userId)
+    if (!companies.some((c) => c.id === companyId)) {
+      throw new ForbiddenException('您没有该公司的访问权限')
+    }
+    const company = companies.find((c) => c.id === companyId)!
+    if (company.status !== 1) throw new ForbiddenException('该公司已停用，无法切换')
+
+    return this.buildResult(user, companies, companyId)
   }
 
   /**
@@ -106,6 +137,63 @@ export class AuthService {
     return { message: '密码修改成功，请重新登录' }
   }
 
+  // ==================== 私有方法 ====================
+
+  private async buildResult(
+    user: User,
+    companies: Record<string, any>[],
+    companyId: string,
+  ): Promise<AuthResult> {
+    const { roles, permissions } = this.extractIdentity(user)
+    const payload: JwtPayload = {
+      sub: user.id,
+      username: user.username,
+      nickname: user.nickname,
+      companyId,
+      roles,
+      permissions,
+    }
+
+    const accessToken = await this.jwtService.signAsync(payload)
+
+    return {
+      accessToken,
+      expiresIn: process.env.JWT_EXPIRES_IN || '8h',
+      user: this.toProfile(user),
+      company: companies.find((c) => c.id === companyId) ?? null,
+      companies,
+    }
+  }
+
+  /** 用户可访问的公司列表 */
+  private async listCompanies(userId: string): Promise<Record<string, any>[]> {
+    const links = await this.linkRepo.find({
+      where: { userId, status: 1 },
+      order: { createdAt: 'ASC' },
+    })
+    if (!links.length) return []
+    const companies = await this.companyRepo.find({
+      where: { id: In(links.map((l) => l.companyId)) },
+      order: { createdAt: 'ASC' },
+    })
+    const byId = new Map(companies.map((c) => [c.id, c]))
+    return links
+      .map((l) => {
+        const c = byId.get(l.companyId)
+        if (!c) return null
+        return {
+          id: c.id,
+          code: c.code,
+          name: c.name,
+          taxNo: c.taxNo,
+          status: c.status,
+          isOwner: l.isOwner,
+          createdAt: c.createdAt,
+        }
+      })
+      .filter(Boolean) as Record<string, any>[]
+  }
+
   /**
    * 从用户实体提取角色与权限标识
    */
@@ -123,7 +211,7 @@ export class AuthService {
   /**
    * 组装返回给前端的用户档案（不含密码）
    */
-  private toProfile(user: User, roles: string[], permissions: string[]): Record<string, any> {
+  private toProfile(user: User): Record<string, any> {
     return {
       id: user.id,
       username: user.username,
@@ -132,8 +220,10 @@ export class AuthService {
       phone: user.phone,
       status: user.status,
       lastLoginAt: user.lastLoginAt,
-      roles,
-      permissions,
+      roles: (user.roles ?? []).map((r) => r.code),
+      permissions: Array.from(
+        new Set((user.roles ?? []).flatMap((r) => (r.permissions ?? []).map((p) => p.code))),
+      ),
       roleNames: (user.roles ?? []).map((r) => r.name),
     }
   }

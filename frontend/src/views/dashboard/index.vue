@@ -6,7 +6,8 @@
         <div>
           <div class="welcome__hello">{{ greeting }}，{{ userStore.nickname }}</div>
           <div class="welcome__sub">
-            当前会计期间 {{ periodLabel(period) }} · 共 {{ stats.voucherCount }} 张凭证 ·
+            当前公司：{{ userStore.companyName || '未选择公司' }} ·
+            {{ periodLabel(period) }} · 共 {{ stats.voucherCount }} 张凭证 ·
             {{ stats.accountCount }} 个会计科目
           </div>
         </div>
@@ -67,11 +68,11 @@
         :closable="false"
         show-icon
         class="overview__alert"
-        :title="`有 ${overview.pendingReceipts} 张票据待确认，尚未生成记账凭证`"
+        :title="`AI 已识别 ${overview.pendingReceipts} 张单据，凭证待你确认入账`"
       >
         <template #default>
           <el-button v-permission="'receipts:workbench'" size="small" @click="router.push('/receipts/workbench')">
-            前往待确认工作台
+            去确认入账
           </el-button>
         </template>
       </el-alert>
@@ -97,8 +98,8 @@
       <el-col :xs="24" :md="12">
         <el-card shadow="never" header="使用提示">
           <ul class="tips">
-            <li>首次使用请先在「基础资料 → 期初余额」录入期初数据，并到「试算平衡表」确认借贷平衡。</li>
-            <li>日常记账通过「凭证管理 → 凭证录入」完成，每张凭证借贷必须相等。</li>
+            <li>日常记账首选「AI 智能记账 → 上传记账」：拖入发票、工资表、银行对账单，AI 自动识别并生成借贷平衡的凭证，你只需核对后点一次「确认入账」。</li>
+            <li>AI 拿不准的单据会标出原因并留在待确认，可手工调整科目或改用「凭证管理 → 手动录入」。</li>
             <li>凭证保存为草稿后需「审核」，已审核凭证才会计入账簿与报表。</li>
             <li>收付款业务建议使用「资金往来 → 现金银行」，系统会自动生成记账凭证。</li>
             <li>客户/供应商往来请使用「应收应付」核销，便于对账与余额查询。</li>
@@ -128,7 +129,7 @@ const stats = ref({
   draftCount: 0,
   todayVoucherCount: 0,
   monthVoucherCount: 0,
-  userCount: 0,
+  companyCount: 0,
 })
 
 /** P18.5 经营看板数据 */
@@ -235,7 +236,9 @@ const cards = computed(() => [
 
 const quickLinks = computed(() => {
   const all = [
-    { title: '凭证录入', path: '/voucher/create', icon: 'EditPen', permission: 'voucher:create' },
+    // AI 记账置顶，作为默认的记账路径
+    { title: 'AI 上传记账', path: '/receipts/workbench', icon: 'MagicStick', permission: 'receipts:workbench' },
+    { title: '手动录入凭证', path: '/voucher/create', icon: 'EditPen', permission: 'voucher:create' },
     { title: '凭证列表', path: '/voucher/list', icon: 'Tickets', permission: 'voucher:list' },
     { title: '现金银行', path: '/cash-bank', icon: 'Money', permission: 'cash-bank' },
     { title: '应收应付', path: '/ar-ap', icon: 'Connection', permission: 'ar-ap' },

@@ -50,29 +50,41 @@ export class DocumentParseService {
 
     const pdf = await parsePdf(buffer)
 
-    if (pdf.hasTextLayer && pdf.fullText.trim()) {
-      const lines = pdf.pages.flatMap((p) => p.lines)
-      const first = pdf.pages[0]
-      const result = parseDocument({
-        lines,
-        rawText: pdf.fullText,
-        width: first?.width ?? 0,
-        height: first?.height ?? 0,
-        source: 'pdf',
-      })
-      return { result, rawText: pdf.fullText, pageCount: pdf.pageCount, source: 'pdf' }
-    }
+    // 逐页合并：有文本层的页直接用文本层，只有无文本层的页才需要 OCR。
+    // 混合型 PDF（部分页文本、部分页扫描）因此不会丢页。
+    const needOcr = pdf.pages.some((p) => p.image)
+    if (needOcr) this.requireOcr()
 
     const allLines: Array<{ text: string; score: number; points: Array<[number, number]> }> = []
     const rawParts: string[] = []
-    this.requireOcr()
-    for (const img of pdf.images) {
-      const ocr = await this.engine.recognize(img, { detMaxSide: MAX_DET_SIDE })
+
+    for (const page of pdf.pages) {
+      if (page.lines.length > 0) {
+        allLines.push(...page.lines)
+        rawParts.push(page.rawText)
+        continue
+      }
+      if (!page.image) continue
+      const ocr = await this.engine.recognize(page.image, { detMaxSide: MAX_DET_SIDE })
       allLines.push(...ocr.lines)
       rawParts.push(ocr.lines.map((l) => l.text).join('\n'))
     }
-    const rawText = rawParts.join('\n\n')
-    const result = parseDocument({ lines: allLines, rawText, width: 0, height: 0, source: 'ocr' })
-    return { result, rawText, pageCount: pdf.pageCount, source: 'ocr' }
+
+    const rawText = rawParts.filter(Boolean).join('\n\n')
+    if (!rawText.trim()) {
+      throw new BadRequestException('未能从文件中提取到文字，请确认文件清晰或含文本层')
+    }
+
+    // 全部页面都来自文本层时置信度按 1 计，含 OCR 页时按 OCR 质量计
+    const source: 'pdf' | 'ocr' = pdf.renderPageCount > 0 ? 'ocr' : 'pdf'
+    const first = pdf.pages.find((p) => p.lines.length > 0) ?? pdf.pages[0]
+    const result = parseDocument({
+      lines: allLines,
+      rawText,
+      width: first?.width ?? 0,
+      height: first?.height ?? 0,
+      source,
+    })
+    return { result, rawText, pageCount: pdf.pageCount, source }
   }
 }

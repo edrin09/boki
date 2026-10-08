@@ -1,28 +1,40 @@
 import { Injectable } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
 import { ClassifyRule } from '../../entities/classify-rule.entity'
 import { Receipt } from '../../entities/receipt.entity'
 import { Account } from '../../entities/account.entity'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { SystemService } from '../system/system.service'
 
-/** 凭证模板类型：进项/销项/费用/银行手续费 */
-export type ReceiptKind = 'input_vat' | 'output_vat' | 'expense' | 'bank_fee' | 'unknown'
+/** 凭证模板类型：进项/销项/费用/银行手续费/工资 */
+export type ReceiptKind = 'input_vat' | 'output_vat' | 'expense' | 'bank_fee' | 'payroll' | 'unknown'
 
 export const KIND_LABELS: Record<ReceiptKind, string> = {
   input_vat: '进项发票',
   output_vat: '销项发票',
   expense: '费用票据',
   bank_fee: '银行手续费',
+  payroll: '工资发放',
   unknown: '无法自动归类',
 }
 
-/** 分录模板：金额取哪个字段 */
+/**
+ * 分录模板：金额取哪个识别字段。
+ * 除通用字段外，也支持解析器产出的业务字段（工资表的对账/个税等），
+ * 由 workbench.buildEntries 按 key 直接取值。
+ */
 export type AmountSource =
-  | 'total_amount' // 价税合计
+  | 'total_amount' // 价税合计 / 工资应发合计
   | 'amount' // 不含税金额
   | 'tax_amount' // 税额
   | 'fixed' // 固定金额（由 partner 模板兜底时使用）
+  | 'net_amount' // 实发工资
+  | 'gross_amount' // 应发工资
+  | 'insurance_personal' // 个人社保
+  | 'fund_personal' // 个人公积金
+  | 'income_tax' // 个人所得税
+  | 'social_deduct' // 代扣社保公积金合计
+  | 'fee_amount' // 银行手续费
 
 export interface DraftEntryTemplate {
   summary: string
@@ -78,12 +90,15 @@ const RECEIVABLE_CODE = '1122'
 const OTHER_PAYABLE_CODE = '2241'
 const FEE_CODE = '6701.03'
 const BANK_CODE = '1002'
+/** 应付职工薪酬-工资 / 应交税费-应交个人所得税（工资凭证用） */
+const PAYROLL_PAYABLE_CODE = '2211.01'
+const INCOME_TAX_PAYABLE_CODE = '2221.04'
 
 @Injectable()
 export class ClassifyService {
   constructor(
-    @InjectRepository(ClassifyRule) private readonly ruleRepo: Repository<ClassifyRule>,
-    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
+    @InjectCompanyRepo(ClassifyRule) private readonly ruleRepo: CompanyScopedRepository<ClassifyRule>,
+    @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
     private readonly systemService: SystemService,
   ) {}
 
@@ -123,6 +138,11 @@ export class ClassifyService {
         kind = 'input_vat'
         direction = 'input'
       }
+    } else if (docType === 'payroll') {
+      kind = 'payroll'
+    } else if (docType === 'bank_statement') {
+      // 对账单只把能直接入账的费用类摘要做成凭证，其余流水需人工/流水导入处理
+      kind = this.num(fields.fee_amount) !== null ? 'bank_fee' : 'unknown'
     } else if (docType === 'train_ticket' || docType === 'receipt') {
       if (BANK_FEE_KEYWORDS.some((k) => text.includes(k))) {
         kind = 'bank_fee'
@@ -143,7 +163,7 @@ export class ClassifyService {
         account: null,
         counterparty: null,
         entries: [],
-        message: '当前票据类型无法自动归类，请人工处理或完善公司信息（进项/销项判定）',
+        message: this.unknownReason(receipt),
       }
     }
 
@@ -220,10 +240,47 @@ export class ClassifyService {
         ]
       }
     } else if (kind === 'bank_fee') {
+      // 对账单优先取费用合计，回落价税合计/金额
+      const src: AmountSource = docType === 'bank_statement' ? 'fee_amount' : 'total_amount'
       entries = [
-        { summary: `银行手续费（${summaryBase}）`, accountCode: FEE_CODE, direction: 'debit', amountSource: 'total_amount', partnerField: null },
-        { summary: `银行手续费（${summaryBase}）`, accountCode: BANK_CODE, direction: 'credit', amountSource: 'total_amount', partnerField: null },
+        { summary: `银行手续费（${summaryBase}）`, accountCode: FEE_CODE, direction: 'debit', amountSource: src, partnerField: null },
+        { summary: `银行手续费（${summaryBase}）`, accountCode: BANK_CODE, direction: 'credit', amountSource: src, partnerField: null },
       ]
+    } else if (kind === 'payroll') {
+      // 工资发放汇总凭证：借 应付职工薪酬-工资，贷 银行存款 + 代扣项目
+      entries = [
+        { summary: `${summaryBase} 应发工资`, accountCode: PAYROLL_PAYABLE_CODE, direction: 'debit', amountSource: 'gross_amount', partnerField: null },
+      ]
+      const net = this.num(fields.net_amount)
+      if (net !== null && net > 0) {
+        entries.push({
+          summary: `${summaryBase} 实发工资`,
+          accountCode: BANK_CODE,
+          direction: 'credit',
+          amountSource: 'net_amount',
+          partnerField: null,
+        })
+      }
+      const incomeTax = this.num(fields.income_tax)
+      if (incomeTax !== null && incomeTax > 0) {
+        entries.push({
+          summary: `${summaryBase} 代扣个人所得税`,
+          accountCode: INCOME_TAX_PAYABLE_CODE,
+          direction: 'credit',
+          amountSource: 'income_tax',
+          partnerField: null,
+        })
+      }
+      const social = this.num(fields.social_deduct)
+      if (social !== null && social > 0) {
+        entries.push({
+          summary: `${summaryBase} 代扣社保公积金`,
+          accountCode: OTHER_PAYABLE_CODE,
+          direction: 'credit',
+          amountSource: 'social_deduct',
+          partnerField: null,
+        })
+      }
     } else {
       // expense：借费用 贷其他应付款
       entries = [
@@ -248,6 +305,24 @@ export class ClassifyService {
       entries,
       message,
     }
+  }
+
+  /**
+   * 无法自动归类时的原因说明。
+   * 区分"识别成不支持的类型"与"识别对了但缺公司信息"，
+   * 避免用户看到"请完善公司信息"却不知道自己上传的是张工资表。
+   */
+  private unknownReason(receipt: Receipt): string {
+    const supported: Record<string, string> = {
+      invoice: '增值税发票',
+      train_ticket: '火车票/行程单',
+      receipt: '通用收据',
+    }
+    const typeName = receipt.receiptTypeName || '未知单据'
+    if (!supported[receipt.receiptType]) {
+      return `已识别为「${typeName}」，该单据暂不支持自动记账，请人工处理或上传原始票据`
+    }
+    return `已识别为「${typeName}」，但无法判断进项/销项方向，请在「公司信息」中完善纳税人识别号后重试，或人工处理`
   }
 
   /** 规则模板与票据类别是否兼容（进项/费用归 expense 模板，销项归 income 模板） */

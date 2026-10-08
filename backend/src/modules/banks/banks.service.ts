@@ -1,18 +1,19 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Brackets, Repository } from 'typeorm'
+import { Brackets } from 'typeorm'
 import { BankAccount } from '../../entities/bank-account.entity'
 import { Account } from '../../entities/account.entity'
 import { BankAccountType } from '../../common/enums'
 import { CODE_PREFIX, nextCode } from '../../common/utils/code.util'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import type { PageResult, PaginationQueryDto } from '../../common/dto/pagination.dto'
 import type { CreateBankDto, UpdateBankDto } from './dto/bank.dto'
 
 @Injectable()
 export class BanksService {
   constructor(
-    @InjectRepository(BankAccount) private readonly repo: Repository<BankAccount>,
-    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
+    @InjectCompanyRepo(BankAccount) private readonly repo: CompanyScopedRepository<BankAccount>,
+    @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
   ) {}
 
   async findAll(query: PaginationQueryDto & { type?: string }): Promise<PageResult<any>> {
@@ -98,7 +99,7 @@ export class BanksService {
 
   async remove(id: string): Promise<{ message: string }> {
     await this.findOne(id)
-    await this.repo.delete(id)
+    await this.repo.delete({ id } as any)
     return { message: '删除成功' }
   }
 

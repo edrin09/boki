@@ -5,18 +5,23 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { In, Repository } from 'typeorm'
+import { Repository } from 'typeorm'
 import { createReadStream, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
 import * as path from 'node:path'
 import * as fs from 'node:fs/promises'
 import { SysLog } from '../../entities/sys-log.entity'
 import { User } from '../../entities/user.entity'
+import { Company } from '../../entities/company.entity'
 import { Account } from '../../entities/account.entity'
+import { Partner } from '../../entities/partner.entity'
 import { Voucher } from '../../entities/voucher.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
-import { SysConfig } from '../../entities/sys-config.entity'
-import { SYS_CONFIG_KEYS } from '../../common/enums'
 import { resolveDatabasePath } from '../../config/database.config'
+import { requireCompanyId } from '../../common/company/company-context'
+import { DEFAULT_AUTO_POST_THRESHOLD } from '../companies/companies.service'
+import { invalidateCompanyCache } from '../../common/company/company-scope.interceptor'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import type { PageResult, PaginationQueryDto } from '../../common/dto/pagination.dto'
 
 @Injectable()
@@ -26,42 +31,70 @@ export class SystemService {
   constructor(
     @InjectRepository(SysLog) private readonly logRepo: Repository<SysLog>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
-    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
-    @InjectRepository(Voucher) private readonly voucherRepo: Repository<Voucher>,
-    @InjectRepository(VoucherEntry) private readonly entryRepo: Repository<VoucherEntry>,
-    @InjectRepository(SysConfig) private readonly configRepo: Repository<SysConfig>,
+    @InjectRepository(Company) private readonly companyRepo: Repository<Company>,
+    @InjectCompanyRepo(Partner) private readonly partnerRepo: CompanyScopedRepository<Partner>,
+    @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
+    @InjectCompanyRepo(Voucher) private readonly voucherRepo: CompanyScopedRepository<Voucher>,
+    @InjectCompanyRepo(VoucherEntry) private readonly entryRepo: CompanyScopedRepository<VoucherEntry>,
   ) {}
 
-  // ==================== 公司信息（P17.2 方向判定） ====================
+  // ==================== 公司信息（当前记账公司） ====================
 
-  /** 读取公司信息（缺省返回空串，不阻塞首次使用） */
-  async getCompanyInfo(): Promise<{ companyName: string; taxNo: string }> {
-    const rows = await this.configRepo.find({
-      where: { key: In([SYS_CONFIG_KEYS.COMPANY_NAME, SYS_CONFIG_KEYS.COMPANY_TAX_NO]) },
-    })
-    const map = new Map(rows.map((r) => [r.key, r.value ?? '']))
+  /**
+   * 读取当前记账公司的信息。
+   * 多公司记账后，公司主体信息由 sys_company 承载（每个公司一份），
+   * 不再是全局配置，因此票据方向判定天然按公司隔离。
+   */
+  async getCompanyInfo(): Promise<{
+    companyId: string
+    companyName: string
+    taxNo: string
+    code: string
+    status: number
+    taxpayerType: string
+    vatRate: number | null
+    taxDeclareCycle: string
+    autoPostEnabled: number
+    autoPostThreshold: number
+  }> {
+    const companyId = requireCompanyId()
+    const company = await this.companyRepo.findOne({ where: { id: companyId } })
     return {
-      companyName: map.get(SYS_CONFIG_KEYS.COMPANY_NAME) ?? '',
-      taxNo: map.get(SYS_CONFIG_KEYS.COMPANY_TAX_NO) ?? '',
+      companyId,
+      companyName: company?.name ?? '',
+      taxNo: company?.taxNo ?? '',
+      code: company?.code ?? '',
+      status: company?.status ?? 0,
+      taxpayerType: company?.taxpayerType ?? 'small_scale',
+      vatRate: company?.vatRate ?? null,
+      taxDeclareCycle: company?.taxDeclareCycle ?? 'month',
+      autoPostEnabled: company?.autoPostEnabled ?? 1,
+      autoPostThreshold: company?.autoPostThreshold ?? DEFAULT_AUTO_POST_THRESHOLD,
     }
   }
 
-  /** 保存公司信息 */
-  async saveCompanyInfo(dto: { companyName?: string; taxNo?: string }): Promise<{ message: string }> {
-    const set = async (key: string, value: string | undefined) => {
-      if (value === undefined) return
-      const row = await this.configRepo.findOne({ where: { key } })
-      if (row) {
-        row.value = value
-        await this.configRepo.save(row)
-      } else {
-        await this.configRepo.save(
-          this.configRepo.create({ key, value, remark: null }),
-        )
-      }
-    }
-    await set(SYS_CONFIG_KEYS.COMPANY_NAME, dto.companyName)
-    await set(SYS_CONFIG_KEYS.COMPANY_TAX_NO, dto.taxNo)
+  /** 保存当前记账公司信息 */
+  async saveCompanyInfo(dto: {
+    companyName?: string
+    taxNo?: string
+    taxpayerType?: string
+    vatRate?: number
+    taxDeclareCycle?: string
+    autoPostEnabled?: number
+    autoPostThreshold?: number
+  }): Promise<{ message: string }> {
+    const companyId = requireCompanyId()
+    const company = await this.companyRepo.findOne({ where: { id: companyId } })
+    if (!company) throw new NotFoundException('当前记账公司不存在')
+    if (dto.companyName !== undefined) company.name = dto.companyName
+    if (dto.taxNo !== undefined) company.taxNo = dto.taxNo || null
+    if (dto.taxpayerType !== undefined) company.taxpayerType = dto.taxpayerType
+    if (dto.vatRate !== undefined) company.vatRate = dto.vatRate
+    if (dto.taxDeclareCycle !== undefined) company.taxDeclareCycle = dto.taxDeclareCycle
+    if (dto.autoPostEnabled !== undefined) company.autoPostEnabled = dto.autoPostEnabled
+    if (dto.autoPostThreshold !== undefined) company.autoPostThreshold = dto.autoPostThreshold
+    await this.companyRepo.save(company)
+    invalidateCompanyCache(companyId)
     return { message: '公司信息已保存' }
   }
 
@@ -80,15 +113,10 @@ export class SystemService {
       draftCount,
       todayVoucherCount,
       monthVoucherCount,
-      userCount,
+      companyCount,
     ] = await Promise.all([
       this.accountRepo.count(),
-      this.userRepo.manager
-        .createQueryBuilder()
-        .select('COUNT(1)', 'c')
-        .from('fin_partner', 'p')
-        .getRawOne()
-        .then((r: any) => Number(r?.c ?? 0)),
+      this.partnerRepo.count(),
       this.voucherRepo.count(),
       this.voucherRepo.count({ where: { status: 'draft' } }),
       this.voucherRepo
@@ -99,7 +127,7 @@ export class SystemService {
         .createQueryBuilder('v')
         .where('v.voucherDate LIKE :month', { month: `${month}%` })
         .getCount(),
-      this.userRepo.count(),
+      this.companyRepo.count({ where: { status: 1 } }),
     ])
 
     return {
@@ -109,7 +137,7 @@ export class SystemService {
       draftCount,
       todayVoucherCount,
       monthVoucherCount,
-      userCount,
+      companyCount,
     }
   }
 
@@ -280,12 +308,13 @@ export class SystemService {
     const dbPath = resolveDatabasePath()
     const dbSize = existsSync(dbPath) ? statSync(dbPath).size : 0
 
-    const [accounts, vouchers, entries, users, logs] = await Promise.all([
+    const [accounts, vouchers, entries, users, logs, companies] = await Promise.all([
       this.accountRepo.count(),
       this.voucherRepo.count(),
       this.entryRepo.count(),
       this.userRepo.count(),
       this.logRepo.count(),
+      this.companyRepo.count(),
     ])
 
     return {
@@ -295,7 +324,7 @@ export class SystemService {
         size: dbSize,
         sizeText: this.formatSize(dbSize),
       },
-      counts: { accounts, vouchers, entries, users, logs },
+      counts: { accounts, vouchers, entries, users, logs, companies },
       nodeVersion: process.version,
       platform: `${process.platform} ${process.arch}`,
       uptime: Math.floor(process.uptime()),

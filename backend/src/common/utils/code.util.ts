@@ -1,4 +1,14 @@
-import type { Repository } from 'typeorm'
+/**
+ * 编码生成所需的最小仓储能力。
+ * 兼容 TypeORM Repository 与公司隔离仓储（两者都提供 createQueryBuilder）。
+ */
+export interface CodeSource {
+  createQueryBuilder(alias: string): {
+    select(selection: string, alias?: string): any
+    where(condition: string, parameters?: Record<string, any>): any
+    getRawMany(): Promise<Record<string, any>[]>
+  }
+}
 
 /** 各基础档案的编码前缀 */
 export const CODE_PREFIX = {
@@ -14,20 +24,21 @@ export const CODE_PREFIX = {
  * 取同前缀已有编码的最大序号 +1，兼容历史不同位数的编码。
  */
 export async function nextCode(
-  repo: Repository<any>,
+  repo: CodeSource,
   prefix: string,
   width = 4,
   field = 'code',
 ): Promise<string> {
+  const codeField = field
   const rows = await repo
     .createQueryBuilder('t')
-    .select(`t.${field}`, 'code')
+    .select(`t.${field}`, codeField)
     .where(`t.${field} LIKE :prefix`, { prefix: `${prefix}%` })
-    .getRawMany<{ code: string }>()
+    .getRawMany()
 
   let max = 0
   for (const row of rows) {
-    const digits = String(row.code ?? '')
+    const digits = String(row[codeField] ?? '')
       .slice(prefix.length)
       .replace(/\D/g, '')
     const seq = parseInt(digits, 10)

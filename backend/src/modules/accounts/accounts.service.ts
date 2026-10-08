@@ -4,14 +4,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
 import { Account } from '../../entities/account.entity'
 import { InitialBalance } from '../../entities/initial-balance.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
 import { BankAccount } from '../../entities/bank-account.entity'
 import { buildTree, collectDescendantIds, sortTree } from '../../common/utils/tree.util'
 import { AccountCategory, BalanceDirection } from '../../common/enums'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import type {
   CreateAccountDto,
   UpdateAccountDto,
@@ -20,11 +20,11 @@ import type {
 @Injectable()
 export class AccountsService {
   constructor(
-    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
-    @InjectRepository(VoucherEntry) private readonly entryRepo: Repository<VoucherEntry>,
-    @InjectRepository(InitialBalance)
-    private readonly initialBalanceRepo: Repository<InitialBalance>,
-    @InjectRepository(BankAccount) private readonly bankRepo: Repository<BankAccount>,
+    @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
+    @InjectCompanyRepo(VoucherEntry) private readonly entryRepo: CompanyScopedRepository<VoucherEntry>,
+    @InjectCompanyRepo(InitialBalance)
+    private readonly initialBalanceRepo: CompanyScopedRepository<InitialBalance>,
+    @InjectCompanyRepo(BankAccount) private readonly bankRepo: CompanyScopedRepository<BankAccount>,
   ) {}
 
   // ==================== 查询 ====================
@@ -137,7 +137,7 @@ export class AccountsService {
 
     const saved = await this.accountRepo.save(account)
     if (parent) {
-      await this.accountRepo.update(parent.id, { isLeaf: false })
+      await this.accountRepo.update({ id: parent.id }, { isLeaf: false })
     }
     return saved
   }
@@ -201,7 +201,7 @@ export class AccountsService {
       throw new BadRequestException('该科目已被资金账户引用，无法删除')
     }
 
-    await this.accountRepo.delete(id)
+    await this.accountRepo.delete({ id } as any)
     return { message: '删除成功' }
   }
 
@@ -216,7 +216,7 @@ export class AccountsService {
       : null
     const selfName = prefix ? `${prefix}.${account.name}` : account.name
     account.fullName = selfName
-    await this.accountRepo.update(account.id, { fullName: selfName })
+    await this.accountRepo.update({ id: account.id }, { fullName: selfName })
 
     const all = await this.accountRepo.find()
     const descendants = collectDescendantIds(all, account.id)
@@ -230,7 +230,7 @@ export class AccountsService {
         ? `${parentFullName}.${child.name}`
         : `${parent?.fullName ?? ''}.${child.name}`
       if (newFullName !== child.fullName && newFullName !== '.') {
-        await this.accountRepo.update(child.id, { fullName: newFullName })
+        await this.accountRepo.update({ id: child.id }, { fullName: newFullName })
       }
     }
   }

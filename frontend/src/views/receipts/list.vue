@@ -72,7 +72,7 @@
     </div>
 
     <!-- 上传弹窗 -->
-    <el-dialog v-model="uploadVisible" title="上传并识别票据" width="640px" destroy-on-close>
+    <el-dialog v-model="uploadVisible" title="上传票据，AI 自动识别并记账" width="760px" destroy-on-close @closed="onUploadClose">
       <el-upload drag multiple :auto-upload="false" :limit="20" accept="image/jpeg,image/png,image/webp,image/bmp,image/tiff,application/pdf"
         :on-change="onFileChange" :on-remove="onFileRemove" :file-list="fileList" :on-exceed="onExceed">
         <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
@@ -83,8 +83,65 @@
       </el-upload>
       <template #footer>
         <el-button @click="uploadVisible = false">关闭</el-button>
-        <el-button type="primary" :disabled="!fileList.length" :loading="uploading" @click="onUpload">开始识别</el-button>
+        <el-button type="primary" :disabled="!fileList.length" :loading="uploading" @click="onUpload">
+          {{ results.length ? '重新识别' : '开始识别' }}
+        </el-button>
       </template>
+
+      <!-- 识别结果：区分「可直接记账」与「需人工处理」 -->
+      <div v-if="results.length" class="result-panel">
+        <div class="result-summary">
+          <el-tag type="success" size="small">凭证已就绪 {{ draftedResults.length }}</el-tag>
+          <el-tag type="warning" size="small">待人工 {{ pendingResults.length }}</el-tag>
+          <el-tag v-if="otherResults.length" type="info" size="small">其他 {{ otherResults.length }}</el-tag>
+        </div>
+        <el-table :data="results" size="small" max-height="260">
+          <el-table-column prop="fileName" label="文件" min-width="160" show-overflow-tooltip />
+          <el-table-column label="识别结果" width="120">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.bookable ? 'success' : row.status === 'duplicate' ? 'info' : 'warning'">
+                {{ row.receiptTypeName || '未识别' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="AI 判断" min-width="260">
+            <template #default="{ row }">
+              <!-- 已自动生成草稿：直接展示凭证摘要 -->
+              <template v-if="row.drafted && row.draft">
+                <div class="suggest-line">
+                  <el-tag size="small" type="success">凭证已就绪</el-tag>
+                  <span class="text-muted">记{{ row.draft.voucherNo }} · {{ row.draft.voucherDate }}</span>
+                </div>
+                <div class="entry-line text-muted">
+                  {{ row.draft.entries.map((e: any) => `${Number(e.debit) ? '借' : '贷'} ${e.accountName} ${Number(e.debit || e.credit)}`).join('；') }}
+                </div>
+              </template>
+              <template v-else-if="row.suggestKindLabel">
+                <div class="suggest-line">
+                  <el-tag size="small" type="warning">{{ row.suggestKindLabel }}</el-tag>
+                </div>
+                <div class="entry-line text-muted">{{ row.draftMessage || row.blockReason }}</div>
+              </template>
+              <span v-else-if="row.status === 'duplicate'" class="text-muted">{{ row.message || '重复票据' }}</span>
+              <span v-else class="text-danger">{{ row.blockReason || row.message || '需人工处理' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="置信度" width="80" align="center">
+            <template #default="{ row }">
+              <span v-if="row.confidence != null">{{ (row.confidence * 100).toFixed(0) }}%</span>
+              <span v-else class="text-muted">-</span>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div class="result-actions">
+          <el-button v-if="draftedResults.length" type="primary" size="small" @click="goWorkbench">
+            <el-icon><Right /></el-icon>去确认入账（{{ draftedResults.length }}）
+          </el-button>
+          <span v-if="pendingResults.length" class="text-muted">
+            待人工的单据尚未入账，可在工作台核对或手工生成凭证
+          </span>
+        </div>
+      </div>
     </el-dialog>
 
     <!-- 详情弹窗 -->
@@ -129,10 +186,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type UploadFile, type UploadFiles } from 'element-plus'
-import { Search, Upload, UploadFilled } from '@element-plus/icons-vue'
+import { Search, Upload, UploadFilled, Right } from '@element-plus/icons-vue'
 import { receiptApi } from '@/api'
 import service from '@/api/http'
 import { usePagedList, ok, confirmDelete } from '@/composables/useList'
@@ -151,6 +208,8 @@ const STATUS_META: Record<string, { label: string; type: 'info' | 'success' | 'd
 
 const typeOptions = [
   { type: 'invoice', typeName: '增值税发票' },
+  { type: 'payroll', typeName: '工资表' },
+  { type: 'bank_statement', typeName: '银行对账单' },
   { type: 'id_card', typeName: '身份证' },
   { type: 'business_license', typeName: '营业执照' },
   { type: 'train_ticket', typeName: '火车票' },
@@ -187,13 +246,22 @@ function onDateChange(val: [string, string] | null) {
 const uploadVisible = ref(false)
 const uploading = ref(false)
 const fileList = ref<UploadFile[]>([])
+/** 识别结果：保留在弹窗内供用户逐条查看原因，不直接关闭弹窗 */
+const results = ref<any[]>([])
+
+/** 凭证已自动生成 / 仍需人工（低置信度或不可归类）/ 重复或失败 */
+const draftedResults = computed(() => results.value.filter((r) => r.drafted))
+const pendingResults = computed(() => results.value.filter((r) => r.status === 'parsed' && !r.drafted))
+const otherResults = computed(() => results.value.filter((r) => r.status !== 'parsed'))
 
 function onFileChange(_file: UploadFile, files: UploadFiles) {
   fileList.value = files
+  results.value = []
 }
 
 function onFileRemove(_file: UploadFile, files: UploadFiles) {
   fileList.value = files
+  results.value = []
 }
 
 function onExceed() {
@@ -205,20 +273,29 @@ async function onUpload() {
   if (!raws.length) return
   uploading.value = true
   try {
-    const results = await receiptApi.upload(raws)
-    const parsed = results.filter((r) => r.status === 'parsed').length
-    const dup = results.filter((r) => r.status === 'duplicate').length
-    const failed = results.filter((r) => r.status === 'failed').length
-    const failedMsgs = results.filter((r) => r.status === 'failed').map((r) => r.message).join('；')
-    ElMessage[failed ? 'warning' : parsed ? 'success' : 'info'](
-      `识别完成：成功 ${parsed}，重复 ${dup}，失败 ${failed}${failedMsgs ? `（${failedMsgs}）` : ''}`,
-    )
-    uploadVisible.value = false
-    fileList.value = []
+    const res = await receiptApi.upload(raws)
+    results.value = res ?? []
+    const drafted = draftedResults.value.length
+    const pending = pendingResults.value.length
+    if (drafted > 0) {
+      ElMessage.success(
+        `识别完成：${drafted} 个已自动生成凭证${pending ? `，${pending} 个需人工确认` : ''}`,
+      )
+    } else if (pending > 0) {
+      ElMessage.warning(`识别完成：${pending} 个单据需人工确认，原因见下方`)
+    } else {
+      ElMessage.info('识别完成：没有新增可记账的单据')
+    }
     await load()
   } finally {
     uploading.value = false
   }
+}
+
+/** 关闭弹窗时清理状态 */
+function onUploadClose() {
+  fileList.value = []
+  results.value = []
 }
 
 // ============ 详情 / 原图 ============
@@ -245,8 +322,9 @@ async function openImage(row: any) {
   }
 }
 
-function goWorkbench(row: any) {
+function goWorkbench(row?: any) {
   void row
+  uploadVisible.value = false
   router.push('/receipts/workbench')
 }
 
@@ -279,5 +357,33 @@ async function onRemove(row: any) {
 }
 .mb12 {
   margin-bottom: 12px;
+}
+.result-panel {
+  margin-top: 16px;
+  border-top: 1px solid var(--el-border-color-lighter);
+  padding-top: 12px;
+}
+.result-summary {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.result-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.suggest-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.entry-line {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.6;
 }
 </style>

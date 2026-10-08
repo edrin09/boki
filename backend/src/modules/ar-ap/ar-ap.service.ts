@@ -1,6 +1,4 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
 import { WriteOff } from '../../entities/business.entity'
 import { Account } from '../../entities/account.entity'
 import { BankAccount } from '../../entities/bank-account.entity'
@@ -8,6 +6,8 @@ import { Partner } from '../../entities/partner.entity'
 import { Voucher } from '../../entities/voucher.entity'
 import { VoucherSource, VoucherStatus } from '../../common/enums'
 import { toCents } from '../../common/utils/money.util'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { BooksService } from '../books/books.service'
 import { VouchersService } from '../vouchers/vouchers.service'
 import type { Operator } from '../cash-bank/cash-bank.service'
@@ -20,11 +20,11 @@ const DEFAULT_PAYABLE_CODE = '2202'
 @Injectable()
 export class ArApService {
   constructor(
-    @InjectRepository(WriteOff) private readonly repo: Repository<WriteOff>,
-    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
-    @InjectRepository(BankAccount) private readonly bankRepo: Repository<BankAccount>,
-    @InjectRepository(Partner) private readonly partnerRepo: Repository<Partner>,
-    @InjectRepository(Voucher) private readonly voucherRepo: Repository<Voucher>,
+    @InjectCompanyRepo(WriteOff) private readonly repo: CompanyScopedRepository<WriteOff>,
+    @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
+    @InjectCompanyRepo(BankAccount) private readonly bankRepo: CompanyScopedRepository<BankAccount>,
+    @InjectCompanyRepo(Partner) private readonly partnerRepo: CompanyScopedRepository<Partner>,
+    @InjectCompanyRepo(Voucher) private readonly voucherRepo: CompanyScopedRepository<Voucher>,
     private readonly booksService: BooksService,
     private readonly vouchersService: VouchersService,
   ) {}
@@ -183,7 +183,7 @@ export class ArApService {
     })
 
     const saved = await this.repo.save(entity)
-    await this.voucherRepo.update(voucher.id, { sourceId: saved.id })
+    await this.voucherRepo.update({ id: voucher.id }, { sourceId: saved.id })
     return this.toVo(saved)
   }
 
@@ -202,7 +202,7 @@ export class ArApService {
       }
     }
 
-    await this.repo.delete(id)
+    await this.repo.delete({ id } as any)
     return { message: '核销记录已撤销' }
   }
 

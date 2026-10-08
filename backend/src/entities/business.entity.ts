@@ -9,6 +9,10 @@ import { decimalTransformer } from '../common/transformers/decimal.transformer'
  */
 @Entity('fin_cash_flow')
 export class CashFlow extends BaseEntity {
+  @Index('idx_cash_flow_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ length: 20, comment: '业务类型：receipt/payment/transfer/expense/income' })
   bizType: CashBankBizType | string
 
@@ -69,6 +73,10 @@ export class CashFlow extends BaseEntity {
 @Entity('fin_write_off')
 @Index('idx_write_off_partner', ['partnerId', 'type'])
 export class WriteOff extends BaseEntity {
+  @Index('idx_write_off_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ length: 20, comment: '核销类型：receivable 应收 / payable 应付' })
   type: string
 
@@ -115,6 +123,10 @@ export class WriteOff extends BaseEntity {
 /** 其他收支单据 */
 @Entity('fin_income_expense')
 export class IncomeExpense extends BaseEntity {
+  @Index('idx_income_expense_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ length: 20, comment: '类型：income 收入 / expense 支出' })
   bizType: string
 

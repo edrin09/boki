@@ -1,5 +1,7 @@
 import type { DocumentParser, ParseContext, ParseResult } from './parser.types'
 import { invoiceParser } from './invoice.parser'
+import { payrollParser } from './payroll.parser'
+import { bankStatementParser } from './bank-statement.parser'
 import { idCardParser } from './id-card.parser'
 import { businessLicenseParser } from './business-license.parser'
 import { trainTicketParser } from './train-ticket.parser'
@@ -8,6 +10,8 @@ import { genericReceiptParser } from './generic-receipt.parser'
 /** 解析器注册表：按 match 分选最高者 */
 export const PARSERS: DocumentParser[] = [
   invoiceParser,
+  payrollParser,
+  bankStatementParser,
   idCardParser,
   businessLicenseParser,
   trainTicketParser,

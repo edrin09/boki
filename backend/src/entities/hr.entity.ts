@@ -13,8 +13,12 @@ import { decimalTransformer } from '../common/transformers/decimal.transformer'
  * 员工档案
  */
 @Entity('fin_employee')
+@Index('uk_employee_code', ['companyId', 'code'], { unique: true })
 export class Employee extends BaseEntity {
-  @Index('uk_employee_code', { unique: true })
+  @Index('idx_employee_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ length: 30, comment: '工号' })
   code: string
 
@@ -77,8 +81,12 @@ export class Employee extends BaseEntity {
  * 财务报销单（主表）
  */
 @Entity('fin_expense_claim')
-@Index('idx_claim_no', ['claimNo'], { unique: true })
+@Index('idx_claim_no', ['companyId', 'claimNo'], { unique: true })
 export class ExpenseClaim extends BaseEntity {
+  @Index('idx_claim_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ name: 'claim_no', length: 30, comment: '报销单号' })
   claimNo: string
 
@@ -160,6 +168,10 @@ export class ExpenseClaim extends BaseEntity {
 @Entity('fin_expense_claim_item')
 @Index('idx_claim_item_claim', ['claimId'])
 export class ExpenseClaimItem extends BaseEntity {
+  @Index('idx_claim_item_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ name: 'claim_id', type: 'varchar', comment: '报销单ID' })
   claimId: string
 
@@ -195,8 +207,12 @@ export class ExpenseClaimItem extends BaseEntity {
  * 工资单（按月批量）
  */
 @Entity('fin_payroll')
-@Index('uk_payroll_period', ['period', 'status'], { unique: false })
+@Index('uk_payroll_period', ['companyId', 'period', 'status'], { unique: false })
 export class Payroll extends BaseEntity {
+  @Index('idx_payroll_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ name: 'payroll_no', length: 30, comment: '工资单号' })
   payrollNo: string
 
@@ -343,6 +359,10 @@ export class Payroll extends BaseEntity {
 @Entity('fin_payroll_item')
 @Index('idx_payroll_item_payroll', ['payrollId'])
 export class PayrollItem extends BaseEntity {
+  @Index('idx_payroll_item_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ name: 'payroll_id', type: 'varchar', comment: '工资单ID' })
   payrollId: string
 

@@ -21,6 +21,15 @@ export class LoginDto {
 }
 
 /**
+ * 切换记账公司 DTO
+ */
+export class SwitchCompanyDto {
+  @IsString({ message: '请选择公司' })
+  @IsNotEmpty({ message: '请选择公司' })
+  companyId: string
+}
+
+/**
  * 修改密码 DTO
  */
 export class ChangePasswordDto {

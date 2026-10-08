@@ -7,8 +7,12 @@ import { decimalTransformer } from '../common/transformers/decimal.transformer'
  * 记账凭证
  */
 @Entity('fin_voucher')
-@Index('uk_voucher_period_no', ['period', 'word', 'voucherNo'], { unique: true })
+@Index('uk_voucher_period_no', ['companyId', 'period', 'word', 'voucherNo'], { unique: true })
 export class Voucher extends BaseEntity {
+  @Index('idx_voucher_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ name: 'voucher_no', type: 'int', comment: '凭证号（按期间连续，从 1 开始）' })
   voucherNo: number
 

@@ -127,6 +127,12 @@ export enum PayrollStatus {
   PAID = 'paid', // 已发放
 }
 
+/** 纳税人类型：决定增值税申报口径（小规模征收率 / 一般纳税人分税率） */
+export enum TaxpayerType {
+  SMALL_SCALE = 'small_scale', // 小规模纳税人
+  GENERAL = 'general', // 一般纳税人
+}
+
 /** 票据类型 */
 export enum ReceiptType {
   INVOICE = 'invoice', // 增值税发票
@@ -134,6 +140,9 @@ export enum ReceiptType {
   BUSINESS_LICENSE = 'business_license', // 营业执照
   TRAIN_TICKET = 'train_ticket', // 火车票/行程单
   RECEIPT = 'receipt', // 通用收据
+  PAYROLL = 'payroll', // 工资表/工资单
+  BANK_STATEMENT = 'bank_statement', // 银行对账单/流水/回单
+  EXPENSE_CLAIM = 'expense_claim', // 报销单
   UNKNOWN = 'unknown', // 未识别
 }
 

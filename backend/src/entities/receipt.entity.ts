@@ -7,8 +7,12 @@ import { decimalTransformer } from '../common/transformers/decimal.transformer'
  * 票据与识别记录（一键录入的原始落盘 + 结构化结果）
  */
 @Entity('fin_receipt')
-@Index('uk_receipt_sha256', ['sha256'], { unique: true })
+@Index('uk_receipt_sha256', ['companyId', 'sha256'], { unique: true })
 export class Receipt extends BaseEntity {
+  @Index('idx_receipt_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ name: 'file_name', length: 255, comment: '原始文件名' })
   fileName: string
 
@@ -50,6 +54,22 @@ export class Receipt extends BaseEntity {
 
   @Column({ length: 20, default: 'parsed', comment: '状态：parsed/duplicate/failed' })
   status: ReceiptStatus | string
+
+  @Column({
+    name: 'bookable',
+    type: 'int',
+    nullable: true,
+    comment: '能否自动生成凭证：1 可，0 需人工，null 未评估',
+  })
+  bookable: number | null
+
+  @Column({
+    name: 'block_reason',
+    length: 200,
+    nullable: true,
+    comment: '不能自动入账的原因（前端直接展示，避免用户到下一步才报错）',
+  })
+  blockReason: string | null
 
   @Column({ name: 'issue_date', type: 'date', nullable: true, comment: '开票/交易日期' })
   issueDate: string | null

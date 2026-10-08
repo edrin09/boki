@@ -1,8 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Brackets, Repository } from 'typeorm'
+import { Brackets } from 'typeorm'
 import { ClassifyRule } from '../../entities/classify-rule.entity'
 import { Account } from '../../entities/account.entity'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import type { PageResult, PaginationQueryDto } from '../../common/dto/pagination.dto'
 import type { SaveClassifyRuleDto, ToggleRuleDto } from './dto/workbench.dto'
 
@@ -13,8 +14,8 @@ import type { SaveClassifyRuleDto, ToggleRuleDto } from './dto/workbench.dto'
 @Injectable()
 export class ClassifyRulesService {
   constructor(
-    @InjectRepository(ClassifyRule) private readonly ruleRepo: Repository<ClassifyRule>,
-    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
+    @InjectCompanyRepo(ClassifyRule) private readonly ruleRepo: CompanyScopedRepository<ClassifyRule>,
+    @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
   ) {}
 
   async findAll(
@@ -113,7 +114,7 @@ export class ClassifyRulesService {
 
   async remove(id: string): Promise<{ message: string }> {
     await this.findEntity(id)
-    await this.ruleRepo.delete(id)
+    await this.ruleRepo.delete({ id } as any)
     return { message: '规则已删除' }
   }
 

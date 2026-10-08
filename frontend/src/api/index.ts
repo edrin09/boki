@@ -5,14 +5,51 @@ export * from './http'
 
 export type { ApiResult }
 
-// ============ 认证 ============
+// ============ 认证 / 记账公司 ============
+/** 公司简要信息（下拉选择用） */
+export interface CompanyBrief {
+  id: string
+  code: string
+  name: string
+  taxNo?: string | null
+  status: number
+  isOwner?: boolean
+}
+
+export interface AuthResult {
+  accessToken: string
+  expiresIn: string
+  user: any
+  company: CompanyBrief | null
+  companies: CompanyBrief[]
+}
+
 export const authApi = {
   login: (data: { username: string; password: string }) =>
-    post<{ accessToken: string; expiresIn: string; user: any }>('/auth/login', data),
+    post<AuthResult>('/auth/login', data),
   profile: () => get<any>('/auth/profile'),
+  /** 可管理的公司列表 */
+  companies: () => get<CompanyBrief[]>('/auth/companies'),
+  /** 切换公司：返回带新 companyId 的令牌 */
+  switchCompany: (companyId: string) => post<AuthResult>('/auth/switch-company', { companyId }),
   logout: () => post('/auth/logout'),
   changePassword: (data: { oldPassword: string; newPassword: string }) =>
     post('/auth/change-password', data),
+}
+
+// ============ 记账公司管理 ============
+export const companyApi = {
+  /** 我可管理的公司 */
+  mine: () => get<CompanyBrief[]>('/companies'),
+  detail: (id: string) => get<any>(`/companies/${id}`),
+  create: (data: any) => post<any>('/companies', data),
+  update: (id: string, data: any) => put(`/companies/${id}`, data),
+  remove: (id: string) => del(`/companies/${id}`),
+  addMembers: (id: string, userIds: string[]) => post(`/companies/${id}/members`, { userIds }),
+  setMembers: (id: string, data: { userIds: string[]; roleIds?: string[] }) =>
+    put(`/companies/${id}/members`, data),
+  removeMember: (id: string, userId: string) =>
+    del(`/companies/${id}/members/${encodeURIComponent(userId)}`),
 }
 
 // ============ 工作台 / 系统 ============
@@ -20,8 +57,15 @@ export const systemApi = {
   dashboard: () => get<any>('/system/dashboard'),
   info: () => get<any>('/system/info'),
   company: () => get<any>('/system/company'),
-  saveCompany: (data: { companyName?: string; taxNo?: string }) =>
-    put('/system/company', data),
+  saveCompany: (data: {
+    companyName?: string
+    taxNo?: string
+    taxpayerType?: string
+    vatRate?: number
+    taxDeclareCycle?: string
+    autoPostEnabled?: number
+    autoPostThreshold?: number
+  }) => put('/system/company', data),
   logs: (params?: Record<string, any>) => get<any>('/system/logs', params),
   cleanLogs: (data: { keepDays?: number }) => post('/system/logs/clean', data),
   backups: () => get<any[]>('/system/backups'),

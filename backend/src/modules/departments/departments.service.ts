@@ -1,20 +1,20 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
 import { Department } from '../../entities/department.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
 import { InitialBalance } from '../../entities/initial-balance.entity'
 import { buildTree, collectDescendantIds, sortTree } from '../../common/utils/tree.util'
 import { CODE_PREFIX, nextCode } from '../../common/utils/code.util'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import type { CreateDepartmentDto, UpdateDepartmentDto } from './dto/department.dto'
 
 @Injectable()
 export class DepartmentsService {
   constructor(
-    @InjectRepository(Department) private readonly repo: Repository<Department>,
-    @InjectRepository(VoucherEntry) private readonly entryRepo: Repository<VoucherEntry>,
-    @InjectRepository(InitialBalance)
-    private readonly initialBalanceRepo: Repository<InitialBalance>,
+    @InjectCompanyRepo(Department) private readonly repo: CompanyScopedRepository<Department>,
+    @InjectCompanyRepo(VoucherEntry) private readonly entryRepo: CompanyScopedRepository<VoucherEntry>,
+    @InjectCompanyRepo(InitialBalance)
+    private readonly initialBalanceRepo: CompanyScopedRepository<InitialBalance>,
   ) {}
 
   async findAll(keyword?: string): Promise<Department[]> {
@@ -97,7 +97,7 @@ export class DepartmentsService {
     if (usedInitial > 0) {
       throw new ConflictException('该部门已录入期初余额，无法删除')
     }
-    await this.repo.delete(id)
+    await this.repo.delete({ id } as any)
     return { message: '删除成功' }
   }
 }

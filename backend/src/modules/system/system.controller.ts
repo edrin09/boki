@@ -36,7 +36,15 @@ export class SystemController {
   @Put('company')
   @RequirePermissions('settings:company')
   @Operation('保存公司信息')
-  saveCompanyInfo(@Body() dto: { companyName?: string; taxNo?: string }) {
+  saveCompanyInfo(@Body() dto: {
+    companyName?: string
+    taxNo?: string
+    taxpayerType?: string
+    vatRate?: number
+    taxDeclareCycle?: string
+    autoPostEnabled?: number
+    autoPostThreshold?: number
+  }) {
     return this.systemService.saveCompanyInfo(dto)
   }
 

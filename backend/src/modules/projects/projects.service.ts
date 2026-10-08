@@ -1,20 +1,20 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
 import { Project } from '../../entities/project.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
 import { InitialBalance } from '../../entities/initial-balance.entity'
 import { CODE_PREFIX, nextCode } from '../../common/utils/code.util'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import type { PageResult, PaginationQueryDto } from '../../common/dto/pagination.dto'
 import type { CreateProjectDto, UpdateProjectDto } from './dto/project.dto'
 
 @Injectable()
 export class ProjectsService {
   constructor(
-    @InjectRepository(Project) private readonly repo: Repository<Project>,
-    @InjectRepository(VoucherEntry) private readonly entryRepo: Repository<VoucherEntry>,
-    @InjectRepository(InitialBalance)
-    private readonly initialBalanceRepo: Repository<InitialBalance>,
+    @InjectCompanyRepo(Project) private readonly repo: CompanyScopedRepository<Project>,
+    @InjectCompanyRepo(VoucherEntry) private readonly entryRepo: CompanyScopedRepository<VoucherEntry>,
+    @InjectCompanyRepo(InitialBalance)
+    private readonly initialBalanceRepo: CompanyScopedRepository<InitialBalance>,
   ) {}
 
   async findAll(query: PaginationQueryDto): Promise<PageResult<any>> {
@@ -88,7 +88,7 @@ export class ProjectsService {
     if (usedInitial > 0) {
       throw new ConflictException('该项目已录入期初余额，无法删除')
     }
-    await this.repo.delete(id)
+    await this.repo.delete({ id } as any)
     return { message: '删除成功' }
   }
 }

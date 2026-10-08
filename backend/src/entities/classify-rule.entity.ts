@@ -8,6 +8,10 @@ import { BaseEntity } from './base.entity'
  */
 @Entity('fin_classify_rule')
 export class ClassifyRule extends BaseEntity {
+  @Index('idx_classify_rule_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ name: 'rule_name', length: 100, comment: '规则名称' })
   ruleName: string
 

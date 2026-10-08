@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
 import * as XLSX from 'xlsx'
 import { Employee } from '../../entities/hr.entity'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { DocumentParseService } from '../receipts/document-parse.service'
 import { PayrollService } from './payroll.service'
 import type { CommitPayrollImportDto } from './dto/payroll-import.dto'
@@ -64,7 +64,7 @@ export interface PayrollImportRow {
 @Injectable()
 export class PayrollImportService {
   constructor(
-    @InjectRepository(Employee) private readonly employeeRepo: Repository<Employee>,
+    @InjectCompanyRepo(Employee) private readonly employeeRepo: CompanyScopedRepository<Employee>,
     private readonly documentParse: DocumentParseService,
     private readonly payrollService: PayrollService,
   ) {}

@@ -7,14 +7,23 @@ export interface PdfPageText {
   /** 文本层抽取的行（与 OCR 输出同构，score 恒为 1） */
   lines: OcrBox[]
   rawText: string
+  /**
+   * 本页无文本层时的渲染图（PNG buffer），需走 OCR。
+   * 有文本层的页面为 undefined——调用方按页决定走文本层还是 OCR，
+   * 而不是整份 PDF 二选一。
+   */
+  image?: Buffer
 }
 
 export interface PdfParseOutput {
+  /** 至少一页抽到了文本层 */
   hasTextLayer: boolean
+  /** 需要 OCR 的渲染页数量 */
+  renderPageCount: number
   pageCount: number
-  /** 有文本层时的逐页文本 */
+  /** 逐页结果（文本层与渲染图按页共存） */
   pages: PdfPageText[]
-  /** 无文本层时渲染出的页面图（PNG buffer） */
+  /** 无文本层时渲染出的页面图（PNG buffer），仅含待 OCR 页 */
   images: Buffer[]
   /** 全部页文本拼接（供结构化解析） */
   fullText: string
@@ -86,8 +95,10 @@ function itemsToLines(items: RawItem[]): OcrBox[] {
 }
 
 /**
- * 解析 PDF：优先抽文本层；无文本层的页面渲染成 PNG 供 OCR。
- * 返回既有文本又有渲染图时，仅当 hasTextLayer 为 true 表示整份 PDF 都有文本层。
+ * 解析 PDF：逐页决策——有文本层的页抽文本，无文本层的页渲染成 PNG 供 OCR。
+ *
+ * 混合型 PDF（部分页有文本层、部分页是扫描图）按页合并，
+ * 不会再因为存在任一扫描页就丢弃已抽到的文本页。
  */
 export async function parsePdf(
   buffer: Buffer,
@@ -101,7 +112,6 @@ export async function parsePdf(
   const pages: PdfPageText[] = []
   const images: Buffer[] = []
   let hasTextLayer = false
-  let anyRendered = false
 
   try {
     for (let i = 1; i <= pageCount; i++) {
@@ -135,16 +145,18 @@ export async function parsePdf(
           rawText: lines.map((l) => l.text).join('\n'),
         })
       } else {
-        // 本页无文本层：渲染为图（超过渲染上限则截断）
-        if (images.length >= MAX_RENDER_PAGES) break
-        const png = await renderPageToPng(page, viewport, options.renderScale ?? 2)
-        images.push(png)
-        anyRendered = true
+        // 本页无文本层：渲染为图（超过渲染上限则截断该页，不影响已抽到的文本页）
+        const png =
+          images.length < MAX_RENDER_PAGES
+            ? await renderPageToPng(page, viewport, options.renderScale ?? 2)
+            : undefined
+        if (png) images.push(png)
         pages.push({
           width: viewport.width,
           height: viewport.height,
           lines: [],
           rawText: '',
+          image: png,
         })
       }
       page.cleanup()
@@ -155,7 +167,8 @@ export async function parsePdf(
 
   const fullText = pages.map((p) => p.rawText).filter(Boolean).join('\n\n')
   return {
-    hasTextLayer: hasTextLayer && !anyRendered,
+    hasTextLayer,
+    renderPageCount: images.length,
     pageCount,
     pages,
     images,

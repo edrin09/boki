@@ -97,5 +97,26 @@ export const useBasicStore = defineStore('basic', {
       if (kind === 'departments') return this.loadDepartments(true)
       return this.loadProjects(true)
     },
+
+    /**
+     * 清空全部档案缓存。
+     *
+     * 切换记账公司后必须调用：档案按公司隔离，
+     * 沿用上一个公司的数据会导致下拉框串账。
+     */
+    reset() {
+      this.accounts = []
+      this.partners = []
+      this.banks = []
+      this.departments = []
+      this.projects = []
+      this.loaded = {
+        accounts: false,
+        partners: false,
+        banks: false,
+        departments: false,
+        projects: false,
+      }
+    },
   },
 })

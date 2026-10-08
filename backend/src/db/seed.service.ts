@@ -5,6 +5,8 @@ import { Account } from '../entities/account.entity'
 import { Permission } from '../entities/permission.entity'
 import { Role } from '../entities/role.entity'
 import { User } from '../entities/user.entity'
+import { Company } from '../entities/company.entity'
+import { UserCompany } from '../entities/user-company.entity'
 import { hashPassword } from '../common/utils/crypto.util'
 import { ACCOUNT_SEED, CATEGORY_LABELS, inferCategory } from './seeds/account.seed'
 import {
@@ -14,9 +16,9 @@ import {
   USER_SEED,
 } from './seeds/permission.seed'
 
-/**
- * 初始化种子数据（幂等：已存在则跳过）
- */
+/** 首次启动时创建的默认公司编码 */
+const DEFAULT_COMPANY_CODE = 'DEFAULT'
+
 @Injectable()
 export class SeedService {
   private readonly logger = new Logger(SeedService.name)
@@ -26,6 +28,8 @@ export class SeedService {
     @InjectRepository(Role) private readonly roleRepo: Repository<Role>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
+    @InjectRepository(Company) private readonly companyRepo: Repository<Company>,
+    @InjectRepository(UserCompany) private readonly linkRepo: Repository<UserCompany>,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -33,8 +37,13 @@ export class SeedService {
     await this.seedRoles()
     await this.syncPermissions()
     await this.syncRolePermissions()
-    await this.seedAccounts()
+
+    // 多公司：先建立默认公司（并把历史数据归入其中），再初始化其科目与用户授权
+    const company = await this.ensureDefaultCompany()
+    await this.adoptOrphanData(company.id)
+    await this.seedAccounts(company.id)
     await this.seedUsers()
+    await this.ensureUserCompanyAccess(company.id)
   }
 
   /** 初始化权限树 */
@@ -160,19 +169,90 @@ export class SeedService {
     if (changed > 0) this.logger.log(`增量补齐角色权限 ${changed} 条`)
   }
 
-  /** 初始化会计科目 */
-  private async seedAccounts(): Promise<void> {
+  /** 确保存在一家记账公司（升级老库时补建） */
+  private async ensureDefaultCompany(): Promise<Company> {
+    const existing = await this.companyRepo.find({ order: { createdAt: 'ASC' } })
+    if (existing.length) return existing[0]
+
+    const company = await this.companyRepo.save(
+      this.companyRepo.create({
+        code: DEFAULT_COMPANY_CODE,
+        name: '默认记账公司',
+        taxNo: null,
+        legalPerson: null,
+        industry: null,
+        address: null,
+        bankName: null,
+        bankAccount: null,
+        fiscalStartMonth: 1,
+        status: 1,
+        remark: '系统初始化创建',
+      }),
+    )
+    this.logger.log(`已创建默认记账公司「${company.name}」`)
+    return company
+  }
+
+  /**
+   * 把 company_id 为空的历史数据归入默认公司。
+   *
+   * 多公司字段以 default '' 加入，老库行升级后为空串，必须回填，
+   * 否则这些数据对任何公司都不可见。
+   */
+  private async adoptOrphanData(companyId: string): Promise<void> {
+    let total = 0
+    // 仅处理本文件中已知的业务表，逐表容错以免个别表结构差异导致中断
+    const tables: Array<() => Promise<any>> = [
+      () => this.accountRepo.update({ companyId: '' }, { companyId } as any),
+      () => this.partnerRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.bankRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.deptRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.projectRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.voucherRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.entryRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.receiptRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.employeeRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.claimRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.claimItemRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.payrollRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.payrollItemRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.initialBalanceRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.cashFlowRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.writeOffRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.incomeExpenseRepoSafe().update({ companyId: '' }, { companyId } as any),
+      () => this.classifyRuleRepoSafe().update({ companyId: '' }, { companyId } as any),
+    ]
+
+    for (const run of tables) {
+      try {
+        const res = await run()
+        total += res?.affected ?? 0
+      } catch (err) {
+        this.logger.warn(`历史数据归入默认公司时跳过一张表: ${(err as Error).message}`)
+      }
+    }
+
+    if (total > 0) this.logger.log(`已将 ${total} 条历史数据归入默认记账公司`)
+  }
+
+  /** 初始化会计科目（默认公司） */
+  private async seedAccounts(companyId: string): Promise<void> {
     const count = await this.accountRepo.count()
     if (count > 0) return
 
     let order = 0
-    const saveRecursive = async (nodes: typeof ACCOUNT_SEED, parentId: string | null, parentPath: string[]) => {
+    const saveRecursive = async (
+      nodes: typeof ACCOUNT_SEED,
+      parentId: string | null,
+      parentPath: string[],
+    ) => {
       for (const node of nodes) {
         order += 1
         const category = inferCategory(node.code)
         const path = [CATEGORY_LABELS[category] ?? category, ...parentPath, node.name]
         const level = path.length - 1
         const entity = this.accountRepo.create({
+          companyId,
           code: node.code,
           name: node.name,
           fullName: path.join('.'),
@@ -188,9 +268,9 @@ export class SeedService {
           sort: node.sort ?? order,
           remark: null,
         })
-        await this.accountRepo.save(entity)
+        const saved = await this.accountRepo.save(entity)
         if (node.children?.length) {
-          await saveRecursive(node.children, entity.id, path)
+          await saveRecursive(node.children, saved.id, path)
         }
       }
     }
@@ -229,6 +309,37 @@ export class SeedService {
   }
 
   /**
+   * 确保所有用户都至少能访问默认公司。
+   *
+   * 老用户没有 user_company 记录，若不补齐将无法登录。
+   */
+  private async ensureUserCompanyAccess(companyId: string): Promise<void> {
+    const users = await this.userRepo.find()
+    if (!users.length) return
+
+    const links = await this.linkRepo.find({ where: { companyId } })
+    const linked = new Set(links.map((l) => l.userId))
+    const missing = users.filter((u) => !linked.has(u.id))
+    if (!missing.length) return
+
+    // 拥有 admin 角色或内置 admin 账号的用户标记为该公司所有者
+    const isAdmin = (u: User) =>
+      (u.roles ?? []).some((r) => r.code === 'admin') || u.username === 'admin'
+
+    await this.linkRepo.save(
+      missing.map((u) =>
+        this.linkRepo.create({
+          userId: u.id,
+          companyId,
+          isOwner: isAdmin(u),
+          status: 1,
+        }),
+      ),
+    )
+    this.logger.log(`已为 ${missing.length} 个用户开通默认公司访问权`)
+  }
+
+  /**
    * 检查初始化状态（供系统信息接口使用）
    */
   async getInitStatus(): Promise<{
@@ -236,20 +347,85 @@ export class SeedService {
     roles: number
     users: number
     accounts: number
+    companies: number
     initialized: boolean
   }> {
-    const [permissions, roles, users, accounts] = await Promise.all([
+    const [permissions, roles, users, accounts, companies] = await Promise.all([
       this.permissionRepo.count(),
       this.roleRepo.count(),
       this.userRepo.count(),
       this.accountRepo.count(),
+      this.companyRepo.count(),
     ])
     return {
       permissions,
       roles,
       users,
       accounts,
+      companies,
       initialized: users > 0 && accounts > 0,
     }
+  }
+
+  // ==================== 便捷访问器（延迟解析，避免构造顺序依赖） ====================
+
+  private get dataSource() {
+    return this.accountRepo.manager
+  }
+
+  private partnerRepoSafe(): Repository<any> {
+    return this.repoOf('fin_partner')
+  }
+  private bankRepoSafe(): Repository<any> {
+    return this.repoOf('fin_bank_account')
+  }
+  private deptRepoSafe(): Repository<any> {
+    return this.repoOf('fin_department')
+  }
+  private projectRepoSafe(): Repository<any> {
+    return this.repoOf('fin_project')
+  }
+  private voucherRepoSafe(): Repository<any> {
+    return this.repoOf('fin_voucher')
+  }
+  private entryRepoSafe(): Repository<any> {
+    return this.repoOf('fin_voucher_entry')
+  }
+  private receiptRepoSafe(): Repository<any> {
+    return this.repoOf('fin_receipt')
+  }
+  private employeeRepoSafe(): Repository<any> {
+    return this.repoOf('fin_employee')
+  }
+  private claimRepoSafe(): Repository<any> {
+    return this.repoOf('fin_expense_claim')
+  }
+  private claimItemRepoSafe(): Repository<any> {
+    return this.repoOf('fin_expense_claim_item')
+  }
+  private payrollRepoSafe(): Repository<any> {
+    return this.repoOf('fin_payroll')
+  }
+  private payrollItemRepoSafe(): Repository<any> {
+    return this.repoOf('fin_payroll_item')
+  }
+  private initialBalanceRepoSafe(): Repository<any> {
+    return this.repoOf('fin_initial_balance')
+  }
+  private cashFlowRepoSafe(): Repository<any> {
+    return this.repoOf('fin_cash_flow')
+  }
+  private writeOffRepoSafe(): Repository<any> {
+    return this.repoOf('fin_write_off')
+  }
+  private incomeExpenseRepoSafe(): Repository<any> {
+    return this.repoOf('fin_income_expense')
+  }
+  private classifyRuleRepoSafe(): Repository<any> {
+    return this.repoOf('fin_classify_rule')
+  }
+
+  private repoOf(table: string): Repository<any> {
+    return this.dataSource.getRepository(table)
   }
 }

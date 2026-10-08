@@ -34,6 +34,7 @@
         </div>
 
         <div class="app-header__right">
+          <CompanySwitcher />
           <span class="app-header__period">{{ periodLabel(currentPeriod()) }}</span>
 
           <el-dropdown trigger="click" @command="onCommand">
@@ -69,6 +70,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { Fold, Expand, ArrowDown, User, SwitchButton } from '@element-plus/icons-vue'
 import MenuItem from './MenuItem.vue'
+import CompanySwitcher from './CompanySwitcher.vue'
 import { useUserStore } from '@/stores/user'
 import { filterMenus, MENUS, type MenuNode } from '@/router/menus'
 import { currentPeriod, periodLabel } from '@/utils/format'
@@ -178,7 +180,7 @@ function onCommand(command: string) {
   &__right {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
   }
 
   &__collapse {

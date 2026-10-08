@@ -67,7 +67,7 @@ export const businessRoutes: RouteRecordRaw[] = [
         path: 'create',
         name: 'VoucherCreate',
         component: () => import('@/views/voucher/create/index.vue'),
-        meta: { title: '凭证录入', permission: 'voucher:create' },
+        meta: { title: '手动录入', permission: 'voucher:create' },
       },
     ],
   },
@@ -170,7 +170,7 @@ export const businessRoutes: RouteRecordRaw[] = [
     path: '/receipts',
     component: AppLayout,
     redirect: '/receipts/workbench',
-    meta: { title: '票据智能记账', permission: 'receipts' },
+    meta: { title: 'AI 智能记账', permission: 'receipts' },
     children: [
       { path: '', redirect: '/receipts/workbench' },
       {
@@ -183,7 +183,7 @@ export const businessRoutes: RouteRecordRaw[] = [
         path: 'workbench',
         name: 'ReceiptWorkbench',
         component: () => import('@/views/receipts/workbench.vue'),
-        meta: { title: '待确认工作台', permission: 'receipts:workbench' },
+        meta: { title: '上传记账', permission: 'receipts:workbench' },
       },
       {
         path: 'rules',
@@ -291,6 +291,12 @@ export const businessRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/settings/company.vue'),
         meta: { title: '公司信息', permission: 'settings:company' },
       },
+      {
+        path: 'companies',
+        name: 'SettingCompanies',
+        component: () => import('@/views/system/companies/index.vue'),
+        meta: { title: '记账公司', permission: 'settings:company-manage' },
+      },
     ],
   },
 
@@ -302,6 +308,12 @@ export const businessRoutes: RouteRecordRaw[] = [
     meta: { title: '系统管理', permission: 'system' },
     children: [
       { path: '', redirect: '/system/users' },
+      {
+        path: 'companies',
+        name: 'SystemCompanies',
+        component: () => import('@/views/system/companies/index.vue'),
+        meta: { title: '记账公司', permission: 'system:company' },
+      },
       {
         path: 'users',
         name: 'SystemUsers',

@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { IsNull, Repository } from 'typeorm'
+import { IsNull } from 'typeorm'
 import { InitialBalance } from '../../entities/initial-balance.entity'
 import { Account } from '../../entities/account.entity'
 import { Partner } from '../../entities/partner.entity'
@@ -8,6 +7,8 @@ import { Department } from '../../entities/department.entity'
 import { Project } from '../../entities/project.entity'
 import { BalanceDirection } from '../../common/enums'
 import { toCents, fromCents } from '../../common/utils/money.util'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import type {
   BatchSaveInitialBalanceDto,
   SaveInitialBalanceDto,
@@ -16,11 +17,12 @@ import type {
 @Injectable()
 export class InitialBalanceService {
   constructor(
-    @InjectRepository(InitialBalance) private readonly repo: Repository<InitialBalance>,
-    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
-    @InjectRepository(Partner) private readonly partnerRepo: Repository<Partner>,
-    @InjectRepository(Department) private readonly departmentRepo: Repository<Department>,
-    @InjectRepository(Project) private readonly projectRepo: Repository<Project>,
+    @InjectCompanyRepo(InitialBalance) private readonly repo: CompanyScopedRepository<InitialBalance>,
+    @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
+    @InjectCompanyRepo(Partner) private readonly partnerRepo: CompanyScopedRepository<Partner>,
+    @InjectCompanyRepo(Department)
+    private readonly departmentRepo: CompanyScopedRepository<Department>,
+    @InjectCompanyRepo(Project) private readonly projectRepo: CompanyScopedRepository<Project>,
   ) {}
 
   /** 按年度查询期初余额（可按科目过滤） */
@@ -115,7 +117,7 @@ export class InitialBalanceService {
   async remove(id: string): Promise<{ message: string }> {
     const entity = await this.repo.findOne({ where: { id } })
     if (!entity) throw new NotFoundException('期初余额不存在')
-    await this.repo.delete(id)
+    await this.repo.delete({ id } as any)
     return { message: '删除成功' }
   }
 

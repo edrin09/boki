@@ -6,8 +6,12 @@ import { PartnerType } from '../common/enums'
  * 往来单位（客户 / 供应商）
  */
 @Entity('fin_partner')
+@Index('uk_partner_code', ['companyId', 'code'], { unique: true })
 export class Partner extends BaseEntity {
-  @Index('uk_partner_code', { unique: true })
+  @Index('idx_partner_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
   @Column({ length: 30, comment: '编码' })
   code: string
 

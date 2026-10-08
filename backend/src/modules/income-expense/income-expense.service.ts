@@ -1,12 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
 import { IncomeExpense } from '../../entities/business.entity'
 import { Account } from '../../entities/account.entity'
 import { BankAccount } from '../../entities/bank-account.entity'
 import { Voucher } from '../../entities/voucher.entity'
 import { VoucherSource, VoucherStatus } from '../../common/enums'
 import { toCents } from '../../common/utils/money.util'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { VouchersService } from '../vouchers/vouchers.service'
 import type { Operator } from '../cash-bank/cash-bank.service'
 import type { PageResult, PaginationQueryDto } from '../../common/dto/pagination.dto'
@@ -19,10 +19,10 @@ const DEFAULT_BANK_CODE = '1002'
 @Injectable()
 export class IncomeExpenseService {
   constructor(
-    @InjectRepository(IncomeExpense) private readonly repo: Repository<IncomeExpense>,
-    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
-    @InjectRepository(BankAccount) private readonly bankRepo: Repository<BankAccount>,
-    @InjectRepository(Voucher) private readonly voucherRepo: Repository<Voucher>,
+    @InjectCompanyRepo(IncomeExpense) private readonly repo: CompanyScopedRepository<IncomeExpense>,
+    @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
+    @InjectCompanyRepo(BankAccount) private readonly bankRepo: CompanyScopedRepository<BankAccount>,
+    @InjectCompanyRepo(Voucher) private readonly voucherRepo: CompanyScopedRepository<Voucher>,
     private readonly vouchersService: VouchersService,
   ) {}
 
@@ -96,7 +96,7 @@ export class IncomeExpenseService {
     })
 
     const saved = await this.repo.save(entity)
-    await this.voucherRepo.update(voucher.id, { sourceId: saved.id })
+    await this.voucherRepo.update({ id: voucher.id }, { sourceId: saved.id })
     void bankAccount
     return this.toVo(saved)
   }
@@ -165,7 +165,7 @@ export class IncomeExpenseService {
       }
     }
 
-    await this.repo.delete(id)
+    await this.repo.delete({ id } as any)
     return { message: '删除成功' }
   }
 

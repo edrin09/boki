@@ -1,7 +1,5 @@
 import { Injectable } from '@nestjs/common'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
 import { Account } from '../../entities/account.entity'
 import { Voucher } from '../../entities/voucher.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
@@ -16,6 +14,8 @@ import {
   periodToYear,
   yearStartDate,
 } from '../../common/utils/date.util'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import type { BooksQueryDto, LedgerQueryDto } from './dto/books.dto'
 
 interface AmountSet {
@@ -60,14 +60,14 @@ interface AuxRow {
 @Injectable()
 export class BooksService {
   constructor(
-    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
-    @InjectRepository(Voucher) private readonly voucherRepo: Repository<Voucher>,
-    @InjectRepository(VoucherEntry) private readonly entryRepo: Repository<VoucherEntry>,
-    @InjectRepository(InitialBalance)
-    private readonly initialBalanceRepo: Repository<InitialBalance>,
-    @InjectRepository(Partner) private readonly partnerRepo: Repository<Partner>,
-    @InjectRepository(Department) private readonly deptRepo: Repository<Department>,
-    @InjectRepository(Project) private readonly projectRepo: Repository<Project>,
+    @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
+    @InjectCompanyRepo(Voucher) private readonly voucherRepo: CompanyScopedRepository<Voucher>,
+    @InjectCompanyRepo(VoucherEntry) private readonly entryRepo: CompanyScopedRepository<VoucherEntry>,
+    @InjectCompanyRepo(InitialBalance)
+    private readonly initialBalanceRepo: CompanyScopedRepository<InitialBalance>,
+    @InjectCompanyRepo(Partner) private readonly partnerRepo: CompanyScopedRepository<Partner>,
+    @InjectCompanyRepo(Department) private readonly deptRepo: CompanyScopedRepository<Department>,
+    @InjectCompanyRepo(Project) private readonly projectRepo: CompanyScopedRepository<Project>,
   ) {}
 
   // ==================== 公共计算内核 ====================

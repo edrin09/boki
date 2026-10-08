@@ -1,11 +1,12 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Brackets, Repository } from 'typeorm'
+import { Brackets, Repository, SelectQueryBuilder } from 'typeorm'
 import { Partner } from '../../entities/partner.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
 import { InitialBalance } from '../../entities/initial-balance.entity'
 import { PartnerType } from '../../common/enums'
 import { CODE_PREFIX, nextCode } from '../../common/utils/code.util'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import type { PageResult, PaginationQueryDto } from '../../common/dto/pagination.dto'
 import type { CreatePartnerDto, UpdatePartnerDto } from './dto/partner.dto'
 
@@ -21,10 +22,10 @@ export interface BatchCreateItemResult {
 @Injectable()
 export class PartnersService {
   constructor(
-    @InjectRepository(Partner) private readonly repo: Repository<Partner>,
-    @InjectRepository(VoucherEntry) private readonly entryRepo: Repository<VoucherEntry>,
-    @InjectRepository(InitialBalance)
-    private readonly initialBalanceRepo: Repository<InitialBalance>,
+    @InjectCompanyRepo(Partner) private readonly repo: CompanyScopedRepository<Partner>,
+    @InjectCompanyRepo(VoucherEntry) private readonly entryRepo: CompanyScopedRepository<VoucherEntry>,
+    @InjectCompanyRepo(InitialBalance)
+    private readonly initialBalanceRepo: CompanyScopedRepository<InitialBalance>,
   ) {}
 
   async findAll(query: PaginationQueryDto & { type?: string }): Promise<PageResult<any>> {
@@ -144,7 +145,7 @@ export class PartnersService {
     if (usedInitial > 0) {
       throw new ConflictException('该往来单位已录入期初余额，无法删除')
     }
-    await this.repo.delete(id)
+    await this.repo.delete({ id } as any)
     return { message: '删除成功' }
   }
 }

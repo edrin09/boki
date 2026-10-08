@@ -4,8 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Brackets, Repository } from 'typeorm'
+import { Brackets } from 'typeorm'
 import { ExpenseClaim, ExpenseClaimItem } from '../../entities/hr.entity'
 import { Employee } from '../../entities/hr.entity'
 import { Department } from '../../entities/department.entity'
@@ -20,6 +19,8 @@ import {
   VoucherWord,
 } from '../../common/enums'
 import { toCents, fromCents } from '../../common/utils/money.util'
+import { CompanyScopedRepository } from '../../common/company/company.repository'
+import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { VouchersService } from '../vouchers/vouchers.service'
 import type { VoucherEntryDto } from '../vouchers/dto/voucher.dto'
 import type { Operator } from '../cash-bank/cash-bank.service'
@@ -40,14 +41,14 @@ const DEFAULT_BANK_CODE = '1002'
 @Injectable()
 export class ExpenseClaimsService {
   constructor(
-    @InjectRepository(ExpenseClaim) private readonly repo: Repository<ExpenseClaim>,
-    @InjectRepository(ExpenseClaimItem)
-    private readonly itemRepo: Repository<ExpenseClaimItem>,
-    @InjectRepository(Employee) private readonly employeeRepo: Repository<Employee>,
-    @InjectRepository(Department) private readonly deptRepo: Repository<Department>,
-    @InjectRepository(Account) private readonly accountRepo: Repository<Account>,
-    @InjectRepository(BankAccount) private readonly bankRepo: Repository<BankAccount>,
-    @InjectRepository(Voucher) private readonly voucherRepo: Repository<Voucher>,
+    @InjectCompanyRepo(ExpenseClaim) private readonly repo: CompanyScopedRepository<ExpenseClaim>,
+    @InjectCompanyRepo(ExpenseClaimItem)
+    private readonly itemRepo: CompanyScopedRepository<ExpenseClaimItem>,
+    @InjectCompanyRepo(Employee) private readonly employeeRepo: CompanyScopedRepository<Employee>,
+    @InjectCompanyRepo(Department) private readonly deptRepo: CompanyScopedRepository<Department>,
+    @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
+    @InjectCompanyRepo(BankAccount) private readonly bankRepo: CompanyScopedRepository<BankAccount>,
+    @InjectCompanyRepo(Voucher) private readonly voucherRepo: CompanyScopedRepository<Voucher>,
     private readonly vouchersService: VouchersService,
   ) {}
 
@@ -294,7 +295,7 @@ export class ExpenseClaimsService {
     }
 
     await this.itemRepo.delete({ claimId: id })
-    await this.repo.delete(id)
+    await this.repo.delete({ id } as any)
     return { message: '删除成功' }
   }
 
