@@ -44,7 +44,7 @@
         <el-table-column prop="lastLoginAt" label="最后登录" width="170">
           <template #default="{ row }">{{ formatDateTime(row.lastLoginAt) || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
             <el-button v-permission="'user:update'" link type="primary" @click="onEdit(row)">编辑</el-button>
             <el-button v-permission="'user:reset-password'" link type="warning" @click="onResetPassword(row)">

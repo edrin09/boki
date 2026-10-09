@@ -54,7 +54,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="170" fixed="right">
+        <el-table-column label="操作" width="190" fixed="right">
           <template #default="{ row }">
             <el-button v-permission="'hr:employee:update'" link type="primary" @click="onEdit(row)">编辑</el-button>
             <el-button v-permission="'hr:employee:update'" link type="warning" @click="onToggle(row)">

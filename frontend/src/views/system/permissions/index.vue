@@ -22,7 +22,7 @@
         </el-table-column>
         <el-table-column prop="module" label="模块" width="130" />
         <el-table-column prop="path" label="路由地址" min-width="200" />
-        <el-table-column label="操作" width="140" fixed="right">
+        <el-table-column label="操作" width="190" fixed="right">
           <template #default="{ row }">
             <el-button v-permission="'permission:create'" link type="success" @click="onCreate(row)">新增子级</el-button>
             <el-button v-permission="'permission:update'" link type="primary" @click="onEdit(row)">编辑</el-button>

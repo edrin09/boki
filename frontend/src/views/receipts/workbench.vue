@@ -136,7 +136,7 @@
             <span v-else class="text-muted">未生成</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="330" fixed="right">
           <template #default="{ row }">
             <el-tooltip v-if="row.bookable === false" content="该单据无法自动生成凭证，请查看左侧原因；可先「修正识别」纠正类型或方向" placement="top">
               <span class="disabled-hint">不可自动入账</span>

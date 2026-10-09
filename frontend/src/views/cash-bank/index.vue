@@ -66,7 +66,7 @@
             <span v-else class="text-muted">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="190" fixed="right">
           <template #default="{ row }">
             <el-button v-permission="'cash-bank:update'" link type="primary" @click="onEdit(row)">编辑</el-button>
             <el-button

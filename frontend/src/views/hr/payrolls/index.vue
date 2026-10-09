@@ -48,7 +48,7 @@
             <el-tag :type="STATUS_TAGS[row.status]" size="small">{{ row.statusLabel }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="265" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="onView(row)">查看明细</el-button>
             <el-button v-if="row.status === 'draft'" v-permission="'hr:payroll:update'" link type="primary"

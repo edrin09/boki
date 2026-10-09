@@ -154,6 +154,15 @@ body {
   word-break: break-word;
 }
 
+/* 表格操作列：操作按钮保持单行显示，避免换行 */
+.el-table .cell:has(.el-button) {
+  white-space: nowrap;
+}
+
+.el-table .cell:has(.el-button) .el-button + .el-button {
+  margin-left: 8px;
+}
+
 .el-menu {
   border-right: none;
 }
