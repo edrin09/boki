@@ -85,32 +85,36 @@
           <el-input v-model="form.name" placeholder="往来单位全称" />
         </el-form-item>
 
+        <el-form-item label="类型">
+          <el-radio-group v-model="form.type">
+            <el-radio value="customer">客户</el-radio>
+            <el-radio value="supplier">供应商</el-radio>
+            <el-radio value="both">客户兼供应商</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
         <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="类型">
-              <el-radio-group v-model="form.type">
-                <el-radio value="customer">客户</el-radio>
-                <el-radio value="supplier">供应商</el-radio>
-                <el-radio value="both">两者兼有</el-radio>
-              </el-radio-group>
-            </el-form-item>
-          </el-col>
           <el-col :span="12">
             <el-form-item label="联系人">
               <el-input v-model="form.contact" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="电话">
+              <el-input v-model="form.phone" />
             </el-form-item>
           </el-col>
         </el-row>
 
         <el-row :gutter="12">
           <el-col :span="12">
-            <el-form-item label="电话">
-              <el-input v-model="form.phone" />
+            <el-form-item label="邮箱">
+              <el-input v-model="form.email" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="邮箱">
-              <el-input v-model="form.email" />
+            <el-form-item label="纳税人识别号" prop="taxNo">
+              <el-input v-model="form.taxNo" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -121,8 +125,8 @@
 
         <el-row :gutter="12">
           <el-col :span="12">
-            <el-form-item label="纳税人识别号" prop="taxNo">
-              <el-input v-model="form.taxNo" />
+            <el-form-item label="法定代表人">
+              <el-input v-model="form.legalPerson" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -131,10 +135,6 @@
             </el-form-item>
           </el-col>
         </el-row>
-
-        <el-form-item label="法定代表人">
-          <el-input v-model="form.legalPerson" />
-        </el-form-item>
 
         <el-row :gutter="12">
           <el-col :span="12">
