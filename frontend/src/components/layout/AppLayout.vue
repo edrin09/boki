@@ -86,7 +86,7 @@ const menus = computed<MenuNode[]>(() =>
   filterMenus(MENUS, userStore.profile?.permissions ?? []),
 )
 
-const activeMenu = computed(() => route.path)
+const activeMenu = computed(() => (route.meta.activeMenu as string) || route.path)
 
 const breadcrumbs = computed(() => {
   const titles = route.matched

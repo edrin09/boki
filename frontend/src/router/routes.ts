@@ -168,6 +168,12 @@ export const businessRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/hr/payrolls/index.vue'),
         meta: { title: '工资表', permission: 'hr:payroll' },
       },
+      {
+        path: 'payrolls/:id/edit',
+        name: 'HrPayrollEdit',
+        component: () => import('@/views/hr/payrolls/edit.vue'),
+        meta: { title: '编辑工资明细', permission: 'hr:payroll:update', activeMenu: '/hr/payrolls' },
+      },
     ],
   },
 

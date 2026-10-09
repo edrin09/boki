@@ -110,7 +110,7 @@
         </el-descriptions>
 
         <div class="page-toolbar">
-          <el-button size="small" @click="onEdit(detail)">
+          <el-button v-if="detail?.status === 'draft'" size="small" @click="onEdit(detail)">
             <el-icon><Edit /></el-icon>编辑明细
           </el-button>
           <div class="page-toolbar__spacer" />
@@ -217,7 +217,7 @@
             <template #default="{ row }">
               <template v-if="row.matched">{{ row.employeeName }}</template>
               <el-select v-else v-model="row.employeeId" filterable placeholder="选择员工" size="small" style="width: 100%">
-                <el-option v-for="e in employeeOptions" :key="e.id" :label="`${e.name}（${e.employeeCode}）`" :value="e.id" />
+                <el-option v-for="e in employeeOptions" :key="e.id" :label="`${e.name}（${e.code}）`" :value="e.id" />
               </el-select>
             </template>
           </el-table-column>
@@ -290,70 +290,12 @@
           @click="onImportParse">解析预览</el-button>
       </template>
     </el-dialog>
-
-    <!-- 编辑弹窗 -->
-    <el-dialog v-model="editVisible" title="编辑工资明细" width="1000px" destroy-on-close>
-      <el-alert type="info" :closable="false" show-icon class="mb12"
-        title="修改后保存为草稿；「审核计提」会生成 借：工资费用 / 贷：应付职工薪酬，「发放」生成 借：应付职工薪酬 / 贷：银行及代扣项。" />
-      <el-table :data="editItems" size="small" max-height="440px">
-        <el-table-column prop="employeeCode" label="工号" width="90" />
-        <el-table-column prop="employeeName" label="姓名" width="90" />
-        <el-table-column label="基本工资" width="140">
-          <template #default="{ row }">
-            <el-input-number v-model="row.baseSalary" :min="0" :precision="2" :controls="false" style="width: 100%" />
-          </template>
-        </el-table-column>
-        <el-table-column label="绩效" width="130">
-          <template #default="{ row }">
-            <el-input-number v-model="row.performance" :min="0" :precision="2" :controls="false" style="width: 100%" />
-          </template>
-        </el-table-column>
-        <el-table-column label="补贴" width="130">
-          <template #default="{ row }">
-            <el-input-number v-model="row.allowance" :min="0" :precision="2" :controls="false" style="width: 100%" />
-          </template>
-        </el-table-column>
-        <el-table-column label="加班费" width="130">
-          <template #default="{ row }">
-            <el-input-number v-model="row.overtime" :min="0" :precision="2" :controls="false" style="width: 100%" />
-          </template>
-        </el-table-column>
-        <el-table-column label="个人社保" width="130">
-          <template #default="{ row }">
-            <el-input-number v-model="row.insurancePersonal" :min="0" :precision="2" :controls="false" style="width: 100%" />
-          </template>
-        </el-table-column>
-        <el-table-column label="个人公积金" width="130">
-          <template #default="{ row }">
-            <el-input-number v-model="row.fundPersonal" :min="0" :precision="2" :controls="false" style="width: 100%" />
-          </template>
-        </el-table-column>
-        <el-table-column label="个税" width="120">
-          <template #default="{ row }">
-            <el-input-number v-model="row.tax" :min="0" :precision="2" :controls="false" style="width: 100%" />
-          </template>
-        </el-table-column>
-        <el-table-column label="其他代扣" width="120">
-          <template #default="{ row }">
-            <el-input-number v-model="row.otherDeduct" :min="0" :precision="2" :controls="false" style="width: 100%" />
-          </template>
-        </el-table-column>
-        <el-table-column label="实发" width="130" align="right">
-          <template #default="{ row }">
-            <span class="amount amount--total">{{ formatAmount(calcNet(row)) }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
-      <template #footer>
-        <el-button @click="editVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="onSaveItems">保存</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Download, Edit, Upload, UploadFilled, Back } from '@element-plus/icons-vue'
 import { bankApi, departmentApi, employeeApi, payrollApi } from '@/api'
@@ -363,6 +305,8 @@ import { exportExcel } from '@/utils/export'
 import PeriodPicker from '@/components/common/PeriodPicker.vue'
 
 const STATUS_TAGS: Record<string, any> = { draft: 'info', approved: 'success', paid: 'primary' }
+
+const router = useRouter()
 
 const query = reactive<Record<string, any>>({ page: 1, pageSize: 20, status: '' })
 const { list, total, loading, load, search, reset } = usePagedList({
@@ -524,59 +468,11 @@ async function onView(row: any) {
 }
 
 async function onEdit(row: any) {
-  const data = await payrollApi.detail(row.id)
-  editId.value = data.id
-  Object.assign(editMeta, {
-    period: data.period,
-    payDate: data.payDate,
-    bankAccountId: data.bankAccountId ?? '',
-    remark: data.remark ?? '',
-  })
-  editItems.value = (data.items ?? []).map((i: any) => ({
-    employeeId: i.employeeId,
-    baseSalary: Number(i.baseSalary ?? 0),
-    performance: Number(i.performance ?? 0),
-    allowance: Number(i.allowance ?? 0),
-    overtime: Number(i.overtime ?? 0),
-    insurancePersonal: Number(i.insurancePersonal ?? 0),
-    fundPersonal: Number(i.fundPersonal ?? 0),
-    tax: Number(i.tax ?? 0),
-    otherDeduct: Number(i.otherDeduct ?? 0),
-  }))
-  editVisible.value = true
-}
-
-const editVisible = ref(false)
-const saving = ref(false)
-const editId = ref('')
-const editItems = ref<any[]>([])
-const editMeta = reactive({ period: 0, payDate: '', bankAccountId: '', remark: '' })
-
-function calcNet(row: any): number {
-  const gross = (row.baseSalary ?? 0) + (row.performance ?? 0) + (row.allowance ?? 0) + (row.overtime ?? 0)
-  const deduct =
-    (row.insurancePersonal ?? 0) + (row.fundPersonal ?? 0) + (row.tax ?? 0) + (row.otherDeduct ?? 0)
-  return Math.round((gross - deduct) * 100) / 100
-}
-
-async function onSaveItems() {
-  saving.value = true
-  try {
-    const payload: any = {
-      period: editMeta.period,
-      payDate: editMeta.payDate,
-      bankAccountId: editMeta.bankAccountId || undefined,
-      remark: editMeta.remark || undefined,
-      items: editItems.value.map((i) => ({ ...i })),
-    }
-    await payrollApi.update(editId.value, payload)
-    ok('保存成功')
-    editVisible.value = false
-    detailVisible.value = false
-    load()
-  } finally {
-    saving.value = false
+  if (row.status && row.status !== 'draft') {
+    ElMessage.warning('仅草稿状态的工资单可以编辑')
+    return
   }
+  router.push(`/hr/payrolls/${row.id}/edit`)
 }
 
 async function onApprove(row: any) {
