@@ -25,18 +25,18 @@
       </div>
 
       <el-table v-loading="loading" :data="list" empty-text="暂无员工">
-        <el-table-column prop="code" label="工号" width="110" />
-        <el-table-column prop="name" label="姓名" width="100" />
+        <el-table-column prop="code" label="工号" width="130" />
+        <el-table-column prop="name" label="姓名" width="160" />
         <el-table-column label="性别" width="70" align="center">
           <template #default="{ row }">{{ genderLabel(row.gender) }}</template>
         </el-table-column>
-        <el-table-column prop="departmentName" label="部门" width="140">
+        <el-table-column prop="departmentName" label="部门" width="130">
           <template #default="{ row }">{{ row.departmentName || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="position" label="岗位" width="140">
+        <el-table-column prop="position" label="岗位" min-width="140">
           <template #default="{ row }">{{ row.position || '-' }}</template>
         </el-table-column>
-        <el-table-column label="基本工资" width="130" align="right">
+        <el-table-column label="基本工资" width="140" align="right">
           <template #default="{ row }">
             <span class="amount">{{ formatAmount(row.baseSalary) }}</span>
           </template>
@@ -47,14 +47,14 @@
         <el-table-column prop="hireDate" label="入职日期" width="115">
           <template #default="{ row }">{{ row.hireDate || '-' }}</template>
         </el-table-column>
-        <el-table-column label="状态" width="90" align="center">
+        <el-table-column label="状态" width="110" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">
               {{ row.status === 1 ? '在职' : '离职' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="190" fixed="right">
+        <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
             <el-button v-permission="'hr:employee:update'" link type="primary" @click="onEdit(row)">编辑</el-button>
             <el-button v-permission="'hr:employee:update'" link type="warning" @click="onToggle(row)">

@@ -131,12 +131,36 @@ async function main() {
     body: JSON.stringify({ username: USERNAME, password: PASSWORD }),
   })
   const loginBody = await loginRes.json()
-  const token = loginBody?.data?.token || loginBody?.data?.accessToken
+  let token = loginBody?.data?.token || loginBody?.data?.accessToken
   console.log(`登录: HTTP ${loginRes.status}  token=${token ? 'OK' : '缺失'}`)
   if (!token) {
     console.log(JSON.stringify(loginBody).slice(0, 300))
     process.exit(1)
   }
+
+  // 空库首次运行没有记账公司：按前端引导建一家并切换到公司上下文，
+  // 否则业务接口会因缺少公司上下文返回 500。已有公司则直接复用。
+  const mineRes = await fetch(`${BASE}/companies`, { headers: { Authorization: `Bearer ${token}` } })
+  const mine = (await mineRes.json())?.data ?? []
+  let companyId = Array.isArray(mine) && mine.length ? mine[0].id : null
+  if (!companyId) {
+    const createdRes = await fetch(`${BASE}/companies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name: '打包验证公司', taxNo: '91310000MA1FL2KX3T', taxpayerType: 'small_scale' }),
+    })
+    companyId = (await createdRes.json())?.data?.id ?? null
+  }
+  if (companyId) {
+    const swRes = await fetch(`${BASE}/auth/switch-company`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ companyId }),
+    })
+    token = (await swRes.json())?.data?.accessToken || token
+  }
+  console.log(`记账公司: ${companyId ? companyId : '未取到（业务接口可能不可用）'}`)
+
   const auth = { Authorization: `Bearer ${token}` }
 
   // 清理历史记录（脚本可重复运行）

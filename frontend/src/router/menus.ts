@@ -67,6 +67,7 @@ export const MENUS: MenuNode[] = [
     children: [
       { title: '员工管理', path: '/hr/employees', permission: 'hr:employee' },
       { title: '报销单', path: '/hr/expense-claims', permission: 'hr:expense-claim' },
+      { title: '借款单', path: '/hr/loans', permission: 'hr:loan' },
       { title: '工资表', path: '/hr/payrolls', permission: 'hr:payroll' },
     ],
   },

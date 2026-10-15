@@ -21,34 +21,34 @@
 
       <el-table v-loading="loading" :data="list" empty-text="暂无工资单">
         <el-table-column prop="payrollNo" label="工资单号" width="130" />
-        <el-table-column label="工资期间" width="110">
+        <el-table-column label="工资期间" min-width="115">
           <template #default="{ row }">{{ periodLabel(row.period) }}</template>
         </el-table-column>
         <el-table-column prop="payDate" label="发放日期" width="115" />
         <el-table-column prop="employeeCount" label="人数" width="80" align="center" />
-        <el-table-column label="应发合计" width="150" align="right">
+        <el-table-column label="应发合计" width="140" align="right">
           <template #default="{ row }">
             <span class="amount amount--debit">{{ formatAmount(row.totalGross) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="代扣合计" width="150" align="right">
+        <el-table-column label="代扣合计" width="140" align="right">
           <template #default="{ row }">
             <span class="amount amount--credit">
               {{ formatAmount(row.totalInsurance + row.totalFund + row.totalTax + row.totalOtherDeduct) }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="实发合计" width="150" align="right">
+        <el-table-column label="实发合计" width="140" align="right">
           <template #default="{ row }">
             <span class="amount amount--total">{{ formatAmount(row.totalNet) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100" align="center">
+        <el-table-column label="状态" width="110" align="center">
           <template #default="{ row }">
             <el-tag :type="STATUS_TAGS[row.status]" size="small">{{ row.statusLabel }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="265" fixed="right">
+        <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="onView(row)">查看明细</el-button>
             <el-button v-if="row.status === 'draft'" v-permission="'hr:payroll:update'" link type="primary"

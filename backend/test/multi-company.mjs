@@ -103,7 +103,7 @@ async function main() {
     const created = await call('/companies', {
       method: 'POST',
       token: tokenA,
-      body: { name: `测试公司${stamp}`, taxNo: `91310000TEST${stamp}`, copyAccountsFromCurrent: true },
+      body: { name: `测试公司${stamp}`, taxNo: `91310000TEST${stamp}`, taxpayerType: 'small_scale', copyAccountsFromCurrent: true },
     })
     ok(created.status === 201 && created.code === 0, '新建公司成功', JSON.stringify(created).slice(0, 160))
     const companyB = created.data
@@ -333,7 +333,7 @@ async function main() {
     const emptyC = await call('/companies', {
       method: 'POST',
       token: tokenA2,
-      body: { name: `待删除公司${stamp}`, taxNo: `91310000DEL${stamp}`, copyAccountsFromCurrent: false },
+      body: { name: `待删除公司${stamp}`, taxNo: `91310000DEL${stamp}`, taxpayerType: 'small_scale', copyAccountsFromCurrent: false },
     })
     createdCompanies.push(emptyC.data?.id)
     const delEmpty = await call(`/companies/${emptyC.data.id}/members/${accountantUser.id}`, {

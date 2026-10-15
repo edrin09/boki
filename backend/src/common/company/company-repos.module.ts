@@ -14,6 +14,8 @@ import { IncomeExpense } from '../../entities/business.entity'
 import { Employee } from '../../entities/hr.entity'
 import { ExpenseClaim } from '../../entities/hr.entity'
 import { ExpenseClaimItem } from '../../entities/hr.entity'
+import { Loan } from '../../entities/hr.entity'
+import { BankStmtRow } from '../../entities/business.entity'
 import { Payroll } from '../../entities/hr.entity'
 import { PayrollItem } from '../../entities/hr.entity'
 import { Receipt } from '../../entities/receipt.entity'
@@ -35,6 +37,8 @@ export const COMPANY_SCOPED_ENTITIES = [
   Employee,
   ExpenseClaim,
   ExpenseClaimItem,
+  Loan,
+  BankStmtRow,
   Payroll,
   PayrollItem,
   Receipt,

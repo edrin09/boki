@@ -172,3 +172,89 @@ export class IncomeExpense extends BaseEntity {
   @Column({ length: 200, nullable: true })
   remark: string | null
 }
+
+/** 银行流水行状态 */
+export const BankStmtStatus = {
+  BOOKED: 'booked', // 已入账（已生成资金单据+凭证）
+  MATCHED: 'matched', // 已匹配其他单据（如借款单），无需重复记账
+  PENDING: 'pending', // 待确认（用户选科目后入账）
+  SKIPPED: 'skipped', // 已跳过（已在其他模块记账/无需记账）
+} as const
+
+/**
+ * 银行流水行（对账单导入）
+ * 一行流水 = 一条银行账户资金变动。入账复用现金银行单据链路生成凭证。
+ */
+@Entity('fin_bank_stmt_row')
+@Index('idx_bank_stmt_company', ['companyId'])
+@Index('idx_bank_stmt_batch', ['batchId'])
+export class BankStmtRow extends BaseEntity {
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
+  @Column({ length: 36, comment: '导入批次ID' })
+  batchId: string
+
+  @Column({ name: 'bank_account_id', type: 'varchar', comment: '资金账户ID' })
+  bankAccountId: string
+
+  @Column({ name: 'row_date', type: 'date', comment: '交易日期' })
+  rowDate: string
+
+  @Column({ length: 200, default: '', comment: '摘要/用途' })
+  summary: string
+
+  @Column({ name: 'counter_name', length: 100, nullable: true, comment: '对方户名' })
+  counterName: string | null
+
+  @Column({ name: 'counter_account', length: 50, nullable: true, comment: '对方账号' })
+  counterAccount: string | null
+
+  @Column({ name: 'flow_no', length: 50, nullable: true, comment: '银行流水号' })
+  flowNo: string | null
+
+  @Column({ type: 'decimal', precision: 18, scale: 2, default: 0, transformer: decimalTransformer, comment: '支出（借方发生额）' })
+  debit: number
+
+  @Column({ type: 'decimal', precision: 18, scale: 2, default: 0, transformer: decimalTransformer, comment: '收入（贷方发生额）' })
+  credit: number
+
+  @Column({ type: 'decimal', precision: 18, scale: 2, nullable: true, transformer: decimalTransformer, comment: '账户余额' })
+  balance: number | null
+
+  @Column({ length: 20, default: 'pending', comment: '状态：booked/matched/pending/skipped' })
+  status: string
+
+  @Column({ name: 'match_info', length: 200, default: '', comment: '匹配/建议说明' })
+  matchInfo: string
+
+  @Column({ name: 'suggest_biz_type', length: 20, nullable: true, comment: '建议业务类型' })
+  suggestBizType: string | null
+
+  @Column({ name: 'suggest_account_id', type: 'varchar', nullable: true, comment: '建议对方科目ID' })
+  suggestAccountId: string | null
+
+  @Column({ name: 'suggest_account_code', length: 20, nullable: true, comment: '建议对方科目编码' })
+  suggestAccountCode: string | null
+
+  @Column({ name: 'suggest_account_name', length: 100, nullable: true, comment: '建议对方科目名称' })
+  suggestAccountName: string | null
+
+  @Column({ name: 'suggest_partner_id', type: 'varchar', nullable: true, comment: '建议往来单位ID' })
+  suggestPartnerId: string | null
+
+  @Column({ name: 'cash_flow_id', type: 'varchar', nullable: true, comment: '生成的资金单据ID' })
+  cashFlowId: string | null
+
+  @Column({ name: 'voucher_id', type: 'varchar', nullable: true, comment: '生成的凭证ID' })
+  voucherId: string | null
+
+  @Column({ name: 'created_by', type: 'varchar', nullable: true })
+  createdBy: string | null
+
+  @Column({ name: 'created_by_name', length: 50, nullable: true })
+  createdByName: string | null
+
+  @Column({ length: 200, nullable: true })
+  remark: string | null
+}

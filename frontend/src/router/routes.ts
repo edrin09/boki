@@ -104,6 +104,12 @@ export const businessRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/income-expense/index.vue'),
         meta: { title: '其他收支', permission: 'income-expense' },
       },
+      {
+        path: '/cash/bank-stmt',
+        name: 'BankStmt',
+        component: () => import('@/views/cash-bank/bank-stmt.vue'),
+        meta: { title: '银行流水', permission: 'bank-stmt' },
+      },
     ],
   },
 
@@ -161,6 +167,12 @@ export const businessRoutes: RouteRecordRaw[] = [
         name: 'HrExpenseClaims',
         component: () => import('@/views/hr/expense-claims/index.vue'),
         meta: { title: '报销单', permission: 'hr:expense-claim' },
+      },
+      {
+        path: 'loans',
+        name: 'HrLoans',
+        component: () => import('@/views/hr/loans/index.vue'),
+        meta: { title: '借款单', permission: 'hr:loan' },
       },
       {
         path: 'payrolls',

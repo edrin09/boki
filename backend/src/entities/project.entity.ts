@@ -1,5 +1,6 @@
 import { Column, Entity, Index } from 'typeorm'
 import { BaseEntity } from './base.entity'
+import { decimalTransformer } from '../common/transformers/decimal.transformer'
 
 /**
  * 项目（辅助核算维度）
@@ -19,6 +20,17 @@ export class Project extends BaseEntity {
 
   @Column({ name: 'manager', length: 50, nullable: true, comment: '负责人' })
   manager: string | null
+
+  @Column({ name: 'contract_no', length: 50, nullable: true, comment: '合同编号' })
+  contractNo: string | null
+
+  /** 合同金额（含税总价） */
+  @Column({ name: 'contract_amount', type: 'decimal', precision: 18, scale: 2, default: 0, transformer: decimalTransformer, comment: '合同金额' })
+  contractAmount: number
+
+  /** 客户（往来单位） */
+  @Column({ name: 'partner_id', type: 'varchar', length: 36, nullable: true, comment: '客户往来单位ID' })
+  partnerId: string | null
 
   @Column({ name: 'start_date', type: 'date', nullable: true })
   startDate: string | null

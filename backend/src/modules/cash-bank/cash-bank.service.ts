@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
-import { CashFlow } from '../../entities/business.entity'
+import { CashFlow, BankStmtRow, BankStmtStatus } from '../../entities/business.entity'
 import { Account } from '../../entities/account.entity'
 import { BankAccount } from '../../entities/bank-account.entity'
 import { Voucher } from '../../entities/voucher.entity'
@@ -24,6 +24,7 @@ export class CashBankService {
     @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
     @InjectCompanyRepo(BankAccount) private readonly bankRepo: CompanyScopedRepository<BankAccount>,
     @InjectCompanyRepo(Voucher) private readonly voucherRepo: CompanyScopedRepository<Voucher>,
+    @InjectCompanyRepo(BankStmtRow) private readonly stmtRowRepo: CompanyScopedRepository<BankStmtRow>,
     private readonly vouchersService: VouchersService,
   ) {}
 
@@ -175,6 +176,18 @@ export class CashBankService {
     }
     void operator
     await this.repo.delete({ id } as any)
+
+    // 联动重置银行流水行：关联资金单据被删后，流水行恢复为待确认，避免状态悬挂
+    const stmtRows = await this.stmtRowRepo.find({ where: { cashFlowId: id } })
+    if (stmtRows.length) {
+      for (const r of stmtRows) {
+        r.status = BankStmtStatus.PENDING
+        r.cashFlowId = null
+        r.voucherId = null
+        r.matchInfo = '关联资金单据已删除，重置为待确认'
+      }
+      await this.stmtRowRepo.save(stmtRows)
+    }
     return { message: '删除成功' }
   }
 

@@ -5,7 +5,8 @@ export const MODEL_FILES = {
   det: 'det.onnx',
   cls: 'cls.onnx',
   rec: 'rec.onnx',
-  keys: 'ppocr_keys_v1.txt',
+  /** PP-OCRv6 rec 配套大字典（从 rec.onnx 的 character 元数据抽取） */
+  keys: 'ppocrv6_dict.txt',
 } as const
 
 /**

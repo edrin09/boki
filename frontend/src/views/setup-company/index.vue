@@ -17,7 +17,7 @@
         </el-form-item>
 
         <el-form-item label="纳税人类型" prop="taxpayerType">
-          <el-select v-model="form.taxpayerType">
+          <el-select v-model="form.taxpayerType" placeholder="请选择纳税人类型">
             <el-option label="小规模纳税人" value="small_scale" />
             <el-option label="一般纳税人" value="general" />
           </el-select>
@@ -50,12 +50,13 @@ const loading = ref(false)
 const form = reactive({
   name: '',
   taxNo: '',
-  taxpayerType: 'small_scale',
+  taxpayerType: '',
 })
 
 const rules: FormRules = {
   name: [{ required: true, message: '请输入公司名称', trigger: 'blur' }],
   taxNo: [{ required: true, message: '请输入纳税人识别号', trigger: 'blur' }],
+  taxpayerType: [{ required: true, message: '请选择纳税人类型', trigger: 'change' }],
 }
 
 async function onSubmit() {

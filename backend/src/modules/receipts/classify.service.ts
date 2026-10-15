@@ -6,6 +6,7 @@ import { CompanyScopedRepository } from '../../common/company/company.repository
 import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { SystemService } from '../system/system.service'
 import { recoverFilename } from '../../common/utils/filename.util'
+import { TaxpayerType } from '../../common/enums'
 import { nameContains, normName, sameTaxNo } from './parsers/parser.utils'
 
 /** 凭证模板类型：进项/销项/费用/银行手续费/工资 */
@@ -229,7 +230,12 @@ export class ClassifyService {
       counterparty || ((recoverFilename(receipt.fileName) ?? receipt.fileName).replace(/\.[^.]+$/, ''))
     if (kind === 'input_vat') {
       const tax = this.num(fields.tax_amount)
-      if (tax !== null && tax > 0) {
+      // 进项税额能否抵扣取决于纳税人类型：
+      // 一般纳税人按「不含税金额 + 进项税额」价税分离；
+      // 小规模纳税人进项不得抵扣，价税合计全额计入费用科目。
+      const canDeductInput = company.taxpayerType === TaxpayerType.GENERAL
+      // 红字发票税额为负数，同样按价税分离处理（草稿生成时会取绝对值并对调借贷方向）
+      if (canDeductInput && tax !== null && tax !== 0) {
         entries = [
           { summary: `${summaryBase} 采购费用`, accountCode: targetAccountCode, direction: 'debit', amountSource: 'amount', partnerField: 'seller_name' },
           { summary: `${summaryBase} 进项税额`, accountCode: VAT_INPUT_CODE, direction: 'debit', amountSource: 'tax_amount', partnerField: null },
@@ -243,7 +249,8 @@ export class ClassifyService {
       }
     } else if (kind === 'output_vat') {
       const tax = this.num(fields.tax_amount)
-      if (tax !== null && tax > 0) {
+      // 红字发票税额为负数，同样按价税分离处理（草稿生成时会取绝对值并对调借贷方向）
+      if (tax !== null && tax !== 0) {
         entries = [
           { summary: `${summaryBase} 销售货款`, accountCode: RECEIVABLE_CODE, direction: 'debit', amountSource: 'total_amount', partnerField: 'buyer_name' },
           { summary: `${summaryBase} 销售收入`, accountCode: targetAccountCode, direction: 'credit', amountSource: 'amount', partnerField: 'buyer_name' },

@@ -32,6 +32,8 @@ import { IncomeExpenseModule } from './income-expense/income-expense.module'
 import { SystemModule } from './system/system.module'
 import { EmployeesModule } from './employees/employees.module'
 import { ExpenseClaimsModule } from './expense-claims/expense-claims.module'
+import { LoansModule } from './loans/loans.module'
+import { BankStmtModule } from './bank-stmt/bank-stmt.module'
 import { PayrollModule } from './payroll/payroll.module'
 import { OcrModule } from './ocr/ocr.module'
 import { ReceiptsModule } from './receipts/receipts.module'
@@ -74,6 +76,8 @@ import { CompanyScopeInterceptor } from '../common/company/company-scope.interce
     SystemModule,
     EmployeesModule,
     ExpenseClaimsModule,
+    LoansModule,
+    BankStmtModule,
     PayrollModule,
     OcrModule,
     ReceiptsModule,

@@ -5,6 +5,8 @@ import {
   EmployeeStatus,
   ExpenseClaimStatus,
   ExpensePayMethod,
+  LoanPayMethod,
+  LoanStatus,
   PayrollStatus,
 } from '../common/enums'
 import { decimalTransformer } from '../common/transformers/decimal.transformer'
@@ -493,4 +495,97 @@ export class PayrollItem extends BaseEntity {
 
   @Column({ type: 'int', default: 0, comment: '行号' })
   sort: number
+}
+
+/**
+ * 员工借款单（备用金 / 差旅费借款等）
+ *
+ * 链路：草稿 → 审核（发放借款，生成借款凭证）→ 还款（生成还款凭证）
+ * 借款凭证：借 其他应收款-员工借款 / 贷 库存现金或银行存款
+ * 还款凭证：借 库存现金或银行存款 / 贷 其他应收款-员工借款
+ */
+@Entity('fin_loan')
+@Index('uk_loan_no', ['companyId', 'loanNo'], { unique: true })
+export class Loan extends BaseEntity {
+  @Index('idx_loan_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
+  @Column({ name: 'loan_no', length: 30, comment: '借款单号' })
+  loanNo: string
+
+  @Column({ name: 'loan_date', type: 'date', comment: '借款日期' })
+  loanDate: string
+
+  @Column({ name: 'employee_id', type: 'varchar', comment: '借款人ID' })
+  employeeId: string
+
+  @Column({ name: 'employee_name', length: 50, comment: '借款人姓名快照' })
+  employeeName: string
+
+  @Column({ name: 'department_id', type: 'varchar', nullable: true })
+  departmentId: string | null
+
+  @Column({ name: 'department_name', length: 100, nullable: true })
+  departmentName: string | null
+
+  @Column({
+    name: 'amount',
+    type: 'decimal',
+    precision: 18,
+    scale: 2,
+    default: 0,
+    transformer: decimalTransformer,
+    comment: '借款金额',
+  })
+  amount: number
+
+  @Column({ length: 200, nullable: true, comment: '借款事由' })
+  reason: string | null
+
+  @Column({
+    length: 20,
+    default: 'cash',
+    comment: '借款方式：cash 现金 / bank 银行',
+  })
+  payMethod: LoanPayMethod | string
+
+  @Column({ name: 'bank_account_id', type: 'varchar', nullable: true, comment: '放款资金账户ID' })
+  bankAccountId: string | null
+
+  @Column({ name: 'bank_account_name', length: 100, nullable: true })
+  bankAccountName: string | null
+
+  @Column({ length: 20, default: 'draft', comment: '状态：draft/approved/repaid/rejected' })
+  status: LoanStatus | string
+
+  /** 审核生成的借款凭证 */
+  @Column({ name: 'voucher_id', type: 'varchar', nullable: true, comment: '借款凭证ID' })
+  voucherId: string | null
+
+  /** 还款生成的还款凭证 */
+  @Column({ name: 'repay_voucher_id', type: 'varchar', nullable: true, comment: '最近一次还款凭证ID' })
+  repayVoucherId: string | null
+
+  /** 已累计还款金额（支持部分还款） */
+  @Column({ name: 'repaid_amount', type: 'decimal', precision: 18, scale: 2, default: 0, transformer: decimalTransformer, comment: '已累计还款金额' })
+  repaidAmount: number
+
+  @Column({ name: 'created_by', type: 'varchar', nullable: true })
+  createdBy: string | null
+
+  @Column({ name: 'created_by_name', length: 50, nullable: true })
+  createdByName: string | null
+
+  @Column({ name: 'approved_at', type: 'datetime', nullable: true })
+  approvedAt: Date | null
+
+  @Column({ name: 'repaid_at', type: 'datetime', nullable: true })
+  repaidAt: Date | null
+
+  @Column({ name: 'repay_date', type: 'date', nullable: true, comment: '实际还款日期' })
+  repayDate: string | null
+
+  @Column({ length: 200, nullable: true })
+  remark: string | null
 }

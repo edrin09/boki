@@ -102,7 +102,7 @@
         <el-row :gutter="12">
           <el-col :span="12">
             <el-form-item label="纳税人类型" prop="taxpayerType">
-              <el-select v-model="form.taxpayerType" @change="onTaxpayerTypeChange">
+              <el-select v-model="form.taxpayerType" placeholder="请选择纳税人类型" @change="onTaxpayerTypeChange">
                 <el-option label="小规模纳税人" value="small_scale" />
                 <el-option label="一般纳税人" value="general" />
               </el-select>
@@ -271,7 +271,7 @@ const emptyCompanyForm = {
   id: '' as string,
   name: '',
   taxNo: '',
-  taxpayerType: 'small_scale' as string,
+  taxpayerType: '' as string,
   vatRate: 3 as number | null,
   taxDeclareCycle: 'month' as string,
   legalPerson: '',
@@ -297,6 +297,7 @@ const rules: FormRules = {
     { required: true, message: '请输入公司名称', trigger: 'blur' },
     { max: 100, message: '公司名称过长', trigger: 'blur' },
   ],
+  taxpayerType: [{ required: true, message: '请选择纳税人类型', trigger: 'change' }],
   taxNo: [
     {
       // 新建必填：税号用于比对票面购销方、判定进项/销项方向，缺失则票据无法自动生成凭证

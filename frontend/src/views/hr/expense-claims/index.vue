@@ -25,10 +25,10 @@
         <el-table-column label="报销人" width="160">
           <template #default="{ row }">{{ row.employeeName }}</template>
         </el-table-column>
-        <el-table-column prop="departmentName" label="部门" width="130">
+        <el-table-column prop="departmentName" label="部门" min-width="130">
           <template #default="{ row }">{{ row.departmentName || '-' }}</template>
         </el-table-column>
-        <el-table-column label="支付方式" width="130">
+        <el-table-column label="支付方式" width="110">
           <template #default="{ row }">
             <el-tag :type="PAY_METHOD_TAGS[row.payMethod]" size="small">{{ PAY_METHODS[row.payMethod] }}</el-tag>
           </template>
@@ -38,7 +38,7 @@
             <span class="amount amount--total">{{ formatAmount(row.totalAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100" align="center">
+        <el-table-column label="状态" width="110" align="center">
           <template #default="{ row }">
             <el-tag :type="STATUS_TAGS[row.status]" size="small">{{ row.statusLabel }}</el-tag>
           </template>

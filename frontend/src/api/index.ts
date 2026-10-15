@@ -235,6 +235,13 @@ export const departmentApi = {
 export const projectApi = {
   list: (params?: Record<string, any>) => get<any>('/projects', params),
   options: () => get<any[]>('/projects/options'),
+  ledger: () => get<any[]>('/projects/ledger'),
+  /** 导入合同 PDF，自动识别合同编号/金额/客户 */
+  parseContract: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return post<any>('/projects/parse-contract', form)
+  },
   create: (data: any) => post('/projects', data),
   update: (id: string, data: any) => put(`/projects/${id}`, data),
   remove: (id: string) => del(`/projects/${id}`),
@@ -279,6 +286,25 @@ export const cashBankApi = {
   remove: (id: string) => del(`/cash-bank/${id}`),
 }
 
+// ============ 银行流水（对账单导入） ============
+export const bankStmtApi = {
+  /** 上传对账单 Excel/CSV，解析落库并自动匹配 */
+  import: (file: File, bankAccountId: string) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('bankAccountId', bankAccountId)
+    return post<any>('/bank-stmt/import', form)
+  },
+  list: (params?: Record<string, any>) => get<any>('/bank-stmt', params),
+  summary: () => get<any>('/bank-stmt/summary'),
+  book: (id: string, data: { bizType: string; accountId: string; summary?: string }) =>
+    post<any>(`/bank-stmt/${id}/book`, data),
+  skip: (id: string, remark?: string) => post<any>(`/bank-stmt/${id}/skip`, { remark }),
+  restore: (id: string) => post<any>(`/bank-stmt/${id}/restore`),
+  remove: (id: string) => del(`/bank-stmt/${id}`),
+  removeBatch: (batchId: string) => del(`/bank-stmt/batch/${batchId}`),
+}
+
 export const arApApi = {
   receivable: (params?: Record<string, any>) => get<any>('/ar-ap/receivable', params),
   payable: (params?: Record<string, any>) => get<any>('/ar-ap/payable', params),
@@ -317,6 +343,19 @@ export const expenseClaimApi = {
   pay: (id: string, data: any) => post(`/expense-claims/${id}/pay`, data),
   reject: (id: string, reason: string) => post(`/expense-claims/${id}/reject`, { reason }),
   remove: (id: string) => del(`/expense-claims/${id}`),
+}
+
+// ============ 借款单 ============
+export const loanApi = {
+  list: (params?: Record<string, any>) => get<any>('/loans', params),
+  detail: (id: string) => get<any>(`/loans/${id}`),
+  nextNo: (loanDate?: string) => get<string>('/loans/next-no', { loanDate }),
+  create: (data: any) => post('/loans', data),
+  update: (id: string, data: any) => put(`/loans/${id}`, data),
+  approve: (id: string) => post(`/loans/${id}/approve`),
+  repay: (id: string, data: any) => post(`/loans/${id}/repay`, data),
+  reject: (id: string, reason: string) => post(`/loans/${id}/reject`, { reason }),
+  remove: (id: string) => del(`/loans/${id}`),
 }
 
 export const payrollApi = {

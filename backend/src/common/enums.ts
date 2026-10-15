@@ -127,6 +127,20 @@ export enum PayrollStatus {
   PAID = 'paid', // 已发放
 }
 
+/** 借款单状态 */
+export enum LoanStatus {
+  DRAFT = 'draft', // 草稿
+  APPROVED = 'approved', // 已借款（款项已发放）
+  REPAID = 'repaid', // 已还款
+  REJECTED = 'rejected', // 已驳回
+}
+
+/** 借款/还款方式 */
+export enum LoanPayMethod {
+  CASH = 'cash', // 现金
+  BANK = 'bank', // 银行转账
+}
+
 /** 纳税人类型：决定增值税申报口径（小规模征收率 / 一般纳税人分税率） */
 export enum TaxpayerType {
   SMALL_SCALE = 'small_scale', // 小规模纳税人
@@ -164,6 +178,7 @@ export enum VoucherSource {
   INCOME_EXPENSE = 'income_expense',
   EXPENSE_CLAIM = 'expense_claim',
   PAYROLL = 'payroll',
+  LOAN = 'loan',
 }
 
 /** 系统参数键 */

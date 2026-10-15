@@ -29,9 +29,9 @@ export class CreateCompanyDto {
   @Length(1, 50, { message: '纳税人识别号长度 1-50' })
   taxNo: string
 
-  @IsOptional()
+  /** 纳税人类型：新建时必须选择 —— 决定增值税记账口径（小规模纳税人进项不可抵扣） */
   @IsIn(['small_scale', 'general'], { message: '纳税人类型只能是 small_scale 或 general' })
-  taxpayerType?: string
+  taxpayerType: string
 
   @IsOptional()
   @Type(() => Number)

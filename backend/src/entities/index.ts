@@ -32,11 +32,12 @@ import { Project } from './project.entity'
 import { InitialBalance } from './initial-balance.entity'
 import { Voucher } from './voucher.entity'
 import { VoucherEntry } from './voucher-entry.entity'
-import { CashFlow, WriteOff, IncomeExpense } from './business.entity'
+import { CashFlow, WriteOff, IncomeExpense, BankStmtRow } from './business.entity'
 import {
   Employee,
   ExpenseClaim,
   ExpenseClaimItem,
+  Loan,
   Payroll,
   PayrollItem,
 } from './hr.entity'
@@ -63,9 +64,11 @@ export const entities = [
   CashFlow,
   WriteOff,
   IncomeExpense,
+  BankStmtRow,
   Employee,
   ExpenseClaim,
   ExpenseClaimItem,
+  Loan,
   Payroll,
   PayrollItem,
   Receipt,
