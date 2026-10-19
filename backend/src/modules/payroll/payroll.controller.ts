@@ -6,22 +6,28 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
   Put,
   Query,
   Req,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common'
-import type { Request } from 'express'
+import type { Request, Response } from 'express'
+import dayjs from 'dayjs'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
 import { PayrollService } from './payroll.service'
 import { PayrollImportService } from './payroll-import.service'
+import { HrDocPdfService } from '../../common/pdf/hr-doc-pdf.service'
+import { sendZipResponse, zipEntries, type ZipEntry } from '../../common/pdf/zip.util'
 import { GeneratePayrollDto, PayPayrollDto, SavePayrollDto } from './dto/payroll.dto'
 import { CommitPayrollImportDto } from './dto/payroll-import.dto'
+import { PayrollPdfPackageDto } from '../../common/dto/pdf-package.dto'
 import { PaginationQueryDto } from '../../common/dto/pagination.dto'
 import { RequirePermissions } from '../../common/decorators/permissions.decorator'
 import { Operation } from '../../common/decorators/operation.decorator'
@@ -32,6 +38,7 @@ export class PayrollController {
   constructor(
     private readonly service: PayrollService,
     private readonly importService: PayrollImportService,
+    private readonly pdfService: HrDocPdfService,
   ) {}
 
   @Get()
@@ -56,6 +63,24 @@ export class PayrollController {
   @Operation('查询工资单详情')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findOne(id)
+  }
+
+  /** 批量生成原始凭证 PDF 压缩包（ids 优先，否则按筛选条件，最多 300 张） */
+  @Post('pdf-package')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('hr:payroll')
+  @Operation('批量生成工资表PDF（原始凭证存根）')
+  async pdfPackage(@Body() dto: PayrollPdfPackageDto, @Res() res: Response) {
+    const docs = await this.service.findForPdfExport(dto)
+    if (!docs.length) throw new NotFoundException('没有符合条件的工资单')
+    const entries: ZipEntry[] = []
+    for (const { payroll, items } of docs) {
+      const buffer = await this.pdfService.payrollPdf(payroll, items)
+      const periodText = `${Math.floor(payroll.period / 100)}年${payroll.period % 100}月`
+      entries.push({ name: `${payroll.payrollNo}_${periodText}工资表.pdf`, buffer })
+    }
+    const zip = await zipEntries(entries)
+    sendZipResponse(res, zip, `工资表原始凭证_${dayjs().format('YYYYMMDD_HHmmss')}.zip`)
   }
 
   @Post('import')

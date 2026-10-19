@@ -38,6 +38,20 @@
                 <div class="summary-card__label">未审核报销单</div>
               </el-card>
             </el-col>
+            <el-col :xs="12" :sm="8" :md="6">
+              <el-card
+                shadow="hover"
+                class="summary-card summary-card--link"
+                :class="{ 'summary-card--warn': data.checks.pendingFixedExpenses > 0 }"
+                @click="data.checks.pendingFixedExpenses > 0 && $router.push('/cash/fixed-expense')"
+              >
+                <div class="summary-card__value">{{ data.checks.pendingFixedExpenses ?? 0 }}</div>
+                <div class="summary-card__label">固定费用待生成</div>
+                <div v-if="data.checks.pendingFixedExpenses > 0" class="summary-card__hint">
+                  预计 {{ formatAmount(data.checks.pendingFixedExpenseAmount ?? 0) }}，点击去生成
+                </div>
+              </el-card>
+            </el-col>
           </el-row>
 
           <el-alert
@@ -265,6 +279,16 @@ onMounted(load)
 .issue-list {
   margin: 6px 0 0;
   padding-left: 18px;
+}
+
+.summary-card--link {
+  cursor: pointer;
+}
+
+.summary-card__hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #e6a23c;
 }
 
 .report-card {

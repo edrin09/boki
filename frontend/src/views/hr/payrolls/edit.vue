@@ -135,6 +135,18 @@
             <el-input-number v-model="row.otherDeduct" :min="0" :precision="2" :controls="false" :disabled="readonly" style="width: 100%" />
           </template>
         </el-table-column>
+        <el-table-column label="欠款余额" width="100" align="right">
+          <template #default="{ row }">
+            <span :class="{ 'loan-outstanding': (outstandingMap.get(row.employeeId) ?? 0) > 0 }">
+              {{ formatAmount(outstandingMap.get(row.employeeId) ?? 0) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="借款扣回" width="110">
+          <template #default="{ row }">
+            <el-input-number v-model="row.loanDeduct" :min="0" :precision="2" :controls="false" :disabled="readonly" style="width: 100%" />
+          </template>
+        </el-table-column>
         <el-table-column label="实发" width="120" align="right">
           <template #default="{ row }">
             <span class="amount amount--total">{{ formatAmount(calcNet(row)) }}</span>
@@ -172,7 +184,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Plus } from '@element-plus/icons-vue'
-import { accountApi, bankApi, employeeApi, payrollApi } from '@/api'
+import { accountApi, bankApi, employeeApi, loanApi, payrollApi } from '@/api'
 import { ok } from '@/composables/useList'
 import { formatAmount } from '@/utils/format'
 import PeriodPicker from '@/components/common/PeriodPicker.vue'
@@ -205,6 +217,8 @@ const items = ref<any[]>([])
 const accountOptions = ref<any[]>([])
 const bankOptions = ref<any[]>([])
 const employeeOptions = ref<any[]>([])
+/** 员工未还清借款余额（employeeId -> 元），用于展示与自动预填扣回 */
+const outstandingMap = ref<Map<string, number>>(new Map())
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
@@ -218,7 +232,7 @@ function calcGross(row: any): number {
 
 function rowDeduct(row: any): number {
   return round2(
-    (row.insurancePersonal ?? 0) + (row.fundPersonal ?? 0) + (row.tax ?? 0) + (row.otherDeduct ?? 0),
+    (row.insurancePersonal ?? 0) + (row.fundPersonal ?? 0) + (row.tax ?? 0) + (row.otherDeduct ?? 0) + (row.loanDeduct ?? 0),
   )
 }
 
@@ -276,6 +290,7 @@ async function load() {
       fundPersonal: Number(i.fundPersonal ?? 0),
       tax: Number(i.tax ?? 0),
       otherDeduct: Number(i.otherDeduct ?? 0),
+      loanDeduct: Number(i.loanDeduct ?? 0),
     }))
   } finally {
     loading.value = false
@@ -327,6 +342,8 @@ async function confirmAdd() {
       fundPersonal: 0,
       tax: 0,
       otherDeduct: 0,
+      // 自动带出员工欠款：扣回金额 = min(欠款余额, 应发工资)
+      loanDeduct: round2(Math.min(outstandingMap.value.get(opt.id) ?? 0, baseSalary)),
     })
     addVisible.value = false
   } finally {
@@ -341,7 +358,7 @@ function removeItem(index: number) {
 function summaryMethod({ columns }: any) {
   return columns.map((_col: any, index: number) => {
     // 列顺序：# 0 / 工号 1 / 姓名 2 / 部门 3 / 基本 4 / 绩效 5 / 补贴 6 / 加班 7
-    //        应发 8 / 社保 9 / 公积金 10 / 个税 11 / 其他代扣 12 / 实发 13 / 操作 14
+    //        应发 8 / 社保 9 / 公积金 10 / 个税 11 / 其他代扣 12 / 欠款余额 13 / 借款扣回 14 / 实发 15 / 操作 16
     const sumField = (field: string) =>
       round2(items.value.reduce((acc, row) => acc + (Number(row[field]) || 0), 0))
     switch (index) {
@@ -350,7 +367,8 @@ function summaryMethod({ columns }: any) {
       case 1:
       case 2:
       case 3:
-      case 14:
+      case 13:
+      case 16:
         return ''
       case 4:
         return formatAmount(sumField('baseSalary'))
@@ -370,7 +388,9 @@ function summaryMethod({ columns }: any) {
         return formatAmount(sumField('tax'))
       case 12:
         return formatAmount(sumField('otherDeduct'))
-      case 13:
+      case 14:
+        return formatAmount(sumField('loanDeduct'))
+      case 15:
         return formatAmount(totals.value.net)
       default:
         return ''
@@ -434,6 +454,7 @@ async function onSave() {
         fundPersonal: row.fundPersonal ?? 0,
         tax: row.tax ?? 0,
         otherDeduct: row.otherDeduct ?? 0,
+        loanDeduct: row.loanDeduct ?? 0,
       })),
     }
     await payrollApi.update(id, payload)
@@ -457,6 +478,16 @@ onMounted(async () => {
     employeeOptions.value = employees
   } catch {
     /* 选项加载失败不影响明细的查看与保存 */
+  }
+  try {
+    const balances = await loanApi.employeeBalances({ page: 1, pageSize: 500 })
+    const map = new Map<string, number>()
+    for (const b of balances?.list ?? []) {
+      if (Number(b.balance ?? 0) > 0) map.set(b.employeeId, Number(b.balance))
+    }
+    outstandingMap.value = map
+  } catch {
+    /* 欠款余额加载失败不影响编辑，仅不显示提示 */
   }
 })
 </script>
@@ -509,5 +540,9 @@ onMounted(async () => {
   margin-top: 10px;
   font-size: 13px;
   color: var(--el-color-info);
+}
+.loan-outstanding {
+  color: var(--el-color-warning);
+  font-weight: 600;
 }
 </style>

@@ -39,6 +39,12 @@ export class VoucherEntry extends BaseEntity {
   @Column({ name: 'project_id', type: 'varchar', nullable: true, comment: '项目' })
   projectId: string | null
 
+  @Column({ name: 'employee_id', type: 'varchar', nullable: true, comment: '员工（其他应收款-员工往来按员工拆分）' })
+  employeeId: string | null
+
+  @Column({ name: 'employee_name', length: 50, nullable: true, comment: '员工姓名快照' })
+  employeeName: string | null
+
   @Column({ type: 'decimal', precision: 18, scale: 2, default: 0, transformer: decimalTransformer })
   debit: number
 

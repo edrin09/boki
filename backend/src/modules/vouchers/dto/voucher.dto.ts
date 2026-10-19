@@ -39,6 +39,10 @@ export class VoucherEntryDto {
   projectId?: string
 
   @IsOptional()
+  @IsString()
+  employeeId?: string
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 }, { message: '借方金额最多两位小数' })
   @Min(0, { message: '借方金额不能为负数' })

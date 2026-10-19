@@ -126,9 +126,11 @@
         <el-pagination
           v-model:current-page="woPage.page"
           v-model:page-size="woPage.pageSize"
+          :page-sizes="[10, 20, 50]"
           :total="woTotal"
-          layout="total, prev, pager, next"
+          layout="total, sizes, prev, pager, next"
           @current-change="loadWriteOffs"
+          @size-change="onWoSizeChange"
         />
       </div>
     </div>
@@ -278,6 +280,11 @@ async function loadWriteOffs() {
   } finally {
     loading.value = false
   }
+}
+
+function onWoSizeChange() {
+  woPage.page = 1
+  loadWriteOffs()
 }
 
 function onWriteOff(row?: any) {

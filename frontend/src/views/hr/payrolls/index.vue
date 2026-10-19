@@ -10,16 +10,20 @@
         <el-button type="primary" @click="search"><el-icon><Search /></el-icon>查询</el-button>
         <el-button @click="onReset">重置</el-button>
         <div class="page-toolbar__spacer" />
-        <el-button @click="onExport"><el-icon><Download /></el-icon>导出工资表</el-button>
+        <el-button :loading="pdfExporting" @click="onPdfPackage">
+          <el-icon><Printer /></el-icon>生成凭证PDF
+        </el-button>
+        <el-button @click="onExport"><el-icon><Download /></el-icon>导出</el-button>
         <el-button v-permission="'hr:payroll:create'" @click="importVisible = true">
-          <el-icon><Upload /></el-icon>导入工资表
+          <el-icon><Upload /></el-icon>导入
         </el-button>
         <el-button v-permission="'hr:payroll:create'" type="primary" @click="openGenerate">
           <el-icon><Plus /></el-icon>生成工资单
         </el-button>
       </div>
 
-      <el-table v-loading="loading" :data="list" empty-text="暂无工资单">
+      <el-table v-loading="loading" :data="list" empty-text="暂无工资单" @selection-change="selected = $event">
+        <el-table-column type="selection" width="42" />
         <el-table-column prop="payrollNo" label="工资单号" width="130" />
         <el-table-column label="工资期间" min-width="115">
           <template #default="{ row }">{{ periodLabel(row.period) }}</template>
@@ -36,6 +40,11 @@
             <span class="amount amount--credit">
               {{ formatAmount(row.totalInsurance + row.totalFund + row.totalTax + row.totalOtherDeduct) }}
             </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="扣回借款" width="130" align="right">
+          <template #default="{ row }">
+            <span class="amount amount--credit">{{ formatAmount(row.totalLoanDeduct ?? 0) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="实发合计" width="140" align="right">
@@ -66,7 +75,7 @@
       <div class="page-pagination">
         <el-pagination v-model:current-page="query.page" v-model:page-size="query.pageSize"
           :page-sizes="[10, 20, 50]" :total="total" layout="total, sizes, prev, pager, next"
-          @current-change="load" @size-change="onReset" />
+          @current-change="load" @size-change="handleSize" />
       </div>
     </div>
 
@@ -86,7 +95,7 @@
         </el-form-item>
       </el-form>
       <el-alert type="info" :closable="false" show-icon
-        title="将按在职员工的「基本工资」预生成工资明细，可在生成后继续编辑绩效、补贴、代扣等项。" />
+        title="按在职员工的「基本工资」预生成工资明细；有未还清借款的员工自动按欠款余额预填「借款扣回」（欠款超过应发时按应发封顶），生成后可继续编辑。" />
       <template #footer>
         <el-button @click="generateVisible = false">取消</el-button>
         <el-button type="primary" :loading="generating" @click="onGenerate">生成</el-button>
@@ -156,6 +165,9 @@
           </el-table-column>
           <el-table-column label="其他代扣" width="100" align="right">
             <template #default="{ row }"><span class="amount">{{ formatAmount(row.otherDeduct) }}</span></template>
+          </el-table-column>
+          <el-table-column label="借款扣回" width="100" align="right">
+            <template #default="{ row }"><span class="amount">{{ formatAmount(row.loanDeduct ?? 0) }}</span></template>
           </el-table-column>
           <el-table-column label="实发" width="120" align="right">
             <template #default="{ row }">
@@ -297,7 +309,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Download, Edit, Upload, UploadFilled, Back } from '@element-plus/icons-vue'
+import { Plus, Search, Download, Edit, Upload, UploadFilled, Back, Printer } from '@element-plus/icons-vue'
 import { bankApi, departmentApi, employeeApi, payrollApi } from '@/api'
 import { confirmDelete, ok, usePagedList } from '@/composables/useList'
 import { currentPeriod, formatAmount, periodLabel } from '@/utils/format'
@@ -308,9 +320,9 @@ const STATUS_TAGS: Record<string, any> = { draft: 'info', approved: 'success', p
 
 const router = useRouter()
 
-const query = reactive<Record<string, any>>({ page: 1, pageSize: 20, status: '' })
-const { list, total, loading, load, search, reset } = usePagedList({
+const { list, total, loading, query, load, search, handleSize, reset } = usePagedList({
   fetcher: (params) => payrollApi.list(params),
+  defaultParams: { page: 1, pageSize: 20, status: '' },
 })
 
 const departmentOptions = ref<any[]>([])
@@ -325,7 +337,7 @@ const generateForm = reactive({
 })
 
 function onReset() {
-  query.status = ''
+  query.value.status = ''
   reset()
 }
 
@@ -545,7 +557,8 @@ function summaryMethod({ columns }: any) {
       10: 'fundPersonal',
       11: 'tax',
       12: 'otherDeduct',
-      13: null as any,
+      13: 'loanDeduct',
+      14: null as any,
     }
     if (map[index] === null) {
       if (index === 8) return formatAmount(detail.value?.totalGross ?? 0)
@@ -583,6 +596,40 @@ function onExport() {
     rows,
   })
   ElMessage.success('导出成功')
+}
+
+// ============ 批量生成原始凭证 PDF ============
+const selected = ref<any[]>([])
+const pdfExporting = ref(false)
+
+async function onPdfPackage() {
+  const ids = selected.value.map((r: any) => r.id)
+  const count = ids.length || total.value
+  if (!count) {
+    ElMessage.warning('当前没有可导出的工资单')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      ids.length
+        ? `将把选中的 ${ids.length} 张工资单各生成一份 PDF（原始凭证存根）并打包为压缩包下载，解压后即可打印。继续吗？`
+        : `未勾选工资单时将打包全部 ${total.value} 张工资表 PDF，继续吗？`,
+      '生成原始凭证 PDF',
+      { type: 'info', confirmButtonText: '生成并下载', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  pdfExporting.value = true
+  try {
+    const payload: Record<string, any> = ids.length
+      ? { ids }
+      : { status: query.value.status || undefined }
+    await payrollApi.downloadPdfPackage(payload)
+    ok(`已生成 ${count} 张工资表 PDF 压缩包`)
+  } finally {
+    pdfExporting.value = false
+  }
 }
 
 onMounted(async () => {

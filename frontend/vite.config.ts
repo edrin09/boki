@@ -25,6 +25,7 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:3000',
         changeOrigin: true,
+        ws: true, // 语音流式识别 WebSocket 也走 /api 代理（dev 同源）
       },
     },
   },

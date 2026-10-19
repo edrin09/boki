@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { Brackets } from 'typeorm'
+import { Brackets, In } from 'typeorm'
 import { ExpenseClaim, ExpenseClaimItem } from '../../entities/hr.entity'
 import { Employee } from '../../entities/hr.entity'
 import { Department } from '../../entities/department.entity'
@@ -13,6 +13,7 @@ import { BankAccount } from '../../entities/bank-account.entity'
 import { Voucher } from '../../entities/voucher.entity'
 import {
   ExpenseClaimStatus,
+  ExpenseClaimType,
   ExpensePayMethod,
   VoucherSource,
   VoucherStatus,
@@ -22,9 +23,11 @@ import { toCents, fromCents } from '../../common/utils/money.util'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
 import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { VouchersService } from '../vouchers/vouchers.service'
+import { EmployeeSettlementService } from '../loans/employee-settlement.service'
 import type { VoucherEntryDto } from '../vouchers/dto/voucher.dto'
 import type { Operator } from '../cash-bank/cash-bank.service'
 import type { PageResult, PaginationQueryDto } from '../../common/dto/pagination.dto'
+import type { HrPdfPackageDto } from '../../common/dto/pdf-package.dto'
 import type {
   PayExpenseClaimDto,
   SaveExpenseClaimDto,
@@ -50,6 +53,7 @@ export class ExpenseClaimsService {
     @InjectCompanyRepo(BankAccount) private readonly bankRepo: CompanyScopedRepository<BankAccount>,
     @InjectCompanyRepo(Voucher) private readonly voucherRepo: CompanyScopedRepository<Voucher>,
     private readonly vouchersService: VouchersService,
+    private readonly settlementService: EmployeeSettlementService,
   ) {}
 
   // ==================== 查询 ====================
@@ -97,6 +101,44 @@ export class ExpenseClaimsService {
     return this.toVo(claim, items)
   }
 
+  /**
+   * 批量导出 PDF（原始凭证存根）用：按 ids 或筛选条件取单据+明细，最多 300 张
+   */
+  async findForPdfExport(
+    dto: HrPdfPackageDto,
+  ): Promise<Array<{ claim: ExpenseClaim; items: ExpenseClaimItem[] }>> {
+    const MAX = 300
+    let claims: ExpenseClaim[]
+    if (dto.ids?.length) {
+      claims = await this.repo.find({ where: { id: In(dto.ids.slice(0, MAX)) } })
+    } else {
+      const qb = this.repo.createQueryBuilder('c')
+      if (dto.status) qb.andWhere('c.status = :status', { status: dto.status })
+      if (dto.employeeId) qb.andWhere('c.employeeId = :employeeId', { employeeId: dto.employeeId })
+      if (dto.startDate) qb.andWhere('c.claimDate >= :startDate', { startDate: dto.startDate })
+      if (dto.endDate) qb.andWhere('c.claimDate <= :endDate', { endDate: dto.endDate })
+      claims = await qb
+        .orderBy('c.claimDate', 'ASC')
+        .addOrderBy('c.claimNo', 'ASC')
+        .take(MAX)
+        .getMany()
+    }
+    if (!claims.length) return []
+
+    const items = await this.itemRepo.find({ where: { claimId: In(claims.map((c) => c.id)) } })
+    const byClaim = new Map<string, ExpenseClaimItem[]>()
+    for (const it of items) {
+      const arr = byClaim.get(it.claimId) ?? []
+      arr.push(it)
+      byClaim.set(it.claimId, arr)
+    }
+    for (const arr of byClaim.values()) arr.sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+    claims.sort((a, b) =>
+      a.claimDate < b.claimDate ? -1 : a.claimDate > b.claimDate ? 1 : a.claimNo < b.claimNo ? -1 : 1,
+    )
+    return claims.map((claim) => ({ claim, items: byClaim.get(claim.id) ?? [] }))
+  }
+
   /** 下一个报销单号 */
   async getNextClaimNo(date: string): Promise<string> {
     const year = date.slice(0, 4).replace(/^0+/, '') || date.slice(0, 4)
@@ -115,7 +157,14 @@ export class ExpenseClaimsService {
 
   async create(dto: SaveExpenseClaimDto, operator: Operator): Promise<any> {
     const context = await this.resolveContext(dto)
-    const claimNo = await this.getNextClaimNo(dto.claimDate)
+
+    // 单号：优先使用外部单号（导入/手工指定），为空或已占用时自动生成
+    let claimNo = (dto.claimNo ?? '').trim()
+    if (claimNo) {
+      const exists = await this.repo.findOne({ where: { claimNo } })
+      if (exists) claimNo = ''
+    }
+    if (!claimNo) claimNo = await this.getNextClaimNo(dto.claimDate)
 
     const entity = this.repo.create({
       claimNo,
@@ -126,11 +175,14 @@ export class ExpenseClaimsService {
       departmentName: context.departmentName,
       totalAmount: context.totalAmount,
       payMethod: dto.payMethod,
+      claimType: dto.claimType ?? (dto.loanId ? ExpenseClaimType.LOAN_OFFSET : ExpenseClaimType.PAYMENT),
       status: ExpenseClaimStatus.DRAFT,
       expenseAccountId: context.defaultExpenseAccount?.id ?? null,
       expenseAccountName: context.defaultExpenseAccount?.name ?? null,
       bankAccountId: context.bankAccount?.id ?? null,
       bankAccountName: context.bankAccount?.name ?? null,
+      loanId: dto.loanId ?? null,
+      loanNo: null,
       voucherId: null,
       payVoucherId: null,
       createdBy: operator.id,
@@ -157,10 +209,12 @@ export class ExpenseClaimsService {
     claim.departmentName = context.departmentName
     claim.totalAmount = context.totalAmount
     claim.payMethod = dto.payMethod
+    claim.claimType = dto.claimType ?? (dto.loanId ? ExpenseClaimType.LOAN_OFFSET : ExpenseClaimType.PAYMENT)
     claim.expenseAccountId = context.defaultExpenseAccount?.id ?? null
     claim.expenseAccountName = context.defaultExpenseAccount?.name ?? null
     claim.bankAccountId = context.bankAccount?.id ?? null
     claim.bankAccountName = context.bankAccount?.name ?? null
+    claim.loanId = dto.loanId ?? null
     claim.remark = dto.remark ?? claim.remark
 
     await this.repo.save(claim)
@@ -211,6 +265,30 @@ export class ExpenseClaimsService {
     claim.approvedAt = new Date()
     await this.repo.save(claim)
 
+    // 冲抵借款：审核已生成的凭证登记为员工往来核销，并回写借款单已清偿金额。
+    // 指定借款单时核销该笔；冲抵型未指定时按借款日期先后 FIFO 自动分配（先借先还）。
+    const isLoanOffset =
+      claim.payMethod === ExpensePayMethod.ADVANCE &&
+      (claim.claimType === ExpenseClaimType.LOAN_OFFSET || Boolean(claim.loanId))
+    if (isLoanOffset) {
+      await this.settlementService.registerExisting(
+        {
+          settleType: 'expense_claim',
+          sourceId: id,
+          sourceNo: claim.claimNo,
+          loanId: claim.loanId ?? undefined,
+          employeeId: claim.employeeId,
+          amount: Number(claim.totalAmount),
+          settleDate: claim.claimDate,
+          summary: `${claim.employeeName}报销抵充借款`,
+          // 复用审核已生成的凭证，不重复出账
+          voucherId: voucher.id,
+          remark: `报销单 ${claim.claimNo} 抵充借款`,
+        },
+        operator,
+      )
+    }
+
     return this.findOne(id)
   }
 
@@ -221,8 +299,12 @@ export class ExpenseClaimsService {
       throw new BadRequestException('仅已审核的报销单可以付款')
     }
     if (claim.payMethod === ExpensePayMethod.ADVANCE) {
-      // 员工垫付：审核时已贷其他应收款，付款只需冲销
-      throw new BadRequestException('当前为「员工垫付」方式，付款请在「其他应收款」中核销，无需在此重复付款')
+      const isLoanOffset = claim.claimType === ExpenseClaimType.LOAN_OFFSET || Boolean(claim.loanId)
+      if (isLoanOffset) {
+        // 冲抵借款型：审核时已贷「其他应收款-员工」抵充借款，无需再付款
+        throw new BadRequestException('当前为「冲抵借款」报销单，审核时已抵充员工借款，无需再付款')
+      }
+      // 直接付款型垫付挂账：审核时已贷「其他应收款-员工」，付款时借回并支付给员工
     }
 
     // 未指定付款账户时，按支付方式回退到默认资金科目
@@ -245,7 +327,8 @@ export class ExpenseClaimsService {
         word: VoucherWord.GENERAl,
         voucherDate: dto.payDate ?? new Date().toISOString().slice(0, 10),
         entries: [
-          { summary, accountId: advanceAccount.id, debit: Number(claim.totalAmount) },
+          // 借 其他应收款-员工（挂员工辅助核算冲平垫付挂账）
+          { summary, accountId: advanceAccount.id, employeeId: claim.employeeId, debit: Number(claim.totalAmount) },
           { summary, accountId: bankAccount.id, credit: Number(claim.totalAmount) },
         ],
         remark: dto.remark ?? `报销单 ${claim.claimNo} 付款`,
@@ -283,7 +366,7 @@ export class ExpenseClaimsService {
       throw new BadRequestException('已付款的报销单不可删除')
     }
 
-    // 已审核但未付款：先撤销凭证
+    // 已审核但未付款：先撤销凭证，并回滚对应的借款核销
     if (claim.voucherId) {
       const voucher = await this.voucherRepo.findOne({ where: { id: claim.voucherId } })
       if (voucher) {
@@ -293,6 +376,7 @@ export class ExpenseClaimsService {
         await this.vouchersService.remove(voucher.id)
       }
     }
+    await this.settlementService.cancelBySource('expense_claim', id)
 
     await this.itemRepo.delete({ claimId: id })
     await this.repo.delete({ id } as any)
@@ -413,16 +497,16 @@ export class ExpenseClaimsService {
   }
 
   /** 构造报销贷方分录 */
+  /** 贷方：员工垫付挂「其他应收款-员工」并挂员工辅助核算，便于按员工拆分往来余额 */
   private async buildCreditEntry(
     claim: ExpenseClaim,
     summary: string,
-  ): Promise<{ summary: string; accountId: string; credit: number; partnerId?: string }> {
+  ): Promise<{ summary: string; accountId: string; credit: number; employeeId?: string }> {
     const amount = Number(claim.totalAmount)
 
     if (claim.payMethod === ExpensePayMethod.ADVANCE) {
-      // 员工垫付：挂其他应收款
       const advance = await this.requireAccount(DEFAULT_ADVANCE_CODE)
-      return { summary, accountId: advance.id, credit: amount }
+      return { summary, accountId: advance.id, credit: amount, employeeId: claim.employeeId }
     }
 
     const code =
@@ -482,6 +566,10 @@ export class ExpenseClaimsService {
       departmentName: claim.departmentName,
       totalAmount: claim.totalAmount,
       payMethod: claim.payMethod,
+      claimType: claim.claimType,
+      claimTypeLabel: claim.claimType === ExpenseClaimType.LOAN_OFFSET ? '冲抵借款' : '直接付款',
+      loanId: claim.loanId,
+      loanNo: claim.loanNo,
       status: claim.status,
       statusLabel: this.statusLabel(claim.status),
       expenseAccountId: claim.expenseAccountId,

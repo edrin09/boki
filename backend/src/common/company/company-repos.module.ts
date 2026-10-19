@@ -15,11 +15,13 @@ import { Employee } from '../../entities/hr.entity'
 import { ExpenseClaim } from '../../entities/hr.entity'
 import { ExpenseClaimItem } from '../../entities/hr.entity'
 import { Loan } from '../../entities/hr.entity'
+import { EmployeeSettlement } from '../../entities/hr.entity'
 import { BankStmtRow } from '../../entities/business.entity'
 import { Payroll } from '../../entities/hr.entity'
 import { PayrollItem } from '../../entities/hr.entity'
 import { Receipt } from '../../entities/receipt.entity'
 import { ClassifyRule } from '../../entities/classify-rule.entity'
+import { FixedExpense, FixedExpenseLog } from '../../entities/fixed-expense.entity'
 
 /** 所有需要公司隔离的业务实体 */
 export const COMPANY_SCOPED_ENTITIES = [
@@ -38,11 +40,14 @@ export const COMPANY_SCOPED_ENTITIES = [
   ExpenseClaim,
   ExpenseClaimItem,
   Loan,
+  EmployeeSettlement,
   BankStmtRow,
   Payroll,
   PayrollItem,
   Receipt,
   ClassifyRule,
+  FixedExpense,
+  FixedExpenseLog,
 ]
 
 /**

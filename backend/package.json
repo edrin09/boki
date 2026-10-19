@@ -24,7 +24,9 @@
     "test:parsers": "node test/parsers-verify.mjs",
     "test:extract": "node test/extract-verify.mjs",
     "test:reports": "node test/reports-verify.mjs http://127.0.0.1:3000/api",
-    "models:fetch": "node scripts/fetch-ocr-models.mjs"
+    "models:fetch": "node scripts/fetch-ocr-models.mjs",
+    "models:fetch-asr": "node scripts/fetch-asr-streaming-model.mjs",
+    "test:voice-stream": "node test/voice-stream-smoke.mjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.10",
@@ -35,6 +37,9 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/typeorm": "^11.0.0",
+    "@types/archiver": "^7.0.0",
+    "@types/ws": "^8.18.2",
+    "archiver": "^7.0.1",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^12.11.1",
     "class-transformer": "^0.5.1",
@@ -45,10 +50,13 @@
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "pdfjs-dist": "^6.4.299",
+    "pdfkit": "^0.20.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sharp": "^0.35.5",
+    "sherpa-onnx-node": "^1.13.8",
     "typeorm": "^0.3.20",
+    "ws": "^8.22.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -61,7 +69,7 @@
     "@types/node": "^22.10.2",
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
-    "pdfkit": "^0.20.2",
+    "@types/pdfkit": "^0.17.6",
     "prettier": "^3.4.2",
     "source-map-support": "^0.5.21",
     "ts-loader": "^9.5.1",
@@ -85,5 +93,6 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
-  }
+  },
+  "test:voice-stream": "node test/voice-stream-smoke.mjs"
 }

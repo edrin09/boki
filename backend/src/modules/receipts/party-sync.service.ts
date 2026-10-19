@@ -5,6 +5,7 @@ import { CODE_PREFIX, nextCode } from '../../common/utils/code.util'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
 import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { SystemService } from '../system/system.service'
+import { normName } from './parsers/parser.utils'
 
 /** 发票一侧的识别字段（字段名与往来单位一致） */
 export interface PartyFields {
@@ -21,10 +22,6 @@ function str(v: string | number | null | undefined): string {
 }
 function cut(s: string, max: number): string | null {
   return s ? s.slice(0, max) : null
-}
-/** 名称归一化：去掉全部空白，规避 OCR 把公司名称识别出多余空格导致的比对失配 */
-function normName(s: string): string {
-  return s.replace(/\s+/g, '')
 }
 
 /**

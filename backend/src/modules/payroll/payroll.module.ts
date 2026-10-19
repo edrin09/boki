@@ -7,8 +7,10 @@ import { BankAccount } from '../../entities/bank-account.entity'
 import { Voucher } from '../../entities/voucher.entity'
 import { VouchersModule } from '../vouchers/vouchers.module'
 import { ReceiptsModule } from '../receipts/receipts.module'
+import { LoansModule } from '../loans/loans.module'
 import { PayrollService } from './payroll.service'
 import { PayrollImportService } from './payroll-import.service'
+import { HrDocPdfService } from '../../common/pdf/hr-doc-pdf.service'
 import { PayrollController } from './payroll.controller'
 
 @Module({
@@ -24,9 +26,10 @@ import { PayrollController } from './payroll.controller'
     ]),
     VouchersModule,
     ReceiptsModule,
+    LoansModule,
   ],
   controllers: [PayrollController],
-  providers: [PayrollService, PayrollImportService],
+  providers: [PayrollService, PayrollImportService, HrDocPdfService],
   exports: [PayrollService],
 })
 export class PayrollModule {}

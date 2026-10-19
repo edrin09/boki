@@ -164,7 +164,7 @@ export class CompaniesService {
       company.code = dto.code
     }
     if (dto.name !== undefined) company.name = dto.name.trim()
-    if (dto.taxNo !== undefined) company.taxNo = dto.taxNo.trim() || null
+    if (dto.taxNo !== undefined) company.taxNo = dto.taxNo.trim().toUpperCase() || null
     if (dto.taxpayerType !== undefined) company.taxpayerType = dto.taxpayerType
     if (dto.vatRate !== undefined) company.vatRate = dto.vatRate
     if (dto.taxDeclareCycle !== undefined) company.taxDeclareCycle = dto.taxDeclareCycle
@@ -347,13 +347,13 @@ export class CompaniesService {
     return company
   }
 
-  private async nextCode(name: string): Promise<string> {
-    const prefix = name.replace(/[^0-9A-Za-z一-龥]/g, '').slice(0, 12) || 'CO'
-    let code = prefix
+  /** 自动编码：GS001 递增，与公司名称无关，保证编码规范可读 */
+  private async nextCode(_name: string): Promise<string> {
     let n = 1
+    let code = `GS${String(n).padStart(3, '0')}`
     while (await this.companyRepo.findOne({ where: { code } })) {
       n += 1
-      code = `${prefix}${n}`
+      code = `GS${String(n).padStart(3, '0')}`
     }
     return code
   }

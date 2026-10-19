@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { Brackets } from 'typeorm'
+import { Brackets, In } from 'typeorm'
 import { Loan } from '../../entities/hr.entity'
 import { Employee } from '../../entities/hr.entity'
 import { Department } from '../../entities/department.entity'
@@ -22,9 +22,11 @@ import { toCents } from '../../common/utils/money.util'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
 import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { VouchersService } from '../vouchers/vouchers.service'
+import { EmployeeSettlementService } from './employee-settlement.service'
 import type { VoucherEntryDto } from '../vouchers/dto/voucher.dto'
 import type { Operator } from '../cash-bank/cash-bank.service'
 import type { PageResult, PaginationQueryDto } from '../../common/dto/pagination.dto'
+import type { HrPdfPackageDto } from '../../common/dto/pdf-package.dto'
 import type { RepayLoanDto, SaveLoanDto } from './dto/loan.dto'
 
 /** 其他应收款-员工借款 科目编码 */
@@ -44,6 +46,7 @@ export class LoansService {
     @InjectCompanyRepo(BankAccount) private readonly bankRepo: CompanyScopedRepository<BankAccount>,
     @InjectCompanyRepo(Voucher) private readonly voucherRepo: CompanyScopedRepository<Voucher>,
     private readonly vouchersService: VouchersService,
+    private readonly settlementService: EmployeeSettlementService,
   ) {}
 
   // ==================== 查询 ====================
@@ -91,6 +94,30 @@ export class LoansService {
     return this.toVo(loan)
   }
 
+  /**
+   * 批量导出 PDF（原始凭证存根）用：按 ids 或筛选条件取借款单，最多 300 张
+   */
+  async findForPdfExport(dto: HrPdfPackageDto): Promise<Loan[]> {
+    const MAX = 300
+    if (dto.ids?.length) {
+      const loans = await this.repo.find({ where: { id: In(dto.ids.slice(0, MAX)) } })
+      loans.sort((a, b) =>
+        a.loanDate < b.loanDate ? -1 : a.loanDate > b.loanDate ? 1 : a.loanNo < b.loanNo ? -1 : 1,
+      )
+      return loans
+    }
+    const qb = this.repo.createQueryBuilder('l')
+    if (dto.status) qb.andWhere('l.status = :status', { status: dto.status })
+    if (dto.employeeId) qb.andWhere('l.employeeId = :employeeId', { employeeId: dto.employeeId })
+    if (dto.startDate) qb.andWhere('l.loanDate >= :startDate', { startDate: dto.startDate })
+    if (dto.endDate) qb.andWhere('l.loanDate <= :endDate', { endDate: dto.endDate })
+    return qb
+      .orderBy('l.loanDate', 'ASC')
+      .addOrderBy('l.loanNo', 'ASC')
+      .take(MAX)
+      .getMany()
+  }
+
   /** 下一个借款单号 */
   async getNextLoanNo(date: string): Promise<string> {
     const year = date.slice(0, 4).replace(/^0+/, '') || date.slice(0, 4)
@@ -109,7 +136,14 @@ export class LoansService {
 
   async create(dto: SaveLoanDto, operator: Operator): Promise<any> {
     const context = await this.resolveContext(dto)
-    const loanNo = await this.getNextLoanNo(dto.loanDate)
+
+    // 单号：优先使用外部单号（导入/手工指定），为空或已占用时自动生成
+    let loanNo = (dto.loanNo ?? '').trim()
+    if (loanNo) {
+      const exists = await this.repo.findOne({ where: { loanNo } })
+      if (exists) loanNo = ''
+    }
+    if (!loanNo) loanNo = await this.getNextLoanNo(dto.loanDate)
 
     const entity = this.repo.create({
       loanNo,
@@ -168,7 +202,7 @@ export class LoansService {
 
     const summary = `${loan.employeeName}借款`
     const entries: VoucherEntryDto[] = [
-      { summary, accountId: receivableAccount.id, debit: Number(loan.amount) },
+      { summary, accountId: receivableAccount.id, employeeId: loan.employeeId, debit: Number(loan.amount) },
       { summary, accountId: payAccount.id, credit: Number(loan.amount) },
     ]
 
@@ -200,7 +234,7 @@ export class LoansService {
       throw new BadRequestException('仅「已借款」状态的借款单可以还款')
     }
 
-    const outstanding = toCents(Number(loan.amount)) - toCents(Number(loan.repaidAmount ?? 0))
+    const outstanding = this.settlementService.outstandingOf(loan)
     if (outstanding <= 0) {
       throw new BadRequestException('该借款单已还清，无需再次还款')
     }
@@ -218,32 +252,36 @@ export class LoansService {
 
     const summary = `${loan.employeeName}归还借款`
     const amountYuan = repayAmount / 100
-    const voucher = await this.vouchersService.createFromSystem(
+    const settleDate = dto.repayDate ? dto.repayDate.slice(0, 10) : new Date().toISOString().slice(0, 10)
+
+    const settlement = await this.settlementService.settle(
       {
-        word: VoucherWord.GENERAl,
-        voucherDate: dto.repayDate ?? new Date().toISOString().slice(0, 10),
-        entries: [
-          { summary, accountId: repayAccount.id, debit: amountYuan },
-          { summary, accountId: receivableAccount.id, credit: amountYuan },
-        ],
-        remark: dto.remark ?? `借款单 ${loan.loanNo} 还款`,
-        sourceType: VoucherSource.LOAN,
+        settleType: dto.repayMethod,
         sourceId: id,
-        autoApprove: true,
+        sourceNo: loan.loanNo,
+        loanId: loan.id,
+        amount: amountYuan,
+        settleDate,
+        summary,
+        remark: dto.remark ?? `借款单 ${loan.loanNo} 还款`,
+        // 现金/银行还款：借方为资金科目，贷方 1221（由服务挂员工辅助核算）
+        debitEntry: {
+          summary,
+          accountId: repayAccount.id,
+          employeeId: loan.employeeId,
+          debit: amountYuan,
+        },
+        receivableAccountId: receivableAccount.id,
       },
       operator,
     )
 
-    // 累计已还金额，还清才置「已还款」
-    const repaidTotal = toCents(Number(loan.repaidAmount ?? 0)) + repayAmount
-    loan.repaidAmount = repaidTotal / 100
-    loan.repayVoucherId = voucher.id
-    loan.repayDate = dto.repayDate ? dto.repayDate.slice(0, 10) : new Date().toISOString().slice(0, 10)
-    if (repaidTotal >= toCents(Number(loan.amount))) {
-      loan.status = LoanStatus.REPAID
-      loan.repaidAt = new Date()
-    }
-    await this.repo.save(loan)
+    // repaidAmount / 状态已由核销服务回写，这里重载后只补还款凭证与日期，
+    // 避免用过期实体把核销服务刚写入的金额覆盖回去
+    const fresh = await this.findEntity(id)
+    fresh.repayVoucherId = settlement.voucherId
+    fresh.repayDate = settleDate
+    await this.repo.save(fresh)
 
     return this.findOne(id)
   }
@@ -387,7 +425,8 @@ export class LoansService {
   }
 
   private toVo(loan: Loan): any {
-    const outstanding = toCents(Number(loan.amount)) - toCents(Number(loan.repaidAmount ?? 0))
+    const offsetAmount = Number(loan.offsetAmount ?? 0)
+    const outstanding = this.settlementService.outstandingOf(loan)
     return {
       id: loan.id,
       loanNo: loan.loanNo,
@@ -398,6 +437,7 @@ export class LoansService {
       departmentName: loan.departmentName,
       amount: loan.amount,
       repaidAmount: Number(loan.repaidAmount ?? 0),
+      offsetAmount,
       outstanding: outstanding / 100,
       reason: loan.reason,
       payMethod: loan.payMethod,
@@ -414,6 +454,27 @@ export class LoansService {
       remark: loan.remark,
       createdAt: loan.createdAt,
     }
+  }
+
+  /**
+   * 某员工尚未还清的借款单（供报销单/采购发票选择抵充对象）
+   */
+  async outstandingLoans(employeeId: string): Promise<any[]> {
+    if (!employeeId) return []
+    const loans = await this.repo.find({
+      where: { employeeId, status: 'approved' },
+      order: { loanDate: 'ASC' },
+    })
+    return loans
+      .map((l) => ({ loan: l, outstanding: this.settlementService.outstandingOf(l) }))
+      .filter((x) => x.outstanding > 0)
+      .map(({ loan: l, outstanding }) => ({
+        id: l.id,
+        loanNo: l.loanNo,
+        loanDate: l.loanDate,
+        amount: l.amount,
+        outstanding: outstanding / 100,
+      }))
   }
 
   /** 供员工模块复用：查询某员工的借款记录数 */

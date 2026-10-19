@@ -70,7 +70,7 @@
           :total="total"
           layout="total, sizes, prev, pager, next"
           @current-change="load"
-          @size-change="onReset"
+          @size-change="handleSize"
         />
       </div>
     </div>
@@ -165,8 +165,7 @@ import { useBasicStore } from '@/stores/basic'
 const basicStore = useBasicStore()
 
 const dateRange = ref<[string, string] | null>(null)
-const query = reactive<Record<string, any>>({ page: 1, pageSize: 20, bizType: '' })
-const { list, total, loading, load, search, reset } = usePagedList({
+const { list, total, loading, query, load, search, handleSize, reset } = usePagedList({
   fetcher: (params) => {
     if (dateRange.value?.length === 2) {
       params.startDate = dateRange.value[0]
@@ -174,6 +173,7 @@ const { list, total, loading, load, search, reset } = usePagedList({
     }
     return incomeExpenseApi.list(params)
   },
+  defaultParams: { page: 1, pageSize: 20, bizType: '' },
 })
 
 const allAccounts = ref<any[]>([])
@@ -215,7 +215,7 @@ const dialogTitle = computed(() => {
 })
 
 function onReset() {
-  query.bizType = ''
+  query.value.bizType = ''
   dateRange.value = null
   reset()
 }

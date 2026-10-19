@@ -14,7 +14,9 @@ import { ReceiptWorkbenchService } from './workbench.service'
 import { PartySyncService } from './party-sync.service'
 import { SystemService } from '../system/system.service'
 import { VouchersService } from '../vouchers/vouchers.service'
+import { ExpenseClaimsService } from '../expense-claims/expense-claims.service'
 import { recoverFilename } from '../../common/utils/filename.util'
+import { parseFolderIntent } from './folder-intent.util'
 import type { ParseResult } from './parsers/parser.types'
 import { ReceiptType } from '../../common/enums'
 
@@ -49,8 +51,36 @@ export interface ProcessFileResult {
     voucherDate: string
     entries: Array<{ summary: string; accountCode: string; accountName: string; debit: number; credit: number }>
   } | null
+  /** 目录归属员工时自动生成的报销单摘要（取代 draft），供上传结果直接展示 */
+  claims?: Array<{
+    id: string
+    claimNo: string
+    claimType: string
+    claimTypeLabel: string
+    totalAmount: number
+    status: string
+    statusLabel?: string
+  }> | null
   fields?: Array<{ key: string; label: string; value: string | number | null; confidence: number }>
+  /** 目录智能判定结果（文件夹批量上传时）；无目录或判不出时为 null */
+  folder?: {
+    path: string
+    purpose: string
+    purposeLabel: string
+    purposeHit: string | null
+    ownerName: string | null
+    periodHint: string | null
+  } | null
   message?: string
+}
+
+/** 目录期间（如 202610）→ 月末日期（如 2026-10-31），用作开票日期兜底 */
+function periodHintToDate(periodHint: string | null): string | null {
+  if (!periodHint) return null
+  const y = periodHint.slice(0, 4)
+  const m = periodHint.slice(4, 6)
+  const last = dayjs(`${y}-${m}-01`).endOf('month').format('YYYY-MM-DD')
+  return last
 }
 
 /** 自动生成草稿策略（按记账公司配置） */
@@ -73,18 +103,32 @@ export class ReceiptsService {
     private readonly systemService: SystemService,
     private readonly partySync: PartySyncService,
     private readonly vouchers: VouchersService,
+    private readonly expenseClaims: ExpenseClaimsService,
   ) {}
+
+  /** 解析票据上关联的报销单ID列表（JSON 数组，容错解析） */
+  private claimIdListOf(claimIds: string | null): string[] {
+    if (!claimIds) return []
+    try {
+      const arr = JSON.parse(claimIds)
+      return Array.isArray(arr) ? arr.filter((x) => typeof x === 'string') : []
+    } catch {
+      return []
+    }
+  }
 
   async processUpload(
     files: Express.Multer.File[],
     user: { id?: string; name?: string } | null,
+    folderPaths?: (string | null)[],
   ): Promise<ProcessFileResult[]> {
     // 自动记账策略（按当前记账公司配置），关闭时退化为纯识别
     const policy = await this.resolveAutoPostPolicy()
     const results: ProcessFileResult[] = []
-    for (const file of files) {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
       try {
-        results.push(await this.processOne(file, user, policy))
+        results.push(await this.processOne(file, user, policy, folderPaths?.[i] ?? null))
       } catch (err) {
         const fileName = recoverFilename(file.originalname) ?? file.originalname
         this.logger.error('票据处理失败 ' + fileName + ': ' + (err as Error).message)
@@ -114,8 +158,12 @@ export class ReceiptsService {
     file: Express.Multer.File,
     user: { id?: string; name?: string } | null,
     policy: AutoPostPolicy,
+    relativePath: string | null = null,
   ): Promise<ProcessFileResult> {
     const sha256 = crypto.createHash('sha256').update(file.buffer).digest('hex')
+
+    // 目录意图：来自上传时的相对路径（文件夹批量上传），纯计算不落库
+    const folder = parseFolderIntent(relativePath)
 
     // 1. sha256 去重
     const byHash = await this.receiptRepo.findOne({ where: { sha256 } })
@@ -159,7 +207,10 @@ export class ReceiptsService {
       structured: JSON.stringify({ fields }),
       confidence: result.confidence,
       status: 'parsed',
-      issueDate: stringOf(fields.find((f) => f.key === 'issue_date')?.value) ?? null,
+      folderPath: folder.raw || null,
+      // 目录给出期间时，作为开票日期的兜底（OCR 漏识别日期很常见）
+      issueDate:
+        stringOf(fields.find((f) => f.key === 'issue_date')?.value) ?? periodHintToDate(folder.periodHint),
       amount: numberOf(fields.find((f) => f.key === 'total_amount')?.value)
         ?? numberOf(fields.find((f) => f.key === 'amount')?.value)
         ?? null,
@@ -207,7 +258,18 @@ export class ReceiptsService {
       drafted: auto.drafted,
       draftMessage: auto.message,
       draft: auto.draft,
+      claims: auto.claims,
       fields: fields.map((f) => ({ key: f.key, label: f.label, value: f.value, confidence: f.confidence })),
+      folder: folder.matched
+        ? {
+            path: folder.raw,
+            purpose: folder.purpose,
+            purposeLabel: folder.purposeLabel,
+            purposeHit: folder.purposeHit,
+            ownerName: folder.ownerName,
+            periodHint: folder.periodHint,
+          }
+        : null,
     }
   }
 
@@ -220,12 +282,17 @@ export class ReceiptsService {
     confidence: number,
     policy: AutoPostPolicy,
     user: { id?: string; name?: string } | null,
-  ): Promise<{ drafted: boolean; message: string | null; draft: ProcessFileResult['draft'] }> {
+  ): Promise<{
+    drafted: boolean
+    message: string | null
+    draft: ProcessFileResult['draft']
+    claims: ProcessFileResult['claims']
+  }> {
     if (!policy.enabled) {
-      return { drafted: false, message: '未开启自动生成草稿，请在工作台确认', draft: null }
+      return { drafted: false, message: '未开启自动生成草稿，请在工作台确认', draft: null, claims: null }
     }
     if (!receipt.bookable) {
-      return { drafted: false, message: '该单据无法自动归类，请人工处理', draft: null }
+      return { drafted: false, message: '该单据无法自动归类，请人工处理', draft: null, claims: null }
     }
     if (confidence < policy.threshold) {
       const pct = (confidence * 100).toFixed(0)
@@ -233,6 +300,7 @@ export class ReceiptsService {
         drafted: false,
         message: `识别置信度 ${pct}% 低于阈值 ${(policy.threshold * 100).toFixed(0)}%，已保留为待确认`,
         draft: null,
+        claims: null,
       }
     }
 
@@ -242,6 +310,24 @@ export class ReceiptsService {
         nickname: user?.name ?? '系统',
       })
       const d = detail?.draft
+      // 目录归属员工流程：改生成报销单（冲抵借款型 + 直接付款型），没有凭证草稿
+      const claimList = Array.isArray(detail?.claims) ? detail.claims : []
+      if (claimList.length) {
+        return {
+          drafted: true,
+          message: null,
+          draft: null,
+          claims: claimList.map((c: any) => ({
+            id: c.id,
+            claimNo: c.claimNo,
+            claimType: c.claimType,
+            claimTypeLabel: c.claimTypeLabel,
+            totalAmount: Number(c.totalAmount) || 0,
+            status: c.status,
+            statusLabel: c.statusLabel,
+          })),
+        }
+      }
       return {
         drafted: true,
         message: null,
@@ -259,11 +345,12 @@ export class ReceiptsService {
               })),
             }
           : null,
+        claims: null,
       }
     } catch (err) {
       const message = `自动生成草稿失败：${(err as Error).message}`
       this.logger.warn(`票据 ${receipt.id} 自动建草稿失败: ${(err as Error).message}`)
-      return { drafted: false, message, draft: null }
+      return { drafted: false, message, draft: null, claims: null }
     }
   }
 
@@ -331,6 +418,12 @@ export class ReceiptsService {
   private async findDuplicateInvoice(result: ParseResult): Promise<Receipt | null> {
     const code = stringOf(result.fields.find((f) => f.key === 'invoice_code')?.value)
     const no = stringOf(result.fields.find((f) => f.key === 'invoice_no')?.value)
+    if (!code && !no) return null
+    // 数电票（全电发票）只有 20 位号码、无发票代码：仅按号码查重，避免照片+扫描件重复入账
+    if (!code && no.length >= 20) {
+      return this.receiptRepo.findOne({ where: { invoiceNo: no } })
+    }
+    // 老式发票代码+号码都识别到才组合查重；缺代码的短号码不查（跨代码可能重号，避免误判）
     if (!code || !no) return null
     return this.receiptRepo.findOne({ where: { invoiceCode: code, invoiceNo: no } })
   }
@@ -393,6 +486,16 @@ export class ReceiptsService {
     if (!r) throw new NotFoundException('票据不存在')
     if (r.status === 'confirmed') {
       throw new BadRequestException('该票据已确认入账，不能删除；如需调整请到凭证管理反审核或红冲处理')
+    }
+    // 目录归属员工流程：删除还挂在草稿态的关联报销单（已审核的报销单先去报销单里处理）
+    for (const cid of this.claimIdListOf(r.claimIds)) {
+      const claim = await this.expenseClaims.findOne(cid).catch(() => null)
+      if (!claim) continue
+      if (claim.status === 'draft') {
+        await this.expenseClaims.remove(cid)
+      } else {
+        throw new BadRequestException(`关联报销单 ${claim.claimNo} 已审核，请先在报销单中删除后再删除票据`)
+      }
     }
     if (r.voucherId) {
       try {
@@ -476,6 +579,7 @@ export class ReceiptsService {
       buyerTaxNo: r.buyerTaxNo,
       voucherId: r.voucherId,
       directionOverride: r.directionOverride ?? null,
+      folderPath: r.folderPath ?? null,
       rejectReason: r.rejectReason,
       confirmedByName: r.confirmedByName,
       confirmedAt: r.confirmedAt,

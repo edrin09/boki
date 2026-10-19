@@ -26,6 +26,20 @@ const CODE = {
 const INTEREST_RE = /利息|结息/
 const FEE_RE = /手续费|工本费|年费|汇费|短信费|网银|服务费|账户费/
 
+/**
+ * 常见摘要关键词 → 建议科目（支出方向）。
+ * 工资/社保/公积金/税费/房租/贷款利息是公司银行流水的固定模式，
+ * 命中即给高置信建议（可一键智能批量入账）；科目不存在时跳过该规则。
+ */
+const KEYWORD_RULES: Array<{ re: RegExp; code: string; label: string }> = [
+  { re: /代发|工资|薪资|薪酬/, code: '2211.01', label: '识别为工资发放，建议冲应付职工薪酬-工资' },
+  { re: /社保|社会保险/, code: '2211.02', label: '识别为社保缴费，建议冲应付职工薪酬-社会保险费' },
+  { re: /公积金/, code: '2211.03', label: '识别为公积金缴费，建议冲应付职工薪酬-住房公积金' },
+  { re: /税款|税费|税务|国税|地税|所得税|增值税/, code: '2221', label: '识别为税费缴纳，建议冲应交税费' },
+  { re: /房租|租赁费|租金/, code: '6602', label: '识别为房租支出，建议计入管理费用' },
+  { re: /贷款利息|借款利息|利息支出/, code: '6701.01', label: '识别为贷款利息，建议计入财务费用-利息支出' },
+]
+
 @Injectable()
 export class BankStmtService {
   constructor(
@@ -117,7 +131,7 @@ export class BankStmtService {
   /** 待确认行入账：复用现金银行单据链路自动生成凭证 */
   async book(
     id: string,
-    dto: { bizType: string; accountId: string; partnerId?: string; summary?: string },
+    dto: { bizType: string; accountId: string; partnerId?: string; employeeId?: string; summary?: string },
     operator: Operator,
   ): Promise<any> {
     const row = await this.mustFind(id)
@@ -135,6 +149,7 @@ export class BankStmtService {
         bankAccountId: row.bankAccountId,
         accountId: dto.accountId,
         partnerId: dto.partnerId || row.suggestPartnerId || null,
+        employeeId: dto.employeeId || row.suggestEmployeeId || null,
         amount,
         summary: (dto.summary || row.summary || row.counterName || '银行流水').slice(0, 180),
         remark: row.flowNo ? `银行流水 ${row.flowNo}` : null,
@@ -150,6 +165,47 @@ export class BankStmtService {
     row.remark = row.flowNo ? `银行流水 ${row.flowNo}` : row.remark
     await this.repo.save(row)
     return this.toVo(row)
+  }
+
+  /**
+   * 一键智能批量入账：把所有「高置信建议」的待确认行（利息/手续费/员工往来/
+   * 往来单位回款/工资社保等固定关键词）按建议科目自动入账。
+   * 逐行复用 book()，单行失败不阻断其余行（如员工往来科目要求辅助核算等），
+   * 失败行保留待确认状态并返回原因，供人工逐行处理。
+   */
+  async batchBook(operator: Operator): Promise<{
+    total: number
+    booked: number
+    failed: Array<{ id: string; summary: string; reason: string }>
+  }> {
+    const rows = await this.repo.find({
+      where: { status: BankStmtStatus.PENDING, autoBookable: 1 } as any,
+    })
+    const targets = rows.filter((r) => r.suggestBizType && r.suggestAccountId && r.suggestBizType !== 'transfer')
+    const failed: Array<{ id: string; summary: string; reason: string }> = []
+    let booked = 0
+
+    for (const row of targets) {
+      try {
+        await this.book(
+          row.id,
+          {
+            bizType: row.suggestBizType!,
+            accountId: row.suggestAccountId!,
+            partnerId: row.suggestPartnerId ?? undefined,
+          },
+          operator,
+        )
+        booked++
+      } catch (err) {
+        failed.push({
+          id: row.id,
+          summary: row.summary || row.counterName || row.id,
+          reason: (err as Error).message ?? '入账失败',
+        })
+      }
+    }
+    return { total: targets.length, booked, failed }
   }
 
   /** 标记跳过：该行已在其他模块记账或无需记账 */
@@ -200,7 +256,9 @@ export class BankStmtService {
 
   private async loadMatchContext(): Promise<MatchContext> {
     const accounts = new Map<string, Account>()
-    for (const code of Object.values(CODE)) {
+    const codes = [...Object.values(CODE), ...KEYWORD_RULES.map((r) => r.code)]
+    for (const code of codes) {
+      if (accounts.has(code)) continue
       const acc = await this.accountRepo.findOne({ where: { code } })
       if (acc) accounts.set(code, acc)
     }
@@ -210,7 +268,7 @@ export class BankStmtService {
     return { accounts, partners, loans, employees }
   }
 
-  /** 逐行匹配。规则按优先级：利息/手续费 → 借款单 → 员工往来 → 往来单位 → 待确认 */
+  /** 逐行匹配。规则按优先级：利息/手续费 → 借款单 → 员工往来 → 往来单位 → 关键词 → 待确认 */
   private buildRow(r: StmtRow, batchId: string, bankAccountId: string, ctx: MatchContext): BankStmtRow {
     const row = this.repo.create({
       batchId,
@@ -229,19 +287,22 @@ export class BankStmtService {
       suggestAccountId: null,
       suggestAccountCode: null,
       suggestAccountName: null,
+      suggestPartnerId: null,
+      suggestEmployeeId: null,
+      autoBookable: 0,
       remark: r.flowNo ? `银行流水 ${r.flowNo}` : null,
     })
 
     const text = `${r.summary ?? ''} ${r.counterName ?? ''}`
     const isInflow = r.credit > 0
 
-    // 1) 利息收入 / 银行手续费：模式固定，直接给建议
+    // 1) 利息收入 / 银行手续费：模式固定，直接给建议（高置信，可批量入账）
     if (isInflow && INTEREST_RE.test(text)) {
-      this.suggest(row, 'income', ctx.accounts.get(CODE.INTEREST_INCOME), '识别为存款利息')
+      this.suggest(row, 'income', ctx.accounts.get(CODE.INTEREST_INCOME), '识别为存款利息', { auto: true })
       return row
     }
     if (!isInflow && FEE_RE.test(text)) {
-      this.suggest(row, 'payment', ctx.accounts.get(CODE.BANK_FEE), '识别为银行手续费')
+      this.suggest(row, 'payment', ctx.accounts.get(CODE.BANK_FEE), '识别为银行手续费', { auto: true })
       return row
     }
 
@@ -264,6 +325,7 @@ export class BankStmtService {
           isInflow ? 'receipt' : 'payment',
           ctx.accounts.get(CODE.EMPLOYEE_RECEIVABLE),
           `对方户名为员工「${emp.name}」，建议挂员工往来（其他应收款）待核实`,
+          { auto: true, employeeId: emp.id },
         )
         return row
       }
@@ -274,7 +336,18 @@ export class BankStmtService {
       const partner = this.matchPartner(r.counterName, ctx.partners)
       if (partner) {
         row.suggestPartnerId = partner.id
-        this.suggest(row, 'receipt', ctx.accounts.get(CODE.RECEIVABLE), `识别为「${partner.name}」回款，建议冲应收账款`)
+        this.suggest(row, 'receipt', ctx.accounts.get(CODE.RECEIVABLE), `识别为「${partner.name}」回款，建议冲应收账款`, {
+          auto: true,
+        })
+        return row
+      }
+    }
+
+    // 4.5) 常见摘要关键词（工资/社保/公积金/税费/房租/贷款利息）：固定模式高置信建议
+    if (!isInflow) {
+      const kw = this.matchKeywordRule(text, ctx.accounts)
+      if (kw) {
+        this.suggest(row, 'payment', kw.account, kw.label, { auto: true })
         return row
       }
     }
@@ -323,7 +396,13 @@ export class BankStmtService {
     return null
   }
 
-  private suggest(row: BankStmtRow, bizType: string, account: Account | undefined, info: string | null): void {
+  private suggest(
+    row: BankStmtRow,
+    bizType: string,
+    account: Account | undefined,
+    info: string | null,
+    opts?: { auto?: boolean; employeeId?: string | null },
+  ): void {
     row.suggestBizType = bizType
     if (account) {
       row.suggestAccountId = account.id
@@ -331,6 +410,22 @@ export class BankStmtService {
       row.suggestAccountName = account.name
     }
     if (info) row.matchInfo = info
+    if (opts?.employeeId !== undefined) row.suggestEmployeeId = opts.employeeId
+    row.autoBookable = opts?.auto ? 1 : 0
+  }
+
+  /** 摘要关键词命中建议科目（科目不存在则跳过，回落保守建议） */
+  private matchKeywordRule(
+    text: string,
+    accounts: Map<string, Account>,
+  ): { account: Account; label: string } | null {
+    for (const rule of KEYWORD_RULES) {
+      if (!rule.re.test(text)) continue
+      const account = accounts.get(rule.code)
+      if (!account) continue
+      return { account, label: rule.label }
+    }
+    return null
   }
 
   private async mustFind(id: string): Promise<BankStmtRow> {

@@ -250,6 +250,7 @@ export class CashBankService {
 
     const aux = {
       partnerId: dto.partnerId,
+      employeeId: dto.employeeId,
       departmentId: dto.departmentId,
       projectId: dto.projectId,
     }

@@ -47,6 +47,7 @@ export const MENUS: MenuNode[] = [
       { title: '现金银行', path: '/cash-bank', permission: 'cash-bank' },
       { title: '应收应付', path: '/ar-ap', permission: 'ar-ap' },
       { title: '其他收支', path: '/income-expense', permission: 'income-expense' },
+      { title: '固定费用', path: '/cash/fixed-expense', permission: 'fixed-expense' },
     ],
   },
   {
@@ -110,6 +111,7 @@ export const MENUS: MenuNode[] = [
       { title: '权限管理', path: '/system/permissions', permission: 'system:permission' },
       { title: '操作日志', path: '/system/logs', permission: 'system:log' },
       { title: '数据备份', path: '/system/backup', permission: 'system:backup' },
+      { title: 'AI模型设置', path: '/system/ai', permission: 'system:ai-config' },
     ],
   },
 ]

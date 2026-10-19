@@ -41,6 +41,25 @@ const ALLOWED_MIME = /^(image\/(jpeg|png|webp|bmp|tiff)|application\/pdf)$/
 const MAX_FILE_BYTES = 20 * 1024 * 1024
 const MAX_FILES = 20
 
+/**
+ * 把 multipart 传来的 paths 字段规整成与 files 等长、按索引对应的数组。
+ *
+ * 情况：
+ * - 未传 / 单文件上传 → 全 null（无目录信息）。
+ * - multer 对同名多字段会收成 string[]；只传一个时会收成 string。
+ * - 长度与 files 不一致（异常上传）→ 截断/补 null，保证下标不越界。
+ */
+function normalizePaths(raw: string | string[] | undefined, count: number): (string | null)[] {
+  if (raw == null) return new Array(count).fill(null)
+  const list = Array.isArray(raw) ? raw : [raw]
+  const out: (string | null)[] = []
+  for (let i = 0; i < count; i++) {
+    const v = list[i]
+    out.push(typeof v === 'string' && v.trim() ? v.trim() : null)
+  }
+  return out
+}
+
 @Controller('receipts')
 export class ReceiptsController {
   constructor(
@@ -68,6 +87,7 @@ export class ReceiptsController {
   @Operation('上传并识别票据')
   upload(
     @UploadedFiles() files: Express.Multer.File[],
+    @Body() body: { paths?: string | string[] },
     @Req() req: Request & { user?: { id?: string; name?: string } },
   ) {
     if (!files || files.length === 0) throw new BadRequestException('请选择要上传的图片或 PDF 文件')
@@ -76,7 +96,10 @@ export class ReceiptsController {
         throw new BadRequestException(`不支持的文件类型: ${file.originalname}（${file.mimetype}）`)
       }
     }
-    return this.service.processUpload(files, req.user ?? null)
+    // 文件夹批量上传时前端并行提交每个文件的 webkitRelativePath，
+    // 与 files 按索引一一对应；单文件上传无该字段，全部按「无目录」处理。
+    const paths = normalizePaths(body?.paths, files.length)
+    return this.service.processUpload(files, req.user ?? null, paths)
   }
 
   @Get()

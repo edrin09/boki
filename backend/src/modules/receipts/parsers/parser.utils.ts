@@ -21,9 +21,19 @@ export function valueAfterLabel(text: string, label: string): string | null {
   return rest.trim() || null
 }
 
-/** 名称归一化：去全部空白（OCR 可能把公司名拆出多余空格），与 party-sync 同口径 */
+/**
+ * 名称归一化：去全部空白 + 全角/半角标点统一为半角。
+ * OCR 票面常用半角括号「(个体工商户)」，公司档案常录全角「（个体工商户）」，
+ * 不统一标点会让「本公司比对」和往来单位查重全部失配。
+ */
 export function normName(s: string): string {
-  return s.replace(/\s+/g, '')
+  return s
+    .replace(/\s+/g, '')
+    .replace(/[（｛［【〔]/g, '(')
+    .replace(/[）｝］】〕]/g, ')')
+    .replace(/[，]/g, ',')
+    .replace(/[：]/g, ':')
+    .replace(/[。]/g, '.')
 }
 
 /** 归一化名称互相包含（票面名常缺「(个体工商户)」等后缀，单向包含会漏配） */

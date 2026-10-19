@@ -61,6 +61,9 @@
         <router-view />
       </main>
     </div>
+
+    <!-- 语音助手悬浮入口 -->
+    <VoiceAssistant v-permission="'voice:use'" />
   </div>
 </template>
 
@@ -71,6 +74,7 @@ import { ElMessageBox } from 'element-plus'
 import { Fold, Expand, ArrowDown, User, SwitchButton } from '@element-plus/icons-vue'
 import MenuItem from './MenuItem.vue'
 import CompanySwitcher from './CompanySwitcher.vue'
+import VoiceAssistant from '../voice/VoiceAssistant.vue'
 import { useUserStore } from '@/stores/user'
 import { filterMenus, MENUS, type MenuNode } from '@/router/menus'
 import { currentPeriod, periodLabel } from '@/utils/format'

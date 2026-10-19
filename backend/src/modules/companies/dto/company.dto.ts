@@ -10,6 +10,7 @@ import {
   IsString,
   Length,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator'
 
@@ -68,17 +69,17 @@ export class CreateCompanyDto {
 
   @IsOptional()
   @IsString()
-  @Max(200)
+  @MaxLength(200)
   address?: string
 
   @IsOptional()
   @IsString()
-  @Max(100)
+  @MaxLength(100)
   bankName?: string
 
   @IsOptional()
   @IsString()
-  @Max(50)
+  @MaxLength(50)
   bankAccount?: string
 
   @IsOptional()
@@ -90,7 +91,7 @@ export class CreateCompanyDto {
 
   @IsOptional()
   @IsString()
-  @Max(200)
+  @MaxLength(200)
   remark?: string
 
   /** 是否同时把当前用户加入该公司（默认加入，创建者） */
@@ -118,7 +119,7 @@ export class UpdateCompanyDto {
 
   @IsOptional()
   @IsString()
-  @Max(50)
+  @MaxLength(50)
   taxNo?: string
 
   @IsOptional()
@@ -150,27 +151,27 @@ export class UpdateCompanyDto {
 
   @IsOptional()
   @IsString()
-  @Max(50)
+  @MaxLength(50)
   legalPerson?: string
 
   @IsOptional()
   @IsString()
-  @Max(50)
+  @MaxLength(50)
   industry?: string
 
   @IsOptional()
   @IsString()
-  @Max(200)
+  @MaxLength(200)
   address?: string
 
   @IsOptional()
   @IsString()
-  @Max(100)
+  @MaxLength(100)
   bankName?: string
 
   @IsOptional()
   @IsString()
-  @Max(50)
+  @MaxLength(50)
   bankAccount?: string
 
   @IsOptional()
@@ -187,7 +188,7 @@ export class UpdateCompanyDto {
 
   @IsOptional()
   @IsString()
-  @Max(200)
+  @MaxLength(200)
   remark?: string
 }
 

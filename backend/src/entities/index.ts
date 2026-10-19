@@ -18,6 +18,7 @@ export * from './receipt.entity'
 export * from './sys-log.entity'
 export * from './sys-config.entity'
 export * from './classify-rule.entity'
+export * from './fixed-expense.entity'
 
 import { Permission } from './permission.entity'
 import { Role } from './role.entity'
@@ -38,6 +39,7 @@ import {
   ExpenseClaim,
   ExpenseClaimItem,
   Loan,
+  EmployeeSettlement,
   Payroll,
   PayrollItem,
 } from './hr.entity'
@@ -45,6 +47,7 @@ import { SysLog } from './sys-log.entity'
 import { Receipt } from './receipt.entity'
 import { SysConfig } from './sys-config.entity'
 import { ClassifyRule } from './classify-rule.entity'
+import { FixedExpense, FixedExpenseLog } from './fixed-expense.entity'
 
 /** 全部实体（供 TypeORM 加载） */
 export const entities = [
@@ -69,10 +72,13 @@ export const entities = [
   ExpenseClaim,
   ExpenseClaimItem,
   Loan,
+  EmployeeSettlement,
   Payroll,
   PayrollItem,
   Receipt,
   SysConfig,
   ClassifyRule,
   SysLog,
+  FixedExpense,
+  FixedExpenseLog,
 ]

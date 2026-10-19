@@ -1,4 +1,4 @@
-import { get, post, put, del, download, type ApiResult } from './http'
+import { get, post, put, del, download, downloadPost, fileStamp, type ApiResult } from './http'
 
 /** 统一导出，业务模块从这里引用 */
 export * from './http'
@@ -77,6 +77,38 @@ export const systemApi = {
   removeBackup: (filename: string) => del(`/system/backups/${encodeURIComponent(filename)}`),
   downloadBackup: (filename: string) =>
     download('/system/backups/download', { filename }, filename),
+  // ============ AI 模型设置 ============
+  aiConfig: () =>
+    get<{
+      provider: string
+      baseURL: string
+      model: string
+      enabled: boolean
+      temperature: number
+      timeoutMs: number
+      apiKeyMasked: string | null
+      ready: boolean
+      providers: Array<{
+        id: string
+        name: string
+        baseURL: string
+        model: string
+        keyRequired: boolean
+        local: boolean
+        remark?: string
+      }>
+    }>('/ai/config'),
+  saveAiConfig: (data: {
+    provider?: string
+    baseURL?: string
+    apiKey?: string
+    model?: string
+    enabled?: boolean
+    temperature?: number
+    timeoutMs?: number
+  }) => put<{ message: string }>('/ai/config', data),
+  testAi: () => post<{ ok: boolean; latencyMs: number; model: string }>('/ai/test'),
+  aiStatus: () => get<{ ready: boolean; provider: string; model: string }>('/ai/status'),
 }
 
 // ============ 用户 / 角色 / 权限 ============
@@ -155,10 +187,13 @@ export const receiptApi = {
   /** 票据列表 */
   list: (params?: Record<string, any>) => get<any>('/receipts', params),
   detail: (id: string) => get<any>(`/receipts/${id}`),
-  /** 上传并识别票据（多文件） */
-  upload: (files: File[]) => {
+  /** 上传并识别票据（支持多文件 / 整个文件夹） */
+  upload: (files: File[], paths?: (string | null)[]) => {
     const form = new FormData()
     files.forEach((f) => form.append('files', f))
+    // 文件夹上传时并行提交每个文件的相对路径，与 files 按索引对应；
+    // 后端据此做目录智能判定。不传则全部按「无目录」处理。
+    if (paths?.length) paths.forEach((p) => form.append('paths', p ?? ''))
     return post<any[]>('/receipts/upload', form)
   },
   remove: (id: string) => del(`/receipts/${id}`),
@@ -297,8 +332,9 @@ export const bankStmtApi = {
   },
   list: (params?: Record<string, any>) => get<any>('/bank-stmt', params),
   summary: () => get<any>('/bank-stmt/summary'),
-  book: (id: string, data: { bizType: string; accountId: string; summary?: string }) =>
+  book: (id: string, data: { bizType: string; accountId: string; summary?: string; employeeId?: string; partnerId?: string }) =>
     post<any>(`/bank-stmt/${id}/book`, data),
+  batchBook: () => post<any>('/bank-stmt/batch-book', {}),
   skip: (id: string, remark?: string) => post<any>(`/bank-stmt/${id}/skip`, { remark }),
   restore: (id: string) => post<any>(`/bank-stmt/${id}/restore`),
   remove: (id: string) => del(`/bank-stmt/${id}`),
@@ -321,14 +357,38 @@ export const incomeExpenseApi = {
   remove: (id: string) => del(`/income-expense/${id}`),
 }
 
+export const fixedExpenseApi = {
+  list: (params?: Record<string, any>) => get<any>('/fixed-expenses', params),
+  pending: (untilPeriod?: string) =>
+    get<any>('/fixed-expenses/pending', untilPeriod ? { untilPeriod } : undefined),
+  suggest: (name: string) => get<any>('/fixed-expenses/suggest', { name }),
+  logs: (id: string) => get<any>(`/fixed-expenses/${id}/logs`),
+  create: (data: any) => post('/fixed-expenses', data),
+  generate: (untilPeriod?: string) =>
+    post<any>('/fixed-expenses/generate', untilPeriod ? { untilPeriod } : {}),
+  update: (id: string, data: any) => put(`/fixed-expenses/${id}`, data),
+  toggleStatus: (id: string, status: number) => put(`/fixed-expenses/${id}/status`, { status }),
+  remove: (id: string) => del(`/fixed-expenses/${id}`),
+}
+
 // ============ 账簿 ============
 // ============ 员工 / 报销 / 工资 ============
 export const employeeApi = {
   list: (params?: Record<string, any>) => get<any>('/employees', params),
   options: (onlyOnJob?: boolean) => get<any[]>('/employees/options', { onlyOnJob }),
   detail: (id: string) => get<any>(`/employees/${id}`),
+  /** 员工欠款明细：借款单列表 + 核销流水 + 汇总 */
+  debts: (id: string) => get<any>(`/employees/${id}/loans`),
   create: (data: any) => post('/employees', data),
   batchCreate: (items: any[]) => post<any>('/employees/batch', { items }),
+  /** 导入员工花名册（Excel/CSV）→ 预览解析 */
+  importPreview: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return post<any>('/employees/import', form)
+  },
+  /** 确认导入预览行 → 批量新建员工（exists 行由后端自动跳过） */
+  importCommit: (data: any) => post<any>('/employees/import/commit', data),
   update: (id: string, data: any) => put(`/employees/${id}`, data),
   remove: (id: string) => del(`/employees/${id}`),
 }
@@ -337,12 +397,23 @@ export const expenseClaimApi = {
   list: (params?: Record<string, any>) => get<any>('/expense-claims', params),
   detail: (id: string) => get<any>(`/expense-claims/${id}`),
   nextNo: (claimDate?: string) => get<string>('/expense-claims/next-no', { claimDate }),
+  /** 导入报销单（Excel/CSV）→ 预览解析 */
+  importPreview: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return post<any>('/expense-claims/import', form)
+  },
+  /** 确认导入预览行 → 生成报销单草稿 */
+  importCommit: (data: any) => post<any>('/expense-claims/import/commit', data),
   create: (data: any) => post('/expense-claims', data),
   update: (id: string, data: any) => put(`/expense-claims/${id}`, data),
   approve: (id: string) => post(`/expense-claims/${id}/approve`),
   pay: (id: string, data: any) => post(`/expense-claims/${id}/pay`, data),
   reject: (id: string, reason: string) => post(`/expense-claims/${id}/reject`, { reason }),
   remove: (id: string) => del(`/expense-claims/${id}`),
+  /** 批量生成原始凭证 PDF 压缩包（ids 优先，否则按筛选条件） */
+  downloadPdfPackage: (data?: Record<string, any>) =>
+    downloadPost('/expense-claims/pdf-package', data, `报销单原始凭证_${fileStamp()}.zip`),
 }
 
 // ============ 借款单 ============
@@ -356,6 +427,19 @@ export const loanApi = {
   repay: (id: string, data: any) => post(`/loans/${id}/repay`, data),
   reject: (id: string, reason: string) => post(`/loans/${id}/reject`, { reason }),
   remove: (id: string) => del(`/loans/${id}`),
+  /** 按员工汇总的往来余额（含未还清借款余额 balance） */
+  employeeBalances: (params?: Record<string, any>) => get<any>('/loans/employee-balances', params),
+  /** 导入借款单（Excel/CSV）→ 预览解析 */
+  importPreview: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return post<any>('/loans/import', form)
+  },
+  /** 确认导入预览行 → 生成借款单草稿 */
+  importCommit: (data: any) => post<any>('/loans/import/commit', data),
+  /** 批量生成原始凭证 PDF 压缩包（ids 优先，否则按筛选条件） */
+  downloadPdfPackage: (data?: Record<string, any>) =>
+    downloadPost('/loans/pdf-package', data, `借款单原始凭证_${fileStamp()}.zip`),
 }
 
 export const payrollApi = {
@@ -376,6 +460,9 @@ export const payrollApi = {
   approve: (id: string) => post(`/payrolls/${id}/approve`),
   pay: (id: string, data: any) => post(`/payrolls/${id}/pay`, data),
   remove: (id: string) => del(`/payrolls/${id}`),
+  /** 批量生成原始凭证 PDF 压缩包（ids 优先，否则按筛选条件） */
+  downloadPdfPackage: (data?: Record<string, any>) =>
+    downloadPost('/payrolls/pdf-package', data, `工资表原始凭证_${fileStamp()}.zip`),
 }
 
 export const booksApi = {

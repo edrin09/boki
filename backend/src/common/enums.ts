@@ -52,6 +52,7 @@ export enum AuxiliaryType {
   PARTNER = 'partner', // 往来单位
   DEPARTMENT = 'department', // 部门
   PROJECT = 'project', // 项目
+  EMPLOYEE = 'employee', // 员工（其他应收款-员工借款/往来按员工拆分）
 }
 
 /** 单据业务类型 */
@@ -92,11 +93,31 @@ export enum WriteOffType {
   PAYABLE = 'payable', // 应付核销（付款）
 }
 
+/** 借款抵充途径：其他应收款-员工借款的贷方核销来源 */
+export enum LoanSettleType {
+  CASH = 'cash', // 现金还款
+  BANK = 'bank', // 银行还款
+  EXPENSE_CLAIM = 'expense_claim', // 报销抵充（借 费用 贷 其他应收款）
+  RECEIPT = 'receipt', // 采购发票抵充（借 库存/费用 贷 其他应收款）
+  PAYROLL = 'payroll', // 工资扣回（借 应付职工薪酬 贷 其他应收款）
+}
+
+/** 员工往来核销类型 */
+export enum EmployeeSettleType {
+  RECEIVABLE = 'receivable', // 员工往来-应收（借款）核销
+}
+
 /** 员工性别 */
 export enum EmployeeGender {
   MALE = 'male',
   FEMALE = 'female',
   UNKNOWN = 'unknown',
+}
+
+/** 员工用工性质 */
+export enum EmployeeEmploymentType {
+  FULL_TIME = 'full_time', // 全职
+  PART_TIME = 'part_time', // 兼职
 }
 
 /** 员工状态 */
@@ -118,6 +139,12 @@ export enum ExpensePayMethod {
   ADVANCE = 'advance', // 员工垫付（贷：其他应收款-员工）
   CASH = 'cash', // 现金支付（贷：库存现金）
   BANK = 'bank', // 银行支付（贷：银行存款）
+}
+
+/** 报销单类型 */
+export enum ExpenseClaimType {
+  LOAN_OFFSET = 'loan_offset', // 冲抵借款（审核时贷 其他应收款-员工，按FIFO冲减借款，不再付款）
+  PAYMENT = 'payment', // 直接付款（员工垫付挂账，审核后付款给员工）
 }
 
 /** 工资单状态 */
@@ -179,6 +206,7 @@ export enum VoucherSource {
   EXPENSE_CLAIM = 'expense_claim',
   PAYROLL = 'payroll',
   LOAN = 'loan',
+  EMPLOYEE_SETTLEMENT = 'employee_settlement',
 }
 
 /** 系统参数键 */

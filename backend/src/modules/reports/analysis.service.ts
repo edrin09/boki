@@ -19,6 +19,7 @@ import {
   periodToYear,
 } from '../../common/utils/date.util'
 import { BooksService } from '../books/books.service'
+import { FixedExpenseService } from '../fixed-expense/fixed-expense.service'
 import { ReportsService } from './reports.service'
 import type { ReportQueryDto } from './dto/report.dto'
 
@@ -59,6 +60,7 @@ export class AnalysisService {
     private readonly expenseClaimRepo: CompanyScopedRepository<ExpenseClaim>,
     private readonly booksService: BooksService,
     private readonly reportsService: ReportsService,
+    private readonly fixedExpenseService: FixedExpenseService,
   ) {}
 
   // ==================== P18.1 票据台账 ====================
@@ -432,13 +434,25 @@ export class AnalysisService {
       this.expenseClaimRepo.count({ where: { status: 'draft' } }),
     ])
 
-    const checks = {
+    const checks: Record<string, number> = {
       pendingReceipts,
       unapprovedVouchers,
       openPayrolls,
       unapprovedExpenseClaims,
     }
     const issues: string[] = []
+
+    // 固定费用：截至结账期间应生成而未生成的项（期间 202610 -> '2026-10'）
+    const untilPeriod = `${Math.floor(endPeriod / 100)}-${String(endPeriod % 100).padStart(2, '0')}`
+    const fixedPending = await this.fixedExpenseService.pending(untilPeriod)
+    checks.pendingFixedExpenses = fixedPending.count
+    checks.pendingFixedExpenseAmount = fixedPending.totalAmount
+    if (fixedPending.count > 0) {
+      issues.push(
+        `尚有 ${fixedPending.count} 期固定费用未生成（预计合计 ${fixedPending.totalAmount} 元，可在「固定费用」页一键生成）`,
+      )
+    }
+
     if (pendingReceipts > 0) {
       issues.push(`尚有 ${pendingReceipts} 张票据未确认（待确认工作台）`)
     }

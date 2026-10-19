@@ -3,17 +3,19 @@
     <div class="page-card">
       <!-- AI 上传区：主入口，上传即自动生成凭证 -->
       <div class="ai-upload">
-        <el-upload drag multiple :auto-upload="false" :limit="20"
+        <el-upload drag multiple :auto-upload="false" :limit="20" webkitdirectory
           accept="image/jpeg,image/png,image/webp,image/bmp,image/tiff,application/pdf"
           :on-change="onFileChange" :on-remove="onFileRemove" :file-list="fileList" :on-exceed="onExceed">
           <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
           <div class="el-upload__text">
-            拖拽发票、工资表、银行对账单到此处，或<em>点击选择文件</em>
+            拖拽发票、工资表、银行对账单到此处，或<em>点击选择文件夹</em>
           </div>
           <template #tip>
             <div class="el-upload__tip">
               支持 jpg/png/webp/bmp/tiff/pdf，单文件 ≤ 20MB，一次最多 20 个。
-              AI 自动识别并生成借贷平衡的凭证，你只需核对后点一次「确认入账」。
+              <strong>可直接选整个文件夹</strong>，系统递归读取其中全部票据；
+              并按<strong>文件夹名</strong>智能判断用途（采购 / 报销 / 工资 / 银行）与归属人，
+              例如「采购单/张三/」即识别为「采购 · 张三」。
             </div>
           </template>
         </el-upload>
@@ -31,6 +33,18 @@
         </div>
         <el-table :data="results" size="small" max-height="240">
           <el-table-column prop="fileName" label="文件" min-width="150" show-overflow-tooltip />
+          <el-table-column v-if="folderResults.length" label="目录判定" width="150">
+            <template #default="{ row }">
+              <template v-if="row.folder">
+                <div class="folder-line">
+                  <el-tag size="small" type="primary">{{ row.folder.purposeLabel }}</el-tag>
+                  <el-tag v-if="row.folder.ownerName" size="small" class="ml6">{{ row.folder.ownerName }}</el-tag>
+                </div>
+                <div class="folder-path text-muted">{{ row.folder.path }}</div>
+              </template>
+              <span v-else class="text-muted">-</span>
+            </template>
+          </el-table-column>
           <el-table-column label="识别" width="110">
             <template #default="{ row }">
               <el-tag size="small" :type="row.drafted ? 'success' : row.status === 'duplicate' ? 'info' : 'warning'">
@@ -47,6 +61,12 @@
                 </div>
                 <div class="entry-line text-muted">
                   {{ row.draft.entries.map((e: any) => `${Number(e.debit) ? '借' : '贷'} ${e.accountName} ${Number(e.debit || e.credit)}`).join('；') }}
+                </div>
+              </template>
+              <template v-else-if="row.drafted && row.claims && row.claims.length">
+                <div class="suggest-line">
+                  <el-tag size="small" type="success">报销单已生成</el-tag>
+                  <span class="text-muted">{{ row.claims.map((c: any) => `${c.claimNo}（${c.claimTypeLabel} ${Number(c.totalAmount)}）`).join('、') }}</span>
                 </div>
               </template>
               <template v-else-if="row.suggestKindLabel">
@@ -133,6 +153,12 @@
                 </span>
               </div>
             </template>
+            <template v-else-if="row.claims && row.claims.length">
+              <div v-for="c in row.claims" :key="c.id" class="suggest-sub">
+                报销单 {{ c.claimNo }}（{{ c.claimTypeLabel }} {{ formatAmount(Number(c.totalAmount)) }}）
+              </div>
+              <div class="suggest-sub text-muted">可到「报销单」调整明细后回此确认入账</div>
+            </template>
             <span v-else class="text-muted">未生成</span>
           </template>
         </el-table-column>
@@ -147,7 +173,8 @@
             <template v-if="row.status === 'drafted'">
               <el-button v-permission="'receipt:confirm'" link type="primary" :loading="draftingId === row.id"
                 @click="onGenerateDraft(row)">重新生成</el-button>
-              <el-button v-permission="'receipt:confirm'" link type="primary" @click="openEditDraft(row)">修改草稿</el-button>
+              <el-button v-if="row.draft" v-permission="'receipt:confirm'" link type="primary"
+                @click="openEditDraft(row)">修改草稿</el-button>
               <el-button v-permission="'receipt:confirm'" link type="success" @click="onConfirm(row)">确认入账</el-button>
               <el-button v-permission="'receipt:confirm'" link type="danger" @click="onReject(row)">驳回</el-button>
             </template>
@@ -160,7 +187,7 @@
       <div class="page-pagination">
         <el-pagination v-model:current-page="query.page" v-model:page-size="query.pageSize"
           :page-sizes="[10, 20, 50]" :total="total" layout="total, sizes, prev, pager, next"
-          @current-change="load" @size-change="onReset" />
+          @current-change="load" @size-change="handleSize" />
       </div>
     </div>
 
@@ -284,7 +311,7 @@ const SUGGEST_TAG: Record<string, 'success' | 'danger' | 'warning' | 'info'> = {
   unknown: 'info',
 }
 
-const { list, total, loading, query, load, reset: onReset } = usePagedList({
+const { list, total, loading, query, load, handleSize } = usePagedList({
   fetcher: (params) => receiptApi.pending(params),
   defaultParams: { page: 1, pageSize: 20 },
 })
@@ -298,6 +325,8 @@ const results = ref<any[]>([])
 const draftedResults = computed(() => results.value.filter((r) => r.drafted))
 const pendingResults = computed(() => results.value.filter((r) => r.status === 'parsed' && !r.drafted))
 const otherResults = computed(() => results.value.filter((r) => r.status !== 'parsed'))
+/** 存在目录智能判定结果时才显示「目录判定」列，避免单文件上传时多出空列 */
+const folderResults = computed(() => results.value.filter((r) => r.folder))
 
 function onFileChange(_f: UploadFile, files: UploadFiles) {
   fileList.value = files
@@ -318,17 +347,31 @@ function clearResults() {
   fileList.value = []
 }
 
+/** 与后端 ALLOWED_MIME 对齐的扩展名白名单（文件夹上传时 accept 不生效，需前端过滤） */
+const UPLOAD_EXT = /\.(jpe?g|png|webp|bmp|tiff|pdf)$/i
+
 async function onUpload() {
-  const raws: File[] = fileList.value.filter((f) => f.raw instanceof File).map((f) => f.raw as File)
-  if (!raws.length) return
+  const items = fileList.value.filter((f) => f.raw instanceof File)
+  if (!items.length) return
+  // 选文件夹时目录里的所有文件都会进列表，先按扩展名过滤，避免挤占 20 个名额还报错
+  const supported = items.filter((f) => UPLOAD_EXT.test(f.name))
+  const skipped = items.length - supported.length
+  if (skipped > 0) ElMessage.info(`已跳过 ${skipped} 个不支持的文件（仅支持 jpg/png/webp/bmp/tiff/pdf）`)
+  if (!supported.length) return
+  const raws = supported.map((f) => f.raw as File)
+  // webkitRelativePath 仅在「选择文件夹」时有值（如「采购单/张三/发票.pdf」），
+  // 单文件上传时为空串 → 传 null，后端按无目录处理。
+  const paths = supported.map((f) => (f.raw as any).webkitRelativePath || null)
   uploading.value = true
   try {
-    const res = await receiptApi.upload(raws)
+    const res = await receiptApi.upload(raws, paths)
     results.value = res ?? []
     const drafted = draftedResults.value.length
     const pending = pendingResults.value.length
+    const byFolder = folderResults.value.length
     if (drafted > 0) {
-      ElMessage.success(`AI 已生成 ${drafted} 张凭证${pending ? `，${pending} 个需人工确认` : ''}`)
+      const folderTip = byFolder ? `，其中 ${byFolder} 个按目录判定` : ''
+      ElMessage.success(`AI 已生成 ${drafted} 张凭证${folderTip}${pending ? `，${pending} 个需人工确认` : ''}`)
     } else if (pending > 0) {
       ElMessage.warning(`${pending} 个单据需人工确认，原因见上方`)
     } else {
@@ -403,7 +446,9 @@ async function onGenerateDraft(row: any) {
   try {
     const res = await receiptApi.generateDraft(row.id)
     const updated = res as any
-    if (updated.draft) {
+    if (updated.claims && updated.claims.length) {
+      ok(`已生成报销单草稿：${updated.claims.map((c: any) => `${c.claimNo}（${c.claimTypeLabel}）`).join('、')}，确认入账时自动审核报销单`)
+    } else if (updated.draft) {
       ok('凭证草稿已生成，借贷平衡')
     }
     await load()
@@ -638,6 +683,18 @@ onMounted(loadAccounts)
   margin-top: 4px;
   font-size: 12px;
   line-height: 1.6;
+}
+/* 目录智能判定：用途/归属人标签 + 来源目录路径 */
+.folder-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.folder-path {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
 }
 .mt8 {
   margin-top: 8px;

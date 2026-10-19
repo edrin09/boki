@@ -29,6 +29,7 @@ import { ReportsModule } from './reports/reports.module'
 import { CashBankModule } from './cash-bank/cash-bank.module'
 import { ArApModule } from './ar-ap/ar-ap.module'
 import { IncomeExpenseModule } from './income-expense/income-expense.module'
+import { FixedExpenseModule } from './fixed-expense/fixed-expense.module'
 import { SystemModule } from './system/system.module'
 import { EmployeesModule } from './employees/employees.module'
 import { ExpenseClaimsModule } from './expense-claims/expense-claims.module'
@@ -39,6 +40,8 @@ import { OcrModule } from './ocr/ocr.module'
 import { ReceiptsModule } from './receipts/receipts.module'
 import { ExtractModule } from './extract/extract.module'
 import { CompaniesModule } from './companies/companies.module'
+import { VoiceAssistantModule } from './voice-assistant/voice-assistant.module'
+import { AiModule } from './ai/ai.module'
 import { CompanyReposModule } from '../common/company/company-repos.module'
 import { CompanyScopeInterceptor } from '../common/company/company-scope.interceptor'
 
@@ -73,6 +76,7 @@ import { CompanyScopeInterceptor } from '../common/company/company-scope.interce
     CashBankModule,
     ArApModule,
     IncomeExpenseModule,
+    FixedExpenseModule,
     SystemModule,
     EmployeesModule,
     ExpenseClaimsModule,
@@ -82,6 +86,7 @@ import { CompanyScopeInterceptor } from '../common/company/company-scope.interce
     OcrModule,
     ReceiptsModule,
     ExtractModule,
+    VoiceAssistantModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: GlobalAuthGuard },

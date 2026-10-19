@@ -67,6 +67,13 @@ export class PayrollItemDto {
   @Min(0)
   otherDeduct?: number
 
+  /** 借款扣回（从工资扣回员工借款） */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  loanDeduct?: number
+
   @IsOptional()
   @IsString()
   @MaxLength(200)

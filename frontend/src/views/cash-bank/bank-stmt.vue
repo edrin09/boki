@@ -55,6 +55,12 @@
         <el-option label="已跳过" value="skipped" />
       </el-select>
       <el-button style="margin-left: 12px" @click="load">刷新</el-button>
+      <el-button
+        type="success"
+        style="margin-left: 12px"
+        :loading="batchBooking"
+        @click="onBatchBook"
+      >智能批量入账</el-button>
       <span v-if="!bankAccountId" class="tip">请先选择资金账户（收款/付款将记到该账户）</span>
     </el-card>
 
@@ -81,6 +87,9 @@
             <span v-if="row.suggestAccountCode" class="suggest">
               → {{ row.suggestAccountCode }} {{ row.suggestAccountName }}
             </span>
+            <el-tag v-if="row.autoBookable === 1 && row.status === 'pending'" type="success" size="small" style="margin-left: 4px">
+              可批量入账
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
@@ -136,6 +145,16 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item v-if="needEmployee" label="经办员工">
+          <el-select v-model="bookForm.employeeId" filterable placeholder="该科目需挂员工辅助核算" style="width: 100%">
+            <el-option v-for="e in employees" :key="e.id" :label="e.name" :value="e.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="needPartner" label="往来单位">
+          <el-select v-model="bookForm.partnerId" filterable clearable placeholder="选择往来单位（应收/应付/其他需挂往来）" style="width: 100%">
+            <el-option v-for="p in partners" :key="p.id" :label="p.name" :value="p.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="摘要">
           <el-input v-model="bookForm.summary" placeholder="留空默认用流水摘要" />
         </el-form-item>
@@ -149,9 +168,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { bankStmtApi, bankApi, accountApi } from '@/api'
+import { bankStmtApi, bankApi, accountApi, employeeApi, partnerApi } from '@/api'
 
 const summary = ref<any>({})
 const rows = ref<any[]>([])
@@ -159,14 +178,35 @@ const total = ref(0)
 const loading = ref(false)
 const importing = ref(false)
 const booking = ref(false)
+const batchBooking = ref(false)
 const banks = ref<any[]>([])
 const accounts = ref<any[]>([])
+const employees = ref<any[]>([])
+const partners = ref<any[]>([])
 const bankAccountId = ref('')
 const bookDialog = ref(false)
 const current = ref<any>(null)
 
 const query = reactive({ page: 1, pageSize: 50, status: '' })
-const bookForm = reactive({ bizType: 'expense', accountId: '', summary: '' })
+const bookForm = reactive<{ bizType: string; accountId: string; summary: string; employeeId: string; partnerId: string }>({
+  bizType: 'expense',
+  accountId: '',
+  summary: '',
+  employeeId: '',
+  partnerId: '',
+})
+
+/** 选中科目需要员工辅助核算（1221 其他应收款-员工等） */
+const needEmployee = computed(() => {
+  const acc = accounts.value.find((a) => a.id === bookForm.accountId)
+  return !!acc && String(acc.code).startsWith('1221')
+})
+/** 选中科目需要往来单位辅助核算（应收/应付/其他往来） */
+const needPartner = computed(() => {
+  const acc = accounts.value.find((a) => a.id === bookForm.accountId)
+  if (!acc) return false
+  return ['1122', '2202', '2241', '1221'].some((c) => String(acc.code).startsWith(c))
+})
 
 const bizTypes = [
   { value: 'expense', label: '费用支出' },
@@ -176,9 +216,16 @@ const bizTypes = [
 ]
 
 onMounted(async () => {
-  const [b, a] = await Promise.all([bankApi.list({ pageSize: 100 }), accountApi.tree()])
+  const [b, a, e, p] = await Promise.all([
+    bankApi.list({ pageSize: 100 }),
+    accountApi.tree(),
+    employeeApi.list({ pageSize: 200 }),
+    partnerApi.list({ pageSize: 200 }),
+  ])
   banks.value = b?.list ?? b ?? []
   accounts.value = flattenAccounts(a ?? [])
+  employees.value = e?.list ?? e ?? []
+  partners.value = p?.list ?? p ?? []
   await Promise.all([load(), loadSummary()])
 })
 
@@ -232,7 +279,34 @@ function openBook(row: any) {
   bookForm.bizType = row.suggestBizType || (row.credit > 0 ? 'receipt' : 'expense')
   bookForm.accountId = row.suggestAccountId || ''
   bookForm.summary = ''
+  bookForm.employeeId = row.suggestEmployeeId || ''
+  bookForm.partnerId = row.suggestPartnerId || ''
   bookDialog.value = true
+}
+
+/** 一键智能批量入账：高置信建议行自动入账，失败行保留待确认 */
+async function onBatchBook() {
+  batchBooking.value = true
+  try {
+    const res: any = await bankStmtApi.batchBook()
+    if (!res?.total) {
+      ElMessage.info('没有可自动入账的待确认行（仅高置信建议行会批量入账）')
+      return
+    }
+    if (res.failed?.length) {
+      const lines = res.failed.slice(0, 5).map((f: any) => `${f.summary}：${f.reason}`)
+      ElMessageBox.alert(
+        `<div style="max-height:200px;overflow:auto">${lines.join('<br/>')}</div>`,
+        `已入账 ${res.booked}/${res.total} 行，${res.failed.length} 行需人工处理`,
+        { dangerouslyUseHTMLString: true, type: 'warning' },
+      ).catch(() => {})
+    } else {
+      ElMessage.success(`智能批量入账完成：${res.booked}/${res.total} 行已入账并生成凭证`)
+    }
+    await Promise.all([load(), loadSummary()])
+  } finally {
+    batchBooking.value = false
+  }
 }
 
 async function confirmBook() {
@@ -240,9 +314,19 @@ async function confirmBook() {
     ElMessage.warning('请选择对方科目')
     return
   }
+  if (needEmployee && !bookForm.employeeId) {
+    ElMessage.warning('该科目需挂员工辅助核算，请选择员工')
+    return
+  }
   booking.value = true
   try {
-    await bankStmtApi.book(current.value.id, { ...bookForm })
+    await bankStmtApi.book(current.value.id, {
+      bizType: bookForm.bizType,
+      accountId: bookForm.accountId,
+      summary: bookForm.summary,
+      employeeId: bookForm.employeeId || undefined,
+      partnerId: bookForm.partnerId || undefined,
+    })
     ElMessage.success('已入账并生成凭证')
     bookDialog.value = false
     await Promise.all([load(), loadSummary()])

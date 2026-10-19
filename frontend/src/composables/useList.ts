@@ -45,7 +45,8 @@ export function usePagedList<T = any>(options: PagedListOptions<T>) {
   }
 
   function reset() {
-    query.value = { page: 1, pageSize: 20, ...(options.defaultParams ?? {}) }
+    // 重置筛选条件并回到第 1 页，但保留用户选择的每页条数
+    query.value = { page: 1, pageSize: query.value.pageSize, ...(options.defaultParams ?? {}) }
     return load()
   }
 

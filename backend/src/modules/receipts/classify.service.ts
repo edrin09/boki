@@ -2,11 +2,12 @@ import { Injectable } from '@nestjs/common'
 import { ClassifyRule } from '../../entities/classify-rule.entity'
 import { Receipt } from '../../entities/receipt.entity'
 import { Account } from '../../entities/account.entity'
+import { Employee } from '../../entities/hr.entity'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
 import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { SystemService } from '../system/system.service'
 import { recoverFilename } from '../../common/utils/filename.util'
-import { TaxpayerType } from '../../common/enums'
+import { EmployeeStatus, TaxpayerType } from '../../common/enums'
 import { nameContains, normName, sameTaxNo } from './parsers/parser.utils'
 
 /** 凭证模板类型：进项/销项/费用/银行手续费/工资 */
@@ -73,6 +74,11 @@ export interface ClassifySuggestion {
   counterparty: string | null
   /** 分录模板（含科目编码） */
   entries: DraftEntryTemplate[]
+  /**
+   * 归属员工姓名（个人抬头发票：买方命中在职员工时自动判定为进项报销）。
+   * 工作台据此直接生成该员工的报销单草稿，无需目录命名约定。
+   */
+  ownerName?: string | null
   message?: string
 }
 
@@ -102,6 +108,7 @@ export class ClassifyService {
   constructor(
     @InjectCompanyRepo(ClassifyRule) private readonly ruleRepo: CompanyScopedRepository<ClassifyRule>,
     @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
+    @InjectCompanyRepo(Employee) private readonly employeeRepo: CompanyScopedRepository<Employee>,
     private readonly systemService: SystemService,
   ) {}
 
@@ -122,6 +129,8 @@ export class ClassifyService {
 
     let kind: ReceiptKind = 'unknown'
     let direction: 'input' | 'output' | null = null
+    /** 个人抬头归属员工姓名（买方命中在职员工时判定） */
+    let ownerName: string | null = null
     if (docType === 'invoice') {
       // 人工修正的方向优先：用户已在工作台纠正过进项/销项，不再依赖税号比对
       if (receipt.directionOverride === 'input' || receipt.directionOverride === 'output') {
@@ -147,11 +156,19 @@ export class ClassifyService {
         kind = 'input_vat'
         direction = 'input'
       } else {
-        // 公司信息未配置或与购销双方均不匹配时，无法判定进项/销项方向。
-        // 宁可标 unknown 交由人工处理，也不能默认猜成进项——猜错会使
-        // 对方单位取错一侧、借贷记账方向全反（财务基础错误）。
-        kind = 'unknown'
-        direction = null
+        // 购销双方均与本公司不匹配时，先尝试个人抬头判定：
+        // 买方名称命中在职员工 → 自动判为进项（员工个人垫付取得的票据，据实报销入费用），
+        // 归属员工供工作台直接生成报销单草稿；仍判不出才标 unknown 交由人工处理，
+        // 不能默认猜成进项——猜错会使对方单位取错一侧、借贷记账方向全反（财务基础错误）。
+        const buyerEmployee = await this.matchEmployee(buyerName)
+        if (buyerEmployee) {
+          kind = 'input_vat'
+          direction = 'input'
+          ownerName = buyerEmployee.name
+        } else {
+          kind = 'unknown'
+          direction = null
+        }
       }
       }
     } else if (docType === 'payroll') {
@@ -179,6 +196,7 @@ export class ClassifyService {
         account: null,
         counterparty: null,
         entries: [],
+        ownerName: null,
         message: this.unknownReason(receipt),
       }
     }
@@ -326,8 +344,28 @@ export class ClassifyService {
       account,
       counterparty,
       entries,
-      message,
+      ownerName,
+      message: ownerName
+        ? `个人抬头发票：买方为员工「${ownerName}」，已自动判定为进项，可直接生成该员工的报销单草稿${message ? `；${message}` : ''}`
+        : message,
     }
+  }
+
+  /**
+   * 个人抬头判定：买方名称命中在职员工档案（去空白后全等或包含，姓名至少 2 字）。
+   * 与银行流水的员工匹配同口径。
+   */
+  private async matchEmployee(name: string) {
+    const a = normName(name)
+    if (a.length < 2) return null
+    const employees = await this.employeeRepo.find({
+      where: { status: EmployeeStatus.ON_JOB },
+    })
+    for (const e of employees) {
+      const b = normName(e.name)
+      if (b.length >= 2 && (a === b || a.includes(b) || b.includes(a))) return e
+    }
+    return null
   }
 
   /**

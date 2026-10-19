@@ -64,7 +64,7 @@
           :total="total"
           layout="total, sizes, prev, pager, next, jumper"
           @current-change="load"
-          @size-change="reset"
+          @size-change="handleSize"
         />
       </div>
     </div>
@@ -186,9 +186,9 @@ const TYPE_TAGS: Record<string, any> = { customer: 'success', supplier: 'warning
 const typeLabel = (t: string) => TYPE_LABELS[t] ?? t
 const typeTag = (t: string) => TYPE_TAGS[t] ?? 'info'
 
-const query = reactive<Record<string, any>>({ page: 1, pageSize: 20, keyword: '', type: '' })
-const { list, total, loading, load, search, reset } = usePagedList({
+const { list, total, loading, query, load, search, handleSize, reset } = usePagedList({
   fetcher: (params) => partnerApi.list(params),
+  defaultParams: { page: 1, pageSize: 20, keyword: '', type: '' },
 })
 
 const dialogVisible = ref(false)

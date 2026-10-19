@@ -1,11 +1,14 @@
 import { Column, Entity, Index } from 'typeorm'
 import { BaseEntity } from './base.entity'
 import {
+  EmployeeEmploymentType,
   EmployeeGender,
   EmployeeStatus,
   ExpenseClaimStatus,
+  ExpenseClaimType,
   ExpensePayMethod,
   LoanPayMethod,
+  LoanSettleType,
   LoanStatus,
   PayrollStatus,
 } from '../common/enums'
@@ -35,6 +38,14 @@ export class Employee extends BaseEntity {
 
   @Column({ length: 50, nullable: true, comment: '岗位' })
   position: string | null
+
+  @Column({
+    name: 'employment_type',
+    length: 10,
+    default: 'full_time',
+    comment: '用工性质：full_time 全职 / part_time 兼职',
+  })
+  employmentType: EmployeeEmploymentType | string
 
   @Column({ length: 30, nullable: true, comment: '身份证号' })
   idCard: string | null
@@ -124,6 +135,21 @@ export class ExpenseClaim extends BaseEntity {
     comment: '支付方式：advance 员工垫付 / cash 现金 / bank 银行',
   })
   payMethod: ExpensePayMethod | string
+
+  @Column({
+    name: 'claim_type',
+    length: 20,
+    default: 'payment',
+    comment: '类型：loan_offset 冲抵借款 / payment 直接付款',
+  })
+  claimType: ExpenseClaimType | string
+
+  /** 抵充的借款单（员工用借款去报销时选） */
+  @Column({ name: 'loan_id', type: 'varchar', nullable: true, comment: '抵充的借款单ID' })
+  loanId: string | null
+
+  @Column({ name: 'loan_no', length: 30, nullable: true, comment: '借款单号快照' })
+  loanNo: string | null
 
   @Column({ length: 20, default: 'draft', comment: '状态：draft/approved/paid/rejected' })
   status: ExpenseClaimStatus | string
@@ -281,6 +307,17 @@ export class Payroll extends BaseEntity {
     comment: '其他代扣合计',
   })
   totalOtherDeduct: number
+
+  @Column({
+    name: 'total_loan_deduct',
+    type: 'decimal',
+    precision: 18,
+    scale: 2,
+    default: 0,
+    transformer: decimalTransformer,
+    comment: '借款扣回合计',
+  })
+  totalLoanDeduct: number
 
   @Column({
     name: 'total_net',
@@ -479,6 +516,18 @@ export class PayrollItem extends BaseEntity {
   })
   otherDeduct: number
 
+  /** 借款扣回（从工资中扣回员工借款，贷：其他应收款-员工） */
+  @Column({
+    name: 'loan_deduct',
+    type: 'decimal',
+    precision: 18,
+    scale: 2,
+    default: 0,
+    transformer: decimalTransformer,
+    comment: '借款扣回',
+  })
+  loanDeduct: number
+
   @Column({
     name: 'net',
     type: 'decimal',
@@ -585,6 +634,79 @@ export class Loan extends BaseEntity {
 
   @Column({ name: 'repay_date', type: 'date', nullable: true, comment: '实际还款日期' })
   repayDate: string | null
+
+  /**
+   * 已通过「报销/采购发票/工资扣回」抵充的金额（不含现金银行还款）。
+   * 借款总清偿 = repaidAmount + offsetAmount
+   */
+  @Column({ name: 'offset_amount', type: 'decimal', precision: 18, scale: 2, default: 0, transformer: decimalTransformer, comment: '非现金抵充累计金额' })
+  offsetAmount: number
+
+  @Column({ length: 200, nullable: true })
+  remark: string | null
+}
+
+/**
+ * 员工往来核销记录（其他应收款-员工借款的贷方核销流水）
+ *
+ * 借款的「还款」有多种途径，每一笔都登记一条核销记录，并回写借款单：
+ * - cash/bank          现金、银行实际还款      借 资金科目 / 贷 1221
+ * - expense_claim      报销抵充                借 费用     / 贷 1221
+ * - receipt            采购发票抵充            借 库存/费用/ 贷 1221
+ * - payroll            工资扣回                借 2211     / 贷 1221
+ *
+ * 撤销单据时按 sourceType + sourceId 反查并回滚借款单已清偿金额。
+ */
+@Entity('fin_employee_settlement')
+@Index('idx_emp_settle_employee', ['companyId', 'employeeId'])
+@Index('idx_emp_settle_loan', ['companyId', 'loanId'])
+// 同一来源单据抵充多张借款单（FIFO 分配）时会产生多条流水，唯一键需含 loanId
+@Index('uk_emp_settle_source', ['companyId', 'settleType', 'sourceId', 'loanId'], { unique: true })
+export class EmployeeSettlement extends BaseEntity {
+  @Index('idx_emp_settle_company')
+  @Column({ name: 'company_id', type: 'varchar', length: 36, default: '' })
+  companyId: string
+
+  /** 核销途径：cash / bank / expense_claim / receipt / payroll */
+  @Column({ name: 'settle_type', length: 30, comment: '核销途径' })
+  settleType: LoanSettleType | string
+
+  @Column({ name: 'source_id', type: 'varchar', comment: '来源单据ID（借款单/报销单/票据/工资单）' })
+  sourceId: string
+
+  @Column({ name: 'source_no', length: 30, nullable: true, comment: '来源单据号快照' })
+  sourceNo: string | null
+
+  @Column({ name: 'employee_id', type: 'varchar', comment: '员工ID' })
+  employeeId: string
+
+  @Column({ name: 'employee_name', length: 50, comment: '员工姓名快照' })
+  employeeName: string
+
+  /** 抵充的借款单；为空表示员工垫付类挂账（无对应借款） */
+  @Column({ name: 'loan_id', type: 'varchar', nullable: true, comment: '抵充的借款单ID' })
+  loanId: string | null
+
+  @Column({ name: 'loan_no', length: 30, nullable: true, comment: '借款单号快照' })
+  loanNo: string | null
+
+  @Column({ name: 'settle_date', type: 'date', comment: '核销日期' })
+  settleDate: string
+
+  @Column({ type: 'decimal', precision: 18, scale: 2, default: 0, transformer: decimalTransformer, comment: '核销金额' })
+  amount: number
+
+  @Column({ length: 200, default: '', comment: '摘要' })
+  summary: string
+
+  @Column({ name: 'voucher_id', type: 'varchar', nullable: true, comment: '生成的凭证ID' })
+  voucherId: string | null
+
+  @Column({ name: 'created_by', type: 'varchar', nullable: true })
+  createdBy: string | null
+
+  @Column({ name: 'created_by_name', length: 50, nullable: true })
+  createdByName: string | null
 
   @Column({ length: 200, nullable: true })
   remark: string | null

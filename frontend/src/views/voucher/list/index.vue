@@ -165,7 +165,7 @@
           :total="total"
           layout="total, sizes, prev, pager, next"
           @current-change="load"
-          @size-change="onReset"
+          @size-change="handleSize"
         />
       </div>
     </div>
@@ -185,7 +185,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Download, Paperclip } from '@element-plus/icons-vue'
@@ -199,10 +199,11 @@ import PeriodPicker from '@/components/common/PeriodPicker.vue'
 const router = useRouter()
 
 const period = ref<number>(currentPeriod())
-const query = reactive<Record<string, any>>({ page: 1, pageSize: 20, status: '', keyword: '' })
 
-const { list, total, loading, load, search, reset } = usePagedList({
-  fetcher: (params) => voucherApi.list(params),
+const { list, total, loading, query, load, search, handleSize, reset } = usePagedList({
+  fetcher: (params) =>
+    voucherApi.list({ ...params, period: period.value, word: params.keyword || undefined }),
+  defaultParams: { page: 1, pageSize: 20, status: '', keyword: '' },
 })
 
 function pad(n: number): string {
@@ -210,13 +211,13 @@ function pad(n: number): string {
 }
 
 function onReset() {
-  query.status = ''
-  query.keyword = ''
+  query.value.status = ''
+  query.value.keyword = ''
   reset()
 }
 
 watch(period, () => {
-  query.page = 1
+  query.value.page = 1
   load()
 })
 

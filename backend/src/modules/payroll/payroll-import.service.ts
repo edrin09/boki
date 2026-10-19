@@ -32,7 +32,7 @@ const COLUMN_RULES: Array<{ field: SalaryField; keywords: string[] }> = [
   { field: 'insurancePersonal', keywords: ['个人社保', '社保', '养老保险', '医疗保险', '失业保险'] },
   { field: 'fundPersonal', keywords: ['公积金', '住房公积金'] },
   { field: 'tax', keywords: ['个人所得税', '个税', '所得税'] },
-  { field: 'otherDeduct', keywords: ['其他扣款', '其他扣除', '扣款'] },
+  { field: 'otherDeduct', keywords: ['其他扣款', '其他扣除', '其他代扣', '代扣', '扣款'] },
   { field: 'gross', keywords: ['应发工资', '应发', '工资总额'] },
   { field: 'net', keywords: ['实发工资', '实发', '到手'] },
 ]

@@ -7,8 +7,11 @@ import { Account } from '../../entities/account.entity'
 import { Department } from '../../entities/department.entity'
 import { Voucher } from '../../entities/voucher.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
+import { Employee, Loan } from '../../entities/hr.entity'
 import { OcrModule } from '../ocr/ocr.module'
 import { VouchersModule } from '../vouchers/vouchers.module'
+import { LoansModule } from '../loans/loans.module'
+import { ExpenseClaimsModule } from '../expense-claims/expense-claims.module'
 import { ReceiptsController } from './receipts.controller'
 import { ReceiptsService } from './receipts.service'
 import { DocumentParseService } from './document-parse.service'
@@ -27,9 +30,13 @@ import { PartySyncService } from './party-sync.service'
       Department,
       Voucher,
       VoucherEntry,
+      Employee,
+      Loan,
     ]),
     OcrModule,
     VouchersModule,
+    LoansModule,
+    ExpenseClaimsModule,
   ],
   controllers: [ReceiptsController],
   providers: [ReceiptsService, DocumentParseService, ClassifyService, ClassifyRulesService, ReceiptWorkbenchService, PartySyncService],

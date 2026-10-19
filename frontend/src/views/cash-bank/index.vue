@@ -90,7 +90,7 @@
           :total="total"
           layout="total, sizes, prev, pager, next"
           @current-change="load"
-          @size-change="reset"
+          @size-change="handleSize"
         />
       </div>
     </div>
@@ -257,8 +257,7 @@ const bizTag = (t: string) => BIZ_TAGS[t] ?? 'info'
 const statusLabel = (s: string) => voucherStatusMeta(s).label
 
 const dateRange = ref<[string, string] | null>(null)
-const query = reactive<Record<string, any>>({ page: 1, pageSize: 20, bizType: '' })
-const { list, total, loading, load, search, reset } = usePagedList({
+const { list, total, loading, query, load, search, handleSize, reset } = usePagedList({
   fetcher: (params) => {
     if (dateRange.value?.length === 2) {
       params.startDate = dateRange.value[0]
@@ -266,6 +265,7 @@ const { list, total, loading, load, search, reset } = usePagedList({
     }
     return cashBankApi.list(params)
   },
+  defaultParams: { page: 1, pageSize: 20, bizType: '' },
 })
 
 const accountOptions = ref<any[]>([])

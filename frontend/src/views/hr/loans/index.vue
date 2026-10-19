@@ -13,13 +13,20 @@
         <el-button type="primary" @click="search"><el-icon><Search /></el-icon>查询</el-button>
         <el-button @click="onReset">重置</el-button>
         <div class="page-toolbar__spacer" />
+        <el-button :loading="pdfExporting" @click="onPdfPackage">
+          <el-icon><Printer /></el-icon>生成凭证PDF
+        </el-button>
         <el-button @click="onExport"><el-icon><Download /></el-icon>导出</el-button>
+        <el-button v-permission="'hr:loan:create'" @click="importVisible = true">
+          <el-icon><Upload /></el-icon>导入
+        </el-button>
         <el-button v-permission="'hr:loan:create'" type="primary" @click="onCreate">
           <el-icon><Plus /></el-icon>新增借款单
         </el-button>
       </div>
 
-      <el-table v-loading="loading" :data="list" empty-text="暂无借款单">
+      <el-table v-loading="loading" :data="list" empty-text="暂无借款单" @selection-change="selected = $event">
+        <el-table-column type="selection" width="42" />
         <el-table-column prop="loanNo" label="单号" width="130" />
         <el-table-column prop="loanDate" label="借款日期" width="115" />
         <el-table-column label="借款人" width="160">
@@ -87,7 +94,7 @@
       <div class="page-pagination">
         <el-pagination v-model:current-page="query.page" v-model:page-size="query.pageSize"
           :page-sizes="[10, 20, 50]" :total="total" layout="total, sizes, prev, pager, next"
-          @current-change="load" @size-change="onReset" />
+          @current-change="load" @size-change="handleSize" />
       </div>
     </div>
 
@@ -203,6 +210,75 @@
       </template>
     </el-dialog>
 
+    <!-- 导入借款单弹窗 -->
+    <el-dialog v-model="importVisible" title="导入借款单" width="1040px" destroy-on-close>
+      <template v-if="!importPreviewData">
+        <el-upload v-loading="importParsing" drag :auto-upload="false" :limit="1" accept=".xlsx,.xls,.csv"
+          :on-change="onImportFileChange" :on-remove="onImportFileRemove" :file-list="importFileList">
+          <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+          <div class="el-upload__text">拖拽 Excel / CSV 到此处，或<em>点击选择</em></div>
+          <template #tip>
+            <div class="el-upload__tip">按表头关键词自动映射（单号/借款日期/借款人/借款事由/借款方式/金额等），选择文件后立即解析预览；未匹配的借款人可在预览中手动指定</div>
+          </template>
+        </el-upload>
+      </template>
+
+      <template v-else>
+        <div class="import-head">
+          <el-alert
+            :type="importPreviewData.summary.unmatched || importPreviewData.summary.duplicates ? 'warning' : 'success'"
+            :closable="false" show-icon class="import-head__alert"
+            :title="`共 ${importPreviewData.summary.total} 行：匹配 ${importPreviewData.summary.matched} 行，未匹配 ${importPreviewData.summary.unmatched} 行，金额合计 ${formatAmount(importPreviewData.summary.totalAmount)}`" />
+        </div>
+        <el-table :data="importRows" size="small" max-height="440px">
+          <el-table-column type="index" label="#" width="45" align="center" />
+          <el-table-column label="单号" width="120">
+            <template #default="{ row }">
+              <el-tag v-if="row.loanNoTaken" size="small" type="info">自动生成</el-tag>
+              <span v-else>{{ row.loanNo || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="loanDate" label="借款日期" width="105" />
+          <el-table-column label="借款人" width="150">
+            <template #default="{ row }">
+              <template v-if="row.matched">{{ row.employeeName }}</template>
+              <el-select v-else v-model="row.employeeId" filterable placeholder="选择员工" size="small"
+                style="width: 100%" @change="onImportEmployeeChange(row)">
+                <el-option v-for="e in employeeOptions" :key="e.id" :label="`${e.code} ${e.name}`" :value="e.id" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column prop="reason" label="借款事由" min-width="130">
+            <template #default="{ row }">{{ row.reason || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="借款方式" width="95">
+            <template #default="{ row }">{{ row.payMethodLabel || PAY_METHODS[row.payMethod] }}</template>
+          </el-table-column>
+          <el-table-column label="金额" width="100" align="right">
+            <template #default="{ row }">
+              <span class="amount amount--total">{{ formatAmount(row.amount) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="message" label="说明" min-width="130">
+            <template #default="{ row }">
+              <span :class="{ 'import-warning-text': row.duplicate }">{{ row.message }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div v-if="importUnmatchedCount" class="import-warning">
+          {{ importUnmatchedCount }} 行未匹配到员工档案，请在行内选择员工；未选择的行将被跳过。
+        </div>
+      </template>
+
+      <template #footer>
+        <el-button @click="importVisible = false">关闭</el-button>
+        <template v-if="importPreviewData">
+          <el-button @click="backToUpload"><el-icon><Back /></el-icon>重新选择文件</el-button>
+          <el-button type="primary" :loading="importCommitting" @click="onImportCommit">确认导入</el-button>
+        </template>
+      </template>
+    </el-dialog>
+
     <!-- 详情抽屉 -->
     <el-drawer v-model="detailVisible" title="借款单详情" size="600px">
       <template v-if="detail">
@@ -236,7 +312,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { Plus, Search, Download } from '@element-plus/icons-vue'
+import { Plus, Search, Download, Upload, UploadFilled, Back, Printer } from '@element-plus/icons-vue'
 import { bankApi, employeeApi, loanApi } from '@/api'
 import { confirmDelete, ok, usePagedList } from '@/composables/useList'
 import { formatAmount } from '@/utils/format'
@@ -255,8 +331,7 @@ const STATUS_TAGS: Record<string, any> = {
 }
 
 const dateRange = ref<[string, string] | null>(null)
-const query = reactive<Record<string, any>>({ page: 1, pageSize: 20, status: '', employeeId: '' })
-const { list, total, loading, load, search, reset } = usePagedList({
+const { list, total, loading, query, load, search, handleSize, reset } = usePagedList({
   fetcher: (params) => {
     if (dateRange.value?.length === 2) {
       params.startDate = dateRange.value[0]
@@ -264,6 +339,7 @@ const { list, total, loading, load, search, reset } = usePagedList({
     }
     return loanApi.list(params)
   },
+  defaultParams: { page: 1, pageSize: 20, status: '', employeeId: '' },
 })
 
 const employeeOptions = ref<any[]>([])
@@ -295,8 +371,8 @@ const rules: FormRules = {
 const dialogTitle = computed(() => (editId.value ? '编辑借款单' : '新增借款单'))
 
 function onReset() {
-  query.status = ''
-  query.employeeId = ''
+  query.value.status = ''
+  query.value.employeeId = ''
   dateRange.value = null
   reset()
 }
@@ -444,6 +520,88 @@ async function onRemove(row: any) {
   } catch { /* 错误已提示 */ }
 }
 
+// ============ 导入借款单 ============
+const importVisible = ref(false)
+const importFileList = ref<any[]>([])
+const importParsing = ref(false)
+const importPreviewData = ref<any>(null)
+const importRows = ref<any[]>([])
+const importCommitting = ref(false)
+
+const importUnmatchedCount = computed(() =>
+  importRows.value.filter((r: any) => !r.employeeId).length,
+)
+
+function onImportFileChange(_file: any, files: any[]) {
+  importFileList.value = files
+  onImportParse()
+}
+
+function onImportFileRemove(_file: any, files: any[]) {
+  importFileList.value = files
+}
+
+async function onImportParse() {
+  const raw = importFileList.value.find((f: any) => f.raw instanceof File)?.raw as File | undefined
+  if (!raw) return
+  importParsing.value = true
+  try {
+    const res = await loanApi.importPreview(raw)
+    importPreviewData.value = res
+    importRows.value = (res.rows ?? []).map((r: any) => ({ ...r }))
+  } finally {
+    importParsing.value = false
+  }
+}
+
+function backToUpload() {
+  importPreviewData.value = null
+  importRows.value = []
+  importFileList.value = []
+}
+
+function onImportEmployeeChange(row: any) {
+  if (row.employeeId) row.message = ''
+}
+
+async function onImportCommit() {
+  const rows = importRows.value.filter((r: any) => r.matched && r.employeeId)
+  if (!rows.length) {
+    ElMessage.warning('没有可导入的行，请先为未匹配的借款人选择员工档案')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `将生成 ${rows.length} 条借款单草稿，审核后才会生成凭证，确认导入吗？`,
+      '确认导入',
+      { type: 'warning', confirmButtonText: '确认导入', cancelButtonText: '取消' },
+    )
+  } catch { return }
+  importCommitting.value = true
+  try {
+    const res = await loanApi.importCommit({
+      rows: rows.map((r: any) => {
+        const item: any = {
+          employeeId: r.employeeId,
+          loanDate: r.loanDate,
+          amount: Number(r.amount ?? 0),
+          payMethod: r.payMethod,
+        }
+        if (r.loanNo) item.loanNo = r.loanNo
+        if (r.reason) item.reason = r.reason
+        return item
+      }),
+    })
+    ok(`导入完成：生成 ${res.created} 条借款单草稿`)
+    if (res.failed) ElMessage.warning(`有 ${res.failed} 行导入失败`)
+    importVisible.value = false
+    backToUpload()
+    load()
+  } finally {
+    importCommitting.value = false
+  }
+}
+
 const detailVisible = ref(false)
 const detail = ref<any>(null)
 
@@ -471,6 +629,45 @@ function onExport() {
   ElMessage.success('导出成功')
 }
 
+// ============ 批量生成原始凭证 PDF ============
+const selected = ref<any[]>([])
+const pdfExporting = ref(false)
+
+async function onPdfPackage() {
+  const ids = selected.value.map((r: any) => r.id)
+  const count = ids.length || total.value
+  if (!count) {
+    ElMessage.warning('当前没有可导出的借款单')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      ids.length
+        ? `将把选中的 ${ids.length} 张借款单各生成一份 PDF（原始凭证存根）并打包为压缩包下载，解压后即可打印。继续吗？`
+        : `未勾选单据时将按当前筛选条件打包全部 ${total.value} 张借款单 PDF，继续吗？`,
+      '生成原始凭证 PDF',
+      { type: 'info', confirmButtonText: '生成并下载', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  pdfExporting.value = true
+  try {
+    const payload: Record<string, any> = ids.length
+      ? { ids }
+      : {
+          status: query.value.status || undefined,
+          employeeId: query.value.employeeId || undefined,
+          startDate: dateRange.value?.[0],
+          endDate: dateRange.value?.[1],
+        }
+    await loanApi.downloadPdfPackage(payload)
+    ok(`已生成 ${count} 张借款单 PDF 压缩包`)
+  } finally {
+    pdfExporting.value = false
+  }
+}
+
 onMounted(async () => {
   employeeOptions.value = await employeeApi.options()
   bankOptions.value = await bankApi.options()
@@ -481,6 +678,27 @@ onMounted(async () => {
 <style scoped lang="scss">
 .text-muted {
   color: #9ca3af;
+}
+
+.import-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.import-head__alert {
+  flex: 1;
+}
+.import-warning-text {
+  color: var(--el-color-warning);
+}
+.import-warning {
+  margin-top: 8px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  background: var(--el-color-danger-light-9);
+  color: var(--el-color-danger);
+  font-size: 12px;
 }
 
 .amount--outstanding {

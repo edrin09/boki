@@ -73,18 +73,22 @@
       <div class="page-pagination">
         <el-pagination v-model:current-page="query.page" v-model:page-size="query.pageSize"
           :page-sizes="[10, 20, 50]" :total="total" layout="total, sizes, prev, pager, next"
-          @current-change="load" @size-change="onReset" />
+          @current-change="load" @size-change="handleSize" />
       </div>
     </div>
 
     <!-- 上传弹窗 -->
     <el-dialog v-model="uploadVisible" title="上传票据，AI 自动识别并记账" width="760px" destroy-on-close @closed="onUploadClose">
-      <el-upload drag multiple :auto-upload="false" :limit="20" accept="image/jpeg,image/png,image/webp,image/bmp,image/tiff,application/pdf"
+      <el-upload drag multiple :auto-upload="false" :limit="20" webkitdirectory accept="image/jpeg,image/png,image/webp,image/bmp,image/tiff,application/pdf"
         :on-change="onFileChange" :on-remove="onFileRemove" :file-list="fileList" :on-exceed="onExceed">
         <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
-        <div class="el-upload__text">拖拽文件到此处，或<em>点击选择</em></div>
+        <div class="el-upload__text">拖拽文件到此处，或<em>点击选择文件夹</em></div>
         <template #tip>
-          <div class="el-upload__tip">支持 jpg/png/webp/bmp/tiff/pdf，单文件 ≤ 20MB，一次最多 20 个；识别结果进入「待确认」</div>
+          <div class="el-upload__tip">
+            支持 jpg/png/webp/bmp/tiff/pdf，单文件 ≤ 20MB，一次最多 20 个。
+            <strong>可直接选整个文件夹</strong>，系统递归读取并按文件夹名智能判断用途（采购/报销/工资/银行）与归属人；
+            识别结果进入「待确认」。
+          </div>
         </template>
       </el-upload>
       <template #footer>
@@ -235,7 +239,7 @@ const statusOptions = [
 
 const dateRange = ref<[string, string] | null>(null)
 
-const { list, total, loading, query, load, search, reset: onReset } = usePagedList({
+const { list, total, loading, query, load, search, handleSize, reset: onReset } = usePagedList({
   fetcher: (params) => receiptApi.list(params),
   defaultParams: { page: 1, pageSize: 20 },
 })
@@ -277,12 +281,23 @@ function onExceed() {
   ElMessage.warning('一次最多上传 20 个文件')
 }
 
+/** 与后端 ALLOWED_MIME 对齐的扩展名白名单（文件夹上传时 accept 不生效，需前端过滤） */
+const UPLOAD_EXT = /\.(jpe?g|png|webp|bmp|tiff|pdf)$/i
+
 async function onUpload() {
-  const raws: File[] = fileList.value.filter((f) => f.raw instanceof File).map((f) => f.raw as File)
-  if (!raws.length) return
+  const items = fileList.value.filter((f) => f.raw instanceof File)
+  if (!items.length) return
+  // 选文件夹时目录里的所有文件都会进列表，先按扩展名过滤，避免挤占 20 个名额还报错
+  const supported = items.filter((f) => UPLOAD_EXT.test(f.name))
+  const skipped = items.length - supported.length
+  if (skipped > 0) ElMessage.info(`已跳过 ${skipped} 个不支持的文件（仅支持 jpg/png/webp/bmp/tiff/pdf）`)
+  if (!supported.length) return
+  const raws: File[] = supported.map((f) => f.raw as File)
+  // 文件夹上传时带上每个文件的相对路径，供后端做目录智能判定
+  const paths = supported.map((f) => (f.raw as any).webkitRelativePath || null)
   uploading.value = true
   try {
-    const res = await receiptApi.upload(raws)
+    const res = await receiptApi.upload(raws, paths)
     results.value = res ?? []
     const drafted = draftedResults.value.length
     const pending = pendingResults.value.length

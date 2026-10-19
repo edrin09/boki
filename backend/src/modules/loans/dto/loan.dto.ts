@@ -12,6 +12,12 @@ import {
 
 /** 新增/编辑借款单 DTO */
 export class SaveLoanDto {
+  /** 借款单号（可选；缺省或重复时由后端自动生成） */
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  loanNo?: string
+
   @IsDateString({}, { message: '借款日期格式不正确' })
   loanDate: string
 

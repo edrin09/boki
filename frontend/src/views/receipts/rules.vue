@@ -64,7 +64,7 @@
       <div class="page-pagination">
         <el-pagination v-model:current-page="query.page" v-model:page-size="query.pageSize"
           :page-sizes="[10, 20, 50]" :total="total" layout="total, sizes, prev, pager, next"
-          @current-change="load" @size-change="onReset" />
+          @current-change="load" @size-change="handleSize" />
       </div>
     </div>
 
@@ -114,7 +114,7 @@ import { Search, Plus } from '@element-plus/icons-vue'
 import { accountApi, classifyRuleApi } from '@/api'
 import { usePagedList, ok, confirmDelete } from '@/composables/useList'
 
-const { list, total, loading, query, load, search, reset: onReset } = usePagedList({
+const { list, total, loading, query, load, search, handleSize, reset: onReset } = usePagedList({
   fetcher: (params) => classifyRuleApi.list(params),
   defaultParams: { page: 1, pageSize: 20 },
 })

@@ -14,14 +14,29 @@ import { requireCompanyId } from './company-context'
  *
  * 把用户自己写的 `where` / `andWhere` 原样转发，再统一追加
  * `company_id = 当前公司`，避免业务代码各处手工拼条件而漏写。
- * 用 `andWhere` 而非 `where`，因此不会覆盖调用方已有的条件。
+ *
+ * 注意 TypeORM 的 `where()` 语义是「清空整个 WHERE 树再设置」：代理
+ * 返回 qb 时公司条件已注入，业务代码若紧接着再调 `.where('v.period ...')`
+ * 会把公司条件无声清掉，造成跨公司数据泄漏。因此包装 `where`：
+ * 先按 TypeORM 原语义重置业务条件，随后立即重新追加公司条件，
+ * 保证最终 SQL 恒为 `业务条件 AND company_id = 当前公司`。
  */
 function withCompanyScope<T extends ObjectLiteral>(
   qb: SelectQueryBuilder<T>,
   companyId: string,
 ): SelectQueryBuilder<T> {
-  const alias = qb.alias
-  return qb.andWhere(`${alias}.company_id = :__companyId`, { __companyId: companyId })
+  const companyCond = `${qb.alias}.company_id = :__companyId`
+  const companyParams = { __companyId: companyId }
+
+  qb.andWhere(companyCond, companyParams)
+
+  const originalWhere = qb.where.bind(qb) as (...a: any[]) => any
+  ;(qb as any).where = (...args: any[]) => {
+    const result = originalWhere(...args)
+    qb.andWhere(companyCond, companyParams)
+    return result
+  }
+  return qb
 }
 
 /**
@@ -48,15 +63,23 @@ export class CompanyScopedRepository<T extends ObjectLiteral> {
   createQueryBuilder(alias?: string, qb?: SelectQueryBuilder<T>): SelectQueryBuilder<T> {
     const built = this.repo.createQueryBuilder(alias as any, qb as any) as SelectQueryBuilder<T>
     if (!alias) {
-      // 无别名时（如 from('table','x')）在 where 处补条件
+      // 无别名时（如 from('table','x')）在 from 处补条件；
+      // 同样包装 where，避免业务代码调用 where() 清掉公司条件。
+      const companyCondOf = (tableAlias: string) =>
+        `${tableAlias}.company_id = :__companyId`
+
       const originalFrom = built.from.bind(built)
       ;(built as any).from = (...args: any[]) => {
         const result = originalFrom(...args)
         const tableAlias = args[1]
         if (tableAlias) {
-          built.andWhere(`${tableAlias}.company_id = :__companyId`, {
-            __companyId: requireCompanyId(),
-          })
+          built.andWhere(companyCondOf(tableAlias), { __companyId: requireCompanyId() })
+          const originalWhere = built.where.bind(built) as (...a: any[]) => any
+          ;(built as any).where = (...wArgs: any[]) => {
+            const wResult = originalWhere(...wArgs)
+            built.andWhere(companyCondOf(tableAlias), { __companyId: requireCompanyId() })
+            return wResult
+          }
         }
         return result
       }

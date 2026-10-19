@@ -71,10 +71,19 @@ export class BankStmtController {
   @Operation('流水行入账')
   book(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: { bizType: string; accountId: string; summary?: string },
+    @Body() dto: { bizType: string; accountId: string; partnerId?: string; employeeId?: string; summary?: string },
     @Req() req: Request,
   ) {
     return this.service.book(id, dto, this.operator(req))
+  }
+
+  /** 一键智能批量入账：高置信建议行（利息/手续费/员工往来/回款/工资等）自动入账 */
+  @Post('batch-book')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('bank-stmt:book')
+  @Operation('智能批量入账')
+  batchBook(@Req() req: Request) {
+    return this.service.batchBook(this.operator(req))
   }
 
   @Post(':id/skip')

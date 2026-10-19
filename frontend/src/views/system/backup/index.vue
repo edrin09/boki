@@ -17,7 +17,9 @@
           <el-table v-loading="loading" :data="backups" empty-text="暂无备份">
             <el-table-column prop="filename" label="文件名" min-width="220" />
             <el-table-column prop="sizeText" label="大小" width="110" />
-            <el-table-column prop="createdAt" label="备份时间" width="170" />
+            <el-table-column label="备份时间" width="150">
+              <template #default="{ row }">{{ formatDate(row.createdAt, 'YYYY-MM-DD HH:mm') }}</template>
+            </el-table-column>
             <el-table-column label="操作" width="160" fixed="right">
               <template #default="{ row }">
                 <el-button
@@ -66,6 +68,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import { systemApi } from '@/api'
 import { confirmDelete, ok } from '@/composables/useList'
+import { formatDate } from '@/utils/format'
 
 const backups = ref<any[]>([])
 const loading = ref(false)

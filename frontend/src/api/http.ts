@@ -83,6 +83,13 @@ service.interceptors.response.use(
       return Promise.reject(new ApiError(body?.message || '登录已过期，请重新登录', 401))
     }
 
+    // 超时/断网等无响应错误：给出可读的中文提示，避免暴露 axios 原始英文
+    if (!status && /timeout/i.test(error?.message ?? '')) {
+      const message = '请求超时，请稍后重试'
+      ElMessage.error(message)
+      return Promise.reject(new ApiError(message, 0))
+    }
+
     const message =
       body?.message ??
       (status ? `请求失败（HTTP ${status}）` : error?.message || '网络异常，请检查后端服务')
@@ -133,6 +140,24 @@ export async function download(url: string, params?: Record<string, any>, filena
   link.download = filename ?? 'download'
   link.click()
   URL.revokeObjectURL(link.href)
+}
+
+/** POST 下载文件（带 Token，用于批量导出等需要传 body 的下载接口） */
+export async function downloadPost(url: string, data?: any, filename?: string) {
+  const res = await service.post(url, data, { responseType: 'blob' })
+  const blob = new Blob([res.data])
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = filename ?? 'download'
+  link.click()
+  URL.revokeObjectURL(link.href)
+}
+
+/** 当前时间戳（文件名用） */
+export function fileStamp(): string {
+  const d = new Date()
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
 }
 
 export default service

@@ -1,11 +1,13 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import { Brackets } from 'typeorm'
-import { Employee, ExpenseClaim, PayrollItem } from '../../entities/hr.entity'
+import { Employee, ExpenseClaim, PayrollItem, Loan } from '../../entities/hr.entity'
 import { Department } from '../../entities/department.entity'
-import { EmployeeStatus } from '../../common/enums'
+import { EmployeeStatus, LoanStatus } from '../../common/enums'
 import { CODE_PREFIX, nextCode } from '../../common/utils/code.util'
+import { toCents } from '../../common/utils/money.util'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
 import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
+import { EmployeeSettlementService } from '../loans/employee-settlement.service'
 import type { PageResult, PaginationQueryDto } from '../../common/dto/pagination.dto'
 import type { CreateEmployeeDto, UpdateEmployeeDto } from './dto/employee.dto'
 
@@ -26,6 +28,8 @@ export class EmployeesService {
     @InjectCompanyRepo(ExpenseClaim) private readonly claimRepo: CompanyScopedRepository<ExpenseClaim>,
     @InjectCompanyRepo(PayrollItem)
     private readonly payrollItemRepo: CompanyScopedRepository<PayrollItem>,
+    @InjectCompanyRepo(Loan) private readonly loanRepo: CompanyScopedRepository<Loan>,
+    private readonly settlementService: EmployeeSettlementService,
   ) {}
 
   async findAll(
@@ -62,8 +66,12 @@ export class EmployeesService {
       .getManyAndCount()
 
     const deptNames = await this.loadDeptNames()
+    // 当前欠款余额（仅已发放借款单），一次查出本页员工的余额避免逐行查询
+    const balances = await this.settlementService.outstandingMapByEmployees(
+      list.map((e) => e.id),
+    )
     return {
-      list: list.map((e) => this.toVo(e, deptNames)),
+      list: list.map((e) => this.toVo(e, deptNames, balances.get(e.id) ?? 0)),
       total,
       page,
       pageSize,
@@ -82,7 +90,64 @@ export class EmployeesService {
     const employee = await this.repo.findOne({ where: { id } })
     if (!employee) throw new NotFoundException('员工不存在')
     const deptNames = await this.loadDeptNames()
-    return this.toVo(employee, deptNames)
+    const balances = await this.settlementService.outstandingMapByEmployees([id])
+    return this.toVo(employee, deptNames, balances.get(id) ?? 0)
+  }
+
+  /**
+   * 员工欠款明细：借款单列表 + 核销流水 + 汇总。
+   * 已清偿金额拆分为「现金/银行还款」与「报销等非现金抵充」，欠款余额 = 借款总额 - 两者之和。
+   */
+  async findDebts(id: string): Promise<any> {
+    const employee = await this.repo.findOne({ where: { id } })
+    if (!employee) throw new NotFoundException('员工不存在')
+
+    // 借款单：包含已还清的，便于追溯；待审核/已驳回尚未出账不计欠款
+    const loans = await this.loanRepo.find({
+      where: { employeeId: id },
+      order: { loanDate: 'DESC', createdAt: 'DESC' },
+    })
+    const loanRows = loans.map((l) => {
+      const outstandingCents = [LoanStatus.APPROVED, LoanStatus.REPAID].includes(l.status as LoanStatus)
+        ? Math.max(0, toCents(Number(l.amount)) - toCents(Number(l.repaidAmount ?? 0)) - toCents(Number(l.offsetAmount ?? 0)))
+        : 0
+      return {
+        id: l.id,
+        loanNo: l.loanNo,
+        loanDate: l.loanDate,
+        amount: l.amount,
+        repaidAmount: l.repaidAmount ?? 0,
+        offsetAmount: l.offsetAmount ?? 0,
+        outstanding: outstandingCents / 100,
+        status: l.status,
+        reason: l.reason,
+      }
+    })
+
+    // 核销流水：每笔还款/抵充（还了多少钱、走的什么途径）
+    const settlementsPage = await this.settlementService.settlements({
+      page: 1,
+      pageSize: 500,
+      employeeId: id,
+    } as any)
+
+    const summary = loanRows.reduce(
+      (acc, l) => {
+        acc.loanTotal = Math.round((acc.loanTotal + Number(l.amount)) * 100) / 100
+        acc.repaidTotal = Math.round((acc.repaidTotal + Number(l.repaidAmount)) * 100) / 100
+        acc.offsetTotal = Math.round((acc.offsetTotal + Number(l.offsetAmount)) * 100) / 100
+        acc.balance = Math.round((acc.balance + Number(l.outstanding)) * 100) / 100
+        return acc
+      },
+      { loanTotal: 0, repaidTotal: 0, offsetTotal: 0, balance: 0 },
+    )
+
+    return {
+      employee: { id: employee.id, code: employee.code, name: employee.name, status: employee.status },
+      loans: loanRows,
+      settlements: settlementsPage.list,
+      summary,
+    }
   }
 
   /** 预览下一个可用工号 */
@@ -101,6 +166,7 @@ export class EmployeesService {
       code,
       name: dto.name,
       gender: dto.gender ?? 'unknown',
+      employmentType: dto.employmentType ?? 'full_time',
       departmentId: dto.departmentId || null,
       position: dto.position ?? null,
       idCard: dto.idCard ?? null,
@@ -143,8 +209,18 @@ export class EmployeesService {
     const employee = await this.findEntity(id)
     if (dto.departmentId) await this.assertDeptExists(dto.departmentId)
 
+    // 办理离职前必须结清欠款：有未还清借款（或工资扣回未登记完）不允许离职
+    if (
+      dto.status !== undefined &&
+      dto.status !== employee.status &&
+      dto.status === EmployeeStatus.LEFT
+    ) {
+      await this.assertNoOutstanding(employee)
+    }
+
     if (dto.name !== undefined) employee.name = dto.name
     if (dto.gender !== undefined) employee.gender = dto.gender
+    if (dto.employmentType !== undefined) employee.employmentType = dto.employmentType
     if (dto.departmentId !== undefined) employee.departmentId = dto.departmentId || null
     if (dto.position !== undefined) employee.position = dto.position || null
     if (dto.idCard !== undefined) employee.idCard = dto.idCard || null
@@ -165,7 +241,8 @@ export class EmployeesService {
 
   async remove(id: string): Promise<{ message: string }> {
     const employee = await this.findEntity(id)
-    void employee
+
+    await this.assertNoOutstanding(employee)
 
     const usedClaim = await this.claimRepo.count({ where: { employeeId: id } })
     if (usedClaim > 0) {
@@ -198,12 +275,24 @@ export class EmployeesService {
     return new Map(depts.map((d) => [d.id, d.name]))
   }
 
-  private toVo(employee: Employee, deptNames: Map<string, string>): any {
+  /** 校验员工无未还清欠款（办理离职 / 删除档案前调用） */
+  private async assertNoOutstanding(employee: Employee): Promise<void> {
+    const balances = await this.settlementService.outstandingMapByEmployees([employee.id])
+    const balance = balances.get(employee.id) ?? 0
+    if (balance > 0) {
+      throw new ConflictException(
+        `员工「${employee.name}」尚有未还清借款 ${balance.toFixed(2)} 元，须先还款、报销抵充或工资扣回结清后才能办理`,
+      )
+    }
+  }
+
+  private toVo(employee: Employee, deptNames: Map<string, string>, loanBalance = 0): any {
     return {
       id: employee.id,
       code: employee.code,
       name: employee.name,
       gender: employee.gender,
+      employmentType: employee.employmentType ?? 'full_time',
       departmentId: employee.departmentId,
       departmentName: employee.departmentId ? (deptNames.get(employee.departmentId) ?? null) : null,
       position: employee.position,
@@ -216,6 +305,7 @@ export class EmployeesService {
       bankName: employee.bankName,
       bankAccount: employee.bankAccount,
       status: employee.status,
+      loanBalance,
       remark: employee.remark,
       createdAt: employee.createdAt,
     }

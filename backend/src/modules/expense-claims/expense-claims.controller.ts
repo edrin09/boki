@@ -1,24 +1,37 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
   Put,
   Query,
   Req,
+  Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common'
-import type { Request } from 'express'
+import type { Request, Response } from 'express'
+import dayjs from 'dayjs'
+import { FileInterceptor } from '@nestjs/platform-express'
+import { memoryStorage } from 'multer'
 import { ExpenseClaimsService } from './expense-claims.service'
+import { ExpenseClaimsImportService } from './expense-claims-import.service'
+import { HrDocPdfService } from '../../common/pdf/hr-doc-pdf.service'
+import { sendZipResponse, zipEntries, type ZipEntry } from '../../common/pdf/zip.util'
 import {
   PayExpenseClaimDto,
   RejectExpenseClaimDto,
   SaveExpenseClaimDto,
 } from './dto/expense-claim.dto'
+import { CommitClaimsImportDto } from './dto/expense-claim-import.dto'
+import { HrPdfPackageDto } from '../../common/dto/pdf-package.dto'
 import { PaginationQueryDto } from '../../common/dto/pagination.dto'
 import { RequirePermissions } from '../../common/decorators/permissions.decorator'
 import { Operation } from '../../common/decorators/operation.decorator'
@@ -26,7 +39,11 @@ import { getCurrentUser } from '../../common/utils/request.util'
 
 @Controller('expense-claims')
 export class ExpenseClaimsController {
-  constructor(private readonly service: ExpenseClaimsService) {}
+  constructor(
+    private readonly service: ExpenseClaimsService,
+    private readonly importService: ExpenseClaimsImportService,
+    private readonly pdfService: HrDocPdfService,
+  ) {}
 
   @Get()
   @RequirePermissions('hr:expense-claim')
@@ -56,12 +73,56 @@ export class ExpenseClaimsController {
     return this.service.findOne(id)
   }
 
+  /** 批量生成原始凭证 PDF 压缩包（ids 优先，否则按筛选条件，最多 300 张） */
+  @Post('pdf-package')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('hr:expense-claim')
+  @Operation('批量生成报销单PDF（原始凭证存根）')
+  async pdfPackage(@Body() dto: HrPdfPackageDto, @Res() res: Response) {
+    const docs = await this.service.findForPdfExport(dto)
+    if (!docs.length) throw new NotFoundException('没有符合条件的报销单')
+    const entries: ZipEntry[] = []
+    for (const { claim, items } of docs) {
+      const buffer = await this.pdfService.expenseClaimPdf(claim, items)
+      entries.push({
+        name: `${claim.claimNo}_${claim.employeeName}_${claim.claimDate}.pdf`,
+        buffer,
+      })
+    }
+    const zip = await zipEntries(entries)
+    sendZipResponse(res, zip, `报销单原始凭证_${dayjs().format('YYYYMMDD_HHmmss')}.zip`)
+  }
+
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @RequirePermissions('hr:expense-claim:create')
   @Operation('新增报销单')
   create(@Body() dto: SaveExpenseClaimDto, @Req() req: Request) {
     return this.service.create(dto, this.operator(req))
+  }
+
+  @Post('import')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('hr:expense-claim:create')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      defParamCharset: 'utf8',
+      limits: { fileSize: 20 * 1024 * 1024 },
+    }),
+  )
+  @Operation('导入报销单（预览解析）')
+  importFile(@UploadedFile() file?: Express.Multer.File) {
+    if (!file) throw new BadRequestException('请上传报销单文件（Excel/CSV）')
+    return this.importService.parseFile(file.buffer, file.originalname)
+  }
+
+  @Post('import/commit')
+  @HttpCode(HttpStatus.CREATED)
+  @RequirePermissions('hr:expense-claim:create')
+  @Operation('确认导入报销单（生成草稿）')
+  importCommit(@Body() dto: CommitClaimsImportDto, @Req() req: Request) {
+    return this.importService.commit(dto, this.operator(req))
   }
 
   @Put(':id')

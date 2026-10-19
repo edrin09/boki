@@ -7,6 +7,7 @@ import { Receipt } from '../../entities/receipt.entity'
 import { Partner } from '../../entities/partner.entity'
 import { Payroll, ExpenseClaim } from '../../entities/hr.entity'
 import { BooksModule } from '../books/books.module'
+import { FixedExpenseModule } from '../fixed-expense/fixed-expense.module'
 import { ReportsService } from './reports.service'
 import { AnalysisService } from './analysis.service'
 import { ReportsController } from './reports.controller'
@@ -15,6 +16,7 @@ import { ReportsController } from './reports.controller'
   imports: [
     TypeOrmModule.forFeature([Account, Voucher, VoucherEntry, Receipt, Partner, Payroll, ExpenseClaim]),
     BooksModule,
+    FixedExpenseModule,
   ],
   controllers: [ReportsController],
   providers: [ReportsService, AnalysisService],

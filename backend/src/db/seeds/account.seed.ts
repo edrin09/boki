@@ -42,10 +42,12 @@ export const ACCOUNT_SEED: SeedAccountNode[] = [
   { code: '1131', name: '应收股利', direction: D, auxiliaryTypes: [AuxiliaryType.PARTNER], sort: 14 },
   { code: '1132', name: '应收利息', direction: D, auxiliaryTypes: [AuxiliaryType.PARTNER], sort: 15 },
   {
-    // 不强制「往来单位」辅助核算：员工垫付报销等场景对手方是员工而非往来单位
+    // 员工垫付/借款等场景对手方是员工，挂「员工」辅助核算以便按员工拆分往来余额
+    // （不强制「往来单位」辅助核算：对手方不是往来单位）
     code: '1221',
     name: '其他应收款',
     direction: D,
+    auxiliaryTypes: [AuxiliaryType.EMPLOYEE],
     sort: 20,
   },
   { code: '1231', name: '坏账准备', direction: C, sort: 21 },

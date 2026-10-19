@@ -52,6 +52,18 @@ async function bootstrap(): Promise<void> {
   const port = Number(process.env.APP_PORT || 3000)
   await app.listen(port, '0.0.0.0')
 
+  // 流式语音识别 WebSocket（同端口、/api/voice/stream，握手校验 JWT）
+  const { VoiceAsrService } = await import('./modules/voice-assistant/voice-asr.service')
+  const { createVoiceStreamServer } = await import('./modules/voice-assistant/voice-stream.server')
+  const { JwtService } = await import('@nestjs/jwt')
+  createVoiceStreamServer(
+    app.getHttpServer(),
+    app.get(VoiceAsrService, { strict: false }),
+    app.get(JwtService, { strict: false }),
+    prefix,
+    (err) => logger.warn(`语音流会话异常: ${err.message}`),
+  )
+
   logger.log(`应用已启动: http://localhost:${port}/${prefix}`)
   logger.log(`接口文档: http://localhost:${port}/${prefix}`)
 }

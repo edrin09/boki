@@ -243,6 +243,12 @@ export class BankStmtRow extends BaseEntity {
   @Column({ name: 'suggest_partner_id', type: 'varchar', nullable: true, comment: '建议往来单位ID' })
   suggestPartnerId: string | null
 
+  @Column({ name: 'suggest_employee_id', type: 'varchar', nullable: true, comment: '建议员工ID（对方户名命中员工时）' })
+  suggestEmployeeId: string | null
+
+  @Column({ name: 'auto_bookable', type: 'integer', default: 0, comment: '高置信建议：1=可一键智能批量入账' })
+  autoBookable: number
+
   @Column({ name: 'cash_flow_id', type: 'varchar', nullable: true, comment: '生成的资金单据ID' })
   cashFlowId: string | null
 

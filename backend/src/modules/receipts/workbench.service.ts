@@ -3,10 +3,13 @@ import { Receipt } from '../../entities/receipt.entity'
 import { ClassifyRule } from '../../entities/classify-rule.entity'
 import { Account } from '../../entities/account.entity'
 import { Department } from '../../entities/department.entity'
+import { Employee } from '../../entities/hr.entity'
 import { Voucher } from '../../entities/voucher.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
 import {
   AuxiliaryType,
+  EmployeeStatus,
+  ExpenseClaimStatus,
   ReceiptStatus,
   VoucherStatus,
   VoucherWord,
@@ -15,6 +18,9 @@ import { toCents, fromCents } from '../../common/utils/money.util'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
 import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { VouchersService } from '../vouchers/vouchers.service'
+import { EmployeeSettlementService } from '../loans/employee-settlement.service'
+import { ExpenseClaimsService } from '../expense-claims/expense-claims.service'
+import { parseFolderIntent } from './folder-intent.util'
 import { PartySyncService } from './party-sync.service'
 import { ClassifyService, ClassifySuggestion, DraftEntryTemplate } from './classify.service'
 import { recoverFilename } from '../../common/utils/filename.util'
@@ -40,11 +46,14 @@ export class ReceiptWorkbenchService {
     @InjectCompanyRepo(ClassifyRule) private readonly ruleRepo: CompanyScopedRepository<ClassifyRule>,
     @InjectCompanyRepo(Account) private readonly accountRepo: CompanyScopedRepository<Account>,
     @InjectCompanyRepo(Department) private readonly deptRepo: CompanyScopedRepository<Department>,
+    @InjectCompanyRepo(Employee) private readonly employeeRepo: CompanyScopedRepository<Employee>,
     @InjectCompanyRepo(Voucher) private readonly voucherRepo: CompanyScopedRepository<Voucher>,
     @InjectCompanyRepo(VoucherEntry) private readonly entryRepo: CompanyScopedRepository<VoucherEntry>,
     private readonly classify: ClassifyService,
     private readonly vouchers: VouchersService,
     private readonly partySync: PartySyncService,
+    private readonly settlementService: EmployeeSettlementService,
+    private readonly expenseClaims: ExpenseClaimsService,
   ) {}
 
   // ==================== 查询 ====================
@@ -93,6 +102,16 @@ export class ReceiptWorkbenchService {
       await this.partySync.syncBoth(this.parseFields(receipt))
     } catch (err) {
       this.logger.warn(`票据 ${id} 往来单位同步失败: ${(err as Error).message}`)
+    }
+
+    // 目录归属员工（采购/报销目录 + 在职员工）→ 改走报销单流程：
+    // 有未还清借款先生成「冲抵借款型」，票额超出/无借款的部分生成「直接付款型」；
+    // 目录判不出归属人等情况返回 null，回落到原凭证草稿流程
+    const folderClaims = await this.tryCreateFolderClaims(receipt, suggestion, operator)
+    if (folderClaims) {
+      receipt.status = ReceiptStatus.DRAFTED
+      await this.receiptRepo.save(receipt)
+      return this.detail(id)
     }
 
     const { rows: entries, isRed } = await this.buildEntries(receipt, suggestion)
@@ -160,12 +179,37 @@ export class ReceiptWorkbenchService {
 
   // ==================== 确认 / 驳回 ====================
 
-  /** 确认入账：审核关联草稿凭证 + 状态流转 + 修正回写 */
+  /** 确认入账：审核关联草稿凭证/报销单 + 状态流转 + 修正回写 */
   async confirm(id: string, operator: Operator): Promise<any> {
     const receipt = await this.findEntity(id)
-    if (receipt.status !== ReceiptStatus.DRAFTED || !receipt.voucherId) {
+    if (receipt.status !== ReceiptStatus.DRAFTED || (!receipt.voucherId && !receipt.claimIds)) {
       throw new BadRequestException('该票据没有待确认的凭证草稿，请先生成草稿')
     }
+
+    // 目录归属员工流程：审核关联报销单（报销单审核时生成并审核凭证、登记借款核销）
+    if (receipt.claimIds) {
+      let mainVoucherId: string | null = null
+      for (const cid of this.claimIdListOf(receipt)) {
+        const claim = await this.expenseClaims.findOne(cid).catch(() => null)
+        if (!claim) continue
+        if (claim.status === ExpenseClaimStatus.DRAFT) {
+          const approved = await this.expenseClaims.approve(cid, operator)
+          if (!mainVoucherId) mainVoucherId = approved.voucherId ?? null
+        } else if (claim.status === ExpenseClaimStatus.REJECTED) {
+          throw new BadRequestException(`关联报销单 ${claim.claimNo} 已驳回，请重新生成草稿后再确认`)
+        } else if (!mainVoucherId) {
+          mainVoucherId = claim.voucherId ?? null
+        }
+      }
+      receipt.status = ReceiptStatus.CONFIRMED
+      receipt.confirmedBy = operator.id
+      receipt.confirmedByName = operator.nickname
+      receipt.confirmedAt = new Date()
+      if (mainVoucherId) receipt.voucherId = mainVoucherId
+      await this.receiptRepo.save(receipt)
+      return this.detail(id)
+    }
+
     const linked = await this.voucherRepo.findOne({ where: { id: receipt.voucherId } })
     if (!linked || linked.status !== VoucherStatus.DRAFT) {
       throw new BadRequestException('关联凭证状态异常，无法确认入账')
@@ -211,6 +255,20 @@ export class ReceiptWorkbenchService {
     }
     if (receipt.status !== ReceiptStatus.PARSED && receipt.status !== ReceiptStatus.DRAFTED) {
       throw new BadRequestException('当前状态不支持驳回')
+    }
+
+    // 目录归属员工流程：删除草稿报销单（已审核的报销单要求先在报销单中处理）
+    if (receipt.claimIds) {
+      for (const cid of this.claimIdListOf(receipt)) {
+        const claim = await this.expenseClaims.findOne(cid).catch(() => null)
+        if (!claim) continue
+        if (claim.status === ExpenseClaimStatus.DRAFT) {
+          await this.expenseClaims.remove(cid)
+        } else if (claim.status !== ExpenseClaimStatus.REJECTED) {
+          throw new BadRequestException(`关联报销单 ${claim.claimNo} 已审核，请先在报销单中删除后再驳回`)
+        }
+      }
+      receipt.claimIds = null
     }
 
     if (receipt.voucherId) {
@@ -313,6 +371,220 @@ export class ReceiptWorkbenchService {
         credit: r.direction === 'credit' ? r.amount : undefined,
       })),
       isRed,
+    }
+  }
+
+  // ==================== 目录归属员工 → 报销单 ====================
+
+  /**
+   * 归属员工的采购/报销票改走报销单流程（取代旧的直接拆贷方 1221 出凭证）。
+   *
+   * 财务口径：员工借款采购后拿票报销 → 借 库存/费用（+进项税）/ 贷 其他应收款-员工，
+   * 不能既冲借款又付现金（重复付款）。归属员工解析优先级：
+   * 1. 目录命名「采购单|报销/员工名/」；
+   * 2. 个人抬头自动判定（买方命中在职员工，classify.suggestion.ownerName）。
+   * 按归属员工：
+   * - 有未还清借款：先生成「冲抵借款型」报销单（min(票额, 欠款总额)，审核时 FIFO 冲减借款）；
+   * - 票额超出欠款或无借款：超出部分生成「直接付款型」报销单（垫付挂账，审核后付款给员工）。
+   * 红字发票不参与冲抵，仍走原凭证流程。
+   *
+   * @returns 生成的报销单列表；判不出归属员工/归类无借方明细时返回 null（走凭证流程）
+   */
+  private async tryCreateFolderClaims(
+    receipt: Receipt,
+    suggestion: ClassifySuggestion,
+    operator: Operator,
+  ): Promise<any[] | null> {
+    const folder = parseFolderIntent(receipt.folderPath)
+    const folderOwner =
+      folder.purpose === 'purchase' || folder.purpose === 'expense' ? folder.ownerName : null
+    const ownerName = folderOwner ?? suggestion.ownerName ?? null
+    if (!ownerName) return null
+
+    const employee = await this.employeeRepo.findOne({
+      where: { name: ownerName, status: EmployeeStatus.ON_JOB },
+    })
+    if (!employee) return null
+
+    // 红字发票不冲抵（红冲方向相反，应由人工处理）
+    const fields = this.parseFields(receipt)
+    const total =
+      this.num(fields.total_amount) ?? (this.num(fields.amount) ?? 0) + (this.num(fields.tax_amount) ?? 0)
+    if (this.isRedInvoice(fields, total)) return null
+
+    const items = await this.buildClaimItems(receipt, suggestion)
+    if (!items.length) return null
+
+    // 重新生成前校验：关联报销单/凭证必须仍在草稿态
+    await this.assertDraftArtifactsReplaceable(receipt)
+
+    // 员工未还清借款总额（分）
+    const balances = await this.settlementService.outstandingMapByEmployees([employee.id])
+    const outstandingCents = toCents(balances.get(employee.id) ?? 0)
+
+    const totalCents = items.reduce((sum, i) => sum + toCents(i.amount), 0)
+    if (totalCents <= 0) return null
+
+    const fileName = recoverFilename(receipt.fileName) ?? receipt.fileName
+    const baseRemark = (
+      folderOwner
+        ? `目录「${folder.raw || folder.purposeLabel}」导入（${fileName}）`
+        : `个人抬头票（买方 ${ownerName}）导入（${fileName}）`
+    ).slice(0, 180)
+    const claimDate = receipt.issueDate ?? new Date().toISOString().slice(0, 10)
+    const claims: any[] = []
+
+    // 1) 先冲抵借款：票额与未还清借款取小，生成冲抵借款型报销单（审核时贷 1221、FIFO 核销）
+    const offsetCents = Math.min(totalCents, Math.max(0, outstandingCents))
+    if (offsetCents > 0) {
+      claims.push(
+        await this.expenseClaims.create(
+          {
+            claimDate,
+            employeeId: employee.id,
+            payMethod: 'advance',
+            claimType: 'loan_offset',
+            items: this.scaleClaimItems(items, offsetCents),
+            remark: `${baseRemark}，冲抵借款`,
+          },
+          operator,
+        ),
+      )
+    }
+    // 2) 超出借款（或无借款）的部分：直接付款型报销单（员工垫付挂账，审核后付款给员工）
+    const restCents = totalCents - offsetCents
+    if (restCents > 0) {
+      claims.push(
+        await this.expenseClaims.create(
+          {
+            claimDate,
+            employeeId: employee.id,
+            payMethod: 'advance',
+            claimType: 'payment',
+            items: this.scaleClaimItems(items, restCents),
+            remark: offsetCents > 0 ? `${baseRemark}，超出借款部分待付员工` : baseRemark,
+          },
+          operator,
+        ),
+      )
+    }
+
+    // 替换旧草稿后指向新报销单
+    await this.clearDraftArtifacts(receipt)
+    receipt.claimIds = JSON.stringify(claims.map((c) => c.id))
+    receipt.voucherId = null
+    return claims
+  }
+
+  /**
+   * 从归类模板提取报销单费用明细（仅借方行：库存/费用/进项税），
+   * 并把合计校正到价税合计（尾差摊到第一条非税行）。
+   */
+  private async buildClaimItems(
+    receipt: Receipt,
+    suggestion: ClassifySuggestion,
+  ): Promise<Array<{ summary: string; accountId: string; amount: number; isTax: boolean }>> {
+    const fields = this.parseFields(receipt)
+    const total =
+      this.num(fields.total_amount) ?? (this.num(fields.amount) ?? 0) + (this.num(fields.tax_amount) ?? 0)
+    const tax = this.num(fields.tax_amount) ?? 0
+    const net = total - tax
+
+    const items: Array<{ summary: string; accountId: string; amount: number; isTax: boolean }> = []
+    for (const tpl of suggestion.entries) {
+      if (tpl.direction !== 'debit') continue
+      const account = await this.requireLeafAccount(tpl.accountCode)
+      const amount = Math.abs(this.resolveAmount(tpl.amountSource, fields, { total, net, tax }))
+      if (amount <= 0) continue
+      items.push({
+        summary: (tpl.summary || suggestion.counterparty || '').slice(0, 200),
+        accountId: account.id,
+        amount: fromCents(toCents(amount)),
+        isTax: tpl.amountSource === 'tax_amount',
+      })
+    }
+    if (!items.length) return []
+
+    const sum = items.reduce((s, i) => s + toCents(i.amount), 0)
+    const diff = toCents(total) - sum
+    if (diff !== 0) {
+      const target = items.find((i) => !i.isTax) ?? items[0]
+      target.amount = fromCents(Math.max(0, toCents(target.amount) + diff))
+    }
+    return items
+  }
+
+  /** 按目标金额（分）等比拆分明细，尾差落在最后一行（报销单拆分冲抵/付款两段时用） */
+  private scaleClaimItems(
+    items: Array<{ summary: string; accountId: string; amount: number; isTax: boolean }>,
+    targetCents: number,
+  ): Array<{ summary: string; accountId: string; amount: number }> {
+    const totalCents = items.reduce((s, i) => s + toCents(i.amount), 0)
+    let used = 0
+    const rows = items.map((item, idx) => {
+      let cents: number
+      if (idx === items.length - 1) {
+        cents = targetCents - used
+      } else {
+        cents = Math.floor((toCents(item.amount) * targetCents) / totalCents)
+      }
+      used += cents
+      return { summary: item.summary, accountId: item.accountId, amount: fromCents(cents) }
+    })
+    return rows.filter((r) => toCents(r.amount) > 0)
+  }
+
+  /** 重新生成前校验：关联报销单不能已审核/已付款，关联凭证必须还是草稿 */
+  private async assertDraftArtifactsReplaceable(receipt: Receipt): Promise<void> {
+    if (receipt.claimIds) {
+      for (const cid of this.claimIdListOf(receipt)) {
+        const claim = await this.expenseClaims.findOne(cid).catch(() => null)
+        if (
+          claim &&
+          (claim.status === ExpenseClaimStatus.APPROVED || claim.status === ExpenseClaimStatus.PAID)
+        ) {
+          throw new BadRequestException(
+            `关联报销单 ${claim.claimNo} 已审核，不能重新生成草稿；请先在报销单中删除`,
+          )
+        }
+      }
+    }
+    if (receipt.voucherId) {
+      const linked = await this.voucherRepo.findOne({ where: { id: receipt.voucherId } })
+      if (linked && linked.status !== VoucherStatus.DRAFT) {
+        throw new BadRequestException('关联凭证已审核或作废，不能重新生成草稿')
+      }
+    }
+  }
+
+  /** 清掉旧草稿：删除草稿态报销单与草稿凭证（已审核的报销单/凭证由校验先行拦截） */
+  private async clearDraftArtifacts(receipt: Receipt): Promise<void> {
+    if (receipt.claimIds) {
+      for (const cid of this.claimIdListOf(receipt)) {
+        const claim = await this.expenseClaims.findOne(cid).catch(() => null)
+        if (claim && claim.status === ExpenseClaimStatus.DRAFT) {
+          await this.expenseClaims.remove(cid)
+        }
+      }
+      receipt.claimIds = null
+    }
+    if (receipt.voucherId) {
+      const linked = await this.voucherRepo.findOne({ where: { id: receipt.voucherId } })
+      if (linked && linked.status === VoucherStatus.DRAFT) {
+        await this.vouchers.remove(linked.id)
+      }
+      receipt.voucherId = null
+    }
+  }
+
+  /** 解析票据上关联的报销单ID列表（JSON 数组，容错解析） */
+  private claimIdListOf(receipt: Receipt): string[] {
+    if (!receipt.claimIds) return []
+    try {
+      const arr = JSON.parse(receipt.claimIds)
+      return Array.isArray(arr) ? arr.filter((x) => typeof x === 'string') : []
+    } catch {
+      return []
     }
   }
 
@@ -481,6 +753,8 @@ export class ReceiptWorkbenchService {
               accountCode: e.accountCode,
               accountName: e.accountName,
               partnerId: e.partnerId,
+              employeeId: e.employeeId,
+              employeeName: e.employeeName,
               debit: e.debit,
               credit: e.credit,
               sort: e.sort,
@@ -489,6 +763,15 @@ export class ReceiptWorkbenchService {
         }
       } catch {
         draft = null
+      }
+    }
+
+    // 目录归属员工流程：带出关联报销单（含类型/金额/状态）供工作台展示
+    const claims: any[] = []
+    if (receipt.claimIds) {
+      for (const cid of this.claimIdListOf(receipt)) {
+        const claim = await this.expenseClaims.findOne(cid).catch(() => null)
+        if (claim) claims.push(claim)
       }
     }
 
@@ -521,6 +804,7 @@ export class ReceiptWorkbenchService {
       fields: this.parseFieldsArray(receipt),
       suggestion,
       draft,
+      claims,
     }
   }
 

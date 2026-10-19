@@ -16,7 +16,6 @@ const targetDir = path.resolve(here, '..', 'models', 'ocr')
 
 const REPO = 'https://www.modelscope.cn/api/v1/models'
 const RAPIDOCR = `${REPO}/RapidAI/RapidOCR/repo?Revision=master&FilePath=`
-const PADDLE_REC_CONFIG = `${REPO}/PaddlePaddle/PP-OCRv4_mobile_rec/repo?Revision=master&FilePath=config.json`
 
 const ASSETS = [
   {
@@ -36,8 +35,7 @@ const ASSETS = [
   },
 ]
 
-const KEYS_FILE = 'ppocr_keys_v1.txt'
-const KEYS_SHA256 = 'a1c84d9bdb9ab29043c58896224d32941783eb821629618416dcb08f12886492'
+const KEYS_FILE = 'ppocrv6_dict.txt'
 
 function sha256(buf) {
   return crypto.createHash('sha256').update(buf).digest('hex')
@@ -69,29 +67,86 @@ async function ensureAsset(asset) {
 }
 
 /**
- * 识别字典不在模型仓库里，取自 PaddleOCR 识别模型的配置，
- * 其 PostProcess.character_dict 即 ppocr_keys_v1.txt 的内容。
+ * 识别字典不再单独下载：直接从 rec.onnx 的 ONNX 元数据（metadata_props 的
+ * character 键）中抽取，保证字典与识别模型永远配套。
+ * 对应 ocr-model.path.ts 中 keys: 'ppocrv6_dict.txt' 的说明。
  */
-async function ensureKeys() {
-  const target = path.join(targetDir, KEYS_FILE)
-  if (fs.existsSync(target)) {
-    const actual = sha256(fs.readFileSync(target))
-    if (actual === KEYS_SHA256) {
-      console.log(`  跳过 ${KEYS_FILE}（已存在且校验通过）`)
-      return
+function readVarint(buf, p) {
+  let value = 0n
+  let shift = 0n
+  for (;;) {
+    const byte = buf[p++]
+    value |= BigInt(byte & 0x7f) << shift
+    if (!(byte & 0x80)) return [value, p]
+    shift += 7n
+  }
+}
+
+/** 遍历 ModelProto 顶层字段，收集 metadata_props（field 14）的所有条目。 */
+function extractMetadataProps(buf) {
+  const entries = new Map()
+  let p = 0
+  while (p < buf.length) {
+    const [tag, p2] = readVarint(buf, p)
+    p = p2
+    const field = Number(tag >> 3n)
+    const wireType = Number(tag & 7n)
+    if (wireType === 2) {
+      const [len, p3] = readVarint(buf, p)
+      p = p3
+      const size = Number(len)
+      if (field === 14) parseStringStringEntries(buf.subarray(p, p + size), entries)
+      p += size
+    } else if (wireType === 0) {
+      const [, p3] = readVarint(buf, p)
+      p = p3
+    } else if (wireType === 5) {
+      p += 4
+    } else if (wireType === 1) {
+      p += 8
+    } else {
+      throw new Error(`不支持的 protobuf wire type ${wireType}`)
     }
   }
-  const config = JSON.parse((await download(PADDLE_REC_CONFIG)).toString('utf8'))
-  const dict = config?.PostProcess?.character_dict
-  if (!Array.isArray(dict) || dict.length === 0) {
-    throw new Error('未能从配置中解析 character_dict')
+  return entries
+}
+
+function parseStringStringEntries(blob, entries) {
+  let q = 0
+  while (q < blob.length) {
+    const [tag, q2] = readVarint(blob, q)
+    q = q2
+    const field = Number(tag >> 3n)
+    if (Number(tag & 7n) !== 2) throw new Error('metadata 条目应为长度界定字段')
+    const [len, q3] = readVarint(blob, q)
+    q = q3
+    const size = Number(len)
+    if (field === 1) entries.set('_key_', blob.subarray(q, q + size).toString('utf8'))
+    if (field === 2) entries.set('_value_', blob.subarray(q, q + size).toString('utf8'))
+    q += size
+    if (entries.has('_key_') && entries.has('_value_')) {
+      entries.set(entries.get('_key_'), entries.get('_value_'))
+      entries.delete('_key_')
+      entries.delete('_value_')
+    }
   }
-  fs.writeFileSync(target, `${dict.join('\n')}\n`, 'utf8')
-  const actual = sha256(fs.readFileSync(target))
-  if (actual !== KEYS_SHA256) {
-    throw new Error(`${KEYS_FILE} 校验失败\n  期望 ${KEYS_SHA256}\n  实际 ${actual}`)
+}
+
+function ensureKeys() {
+  const target = path.join(targetDir, KEYS_FILE)
+  const recPath = path.join(targetDir, 'rec.onnx')
+  if (!fs.existsSync(recPath)) throw new Error('rec.onnx 不存在，无法抽取识别字典')
+  const dict = extractMetadataProps(fs.readFileSync(recPath)).get('character')
+  if (!dict || dict.length === 0) throw new Error('未能从 rec.onnx 元数据中抽取 character 字典')
+  if (fs.existsSync(target)) {
+    if (fs.readFileSync(target, 'utf8') === dict) {
+      console.log(`  跳过 ${KEYS_FILE}（与 rec.onnx 元数据一致）`)
+      return
+    }
+    console.log(`  重写 ${KEYS_FILE}（与 rec.onnx 元数据不一致）`)
   }
-  console.log(`  完成 ${KEYS_FILE}  ${dict.length} 个字符`)
+  fs.writeFileSync(target, dict, 'utf8')
+  console.log(`  完成 ${KEYS_FILE}  ${dict.split('\n').filter(Boolean).length} 个字符`)
 }
 
 async function main() {

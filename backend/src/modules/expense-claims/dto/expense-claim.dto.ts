@@ -39,6 +39,12 @@ export class ExpenseClaimItemDto {
 
 /** 新增/编辑报销单 DTO */
 export class SaveExpenseClaimDto {
+  /** 报销单号（可选；缺省或重复时由后端自动生成） */
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  claimNo?: string
+
   @IsDateString({}, { message: '报销日期格式不正确' })
   claimDate: string
 
@@ -53,6 +59,16 @@ export class SaveExpenseClaimDto {
   @IsOptional()
   @IsString()
   bankAccountId?: string
+
+  /** 抵充的借款单ID（员工用借款去报销时选择；冲抵型不指定时按借款日期先后FIFO冲抵） */
+  @IsOptional()
+  @IsString()
+  loanId?: string
+
+  /** 报销单类型：loan_offset 冲抵借款 / payment 直接付款（缺省按是否指定借款单推导） */
+  @IsOptional()
+  @IsIn(['loan_offset', 'payment'], { message: '报销单类型不合法' })
+  claimType?: 'loan_offset' | 'payment'
 
   @IsArray({ message: '请至少录入一条费用明细' })
   @ArrayMinSize(1, { message: '请至少录入一条费用明细' })

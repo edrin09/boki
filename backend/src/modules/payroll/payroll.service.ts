@@ -16,8 +16,10 @@ import { toCents, fromCents } from '../../common/utils/money.util'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
 import { InjectCompanyRepo } from '../../common/company/company-repo.decorator'
 import { VouchersService } from '../vouchers/vouchers.service'
+import { EmployeeSettlementService } from '../loans/employee-settlement.service'
 import type { Operator } from '../cash-bank/cash-bank.service'
 import type { PageResult, PaginationQueryDto } from '../../common/dto/pagination.dto'
+import type { PayrollPdfPackageDto } from '../../common/dto/pdf-package.dto'
 import type {
   GeneratePayrollDto,
   PayPayrollDto,
@@ -29,6 +31,7 @@ const DEFAULT_EXPENSE_CODE = '6602' // 管理费用（工资费用）
 const DEFAULT_PAYABLE_CODE = '2211.01' // 应付职工薪酬-工资
 const DEFAULT_DEDUCT_CODE = '2241' // 其他应付款（代扣社保/公积金）
 const DEFAULT_TAX_CODE = '2221.04' // 应交税费-应交个人所得税
+const DEFAULT_RECEIVABLE_CODE = '1221' // 其他应收款-员工借款（工资扣回用）
 const DEFAULT_BANK_CODE = '1002' // 银行存款
 
 @Injectable()
@@ -42,6 +45,7 @@ export class PayrollService {
     @InjectCompanyRepo(BankAccount) private readonly bankRepo: CompanyScopedRepository<BankAccount>,
     @InjectCompanyRepo(Voucher) private readonly voucherRepo: CompanyScopedRepository<Voucher>,
     private readonly vouchersService: VouchersService,
+    private readonly settlementService: EmployeeSettlementService,
   ) {}
 
   // ==================== 查询 ====================
@@ -78,6 +82,41 @@ export class PayrollService {
     return this.toVo(payroll, items)
   }
 
+  /**
+   * 批量导出 PDF（原始凭证存根）用：按 ids 或筛选条件取工资单+明细，最多 300 张
+   */
+  async findForPdfExport(
+    dto: PayrollPdfPackageDto,
+  ): Promise<Array<{ payroll: Payroll; items: PayrollItem[] }>> {
+    const MAX = 300
+    let payrolls: Payroll[]
+    if (dto.ids?.length) {
+      payrolls = await this.repo.find({ where: { id: In(dto.ids.slice(0, MAX)) } })
+    } else {
+      const qb = this.repo.createQueryBuilder('p')
+      if (dto.status) qb.andWhere('p.status = :status', { status: dto.status })
+      if (dto.startPeriod && dto.endPeriod) {
+        qb.andWhere('p.period BETWEEN :s AND :e', { s: dto.startPeriod, e: dto.endPeriod })
+      } else if (dto.startPeriod) {
+        qb.andWhere('p.period >= :s', { s: dto.startPeriod })
+      } else if (dto.endPeriod) {
+        qb.andWhere('p.period <= :e', { e: dto.endPeriod })
+      }
+      payrolls = await qb.orderBy('p.period', 'ASC').take(MAX).getMany()
+    }
+    if (!payrolls.length) return []
+
+    const items = await this.itemRepo.find({ where: { payrollId: In(payrolls.map((p) => p.id)) } })
+    const byPayroll = new Map<string, PayrollItem[]>()
+    for (const it of items) {
+      const arr = byPayroll.get(it.payrollId) ?? []
+      arr.push(it)
+      byPayroll.set(it.payrollId, arr)
+    }
+    for (const arr of byPayroll.values()) arr.sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+    return payrolls.map((payroll) => ({ payroll, items: byPayroll.get(payroll.id) ?? [] }))
+  }
+
   // ==================== 生成 ====================
 
   /** 按在职员工生成工资单草稿 */
@@ -104,6 +143,12 @@ export class PayrollService {
     const deptNames = await this.loadDeptNames()
     const payrollNo = await this.getNextPayrollNo(dto.period)
 
+    // 自动带出员工欠款：有未还清借款的员工按余额预填「借款扣回」，
+    // 欠款超过应发工资时按应发封顶（代扣合计不允许超过应发）
+    const outstandingMap = await this.settlementService.outstandingMapByEmployees(
+      employees.map((e) => e.id),
+    )
+
     const entity = this.repo.create({
       payrollNo,
       period: dto.period,
@@ -116,7 +161,9 @@ export class PayrollService {
     })
     const saved = await this.repo.save(entity)
 
-    const items = employees.map((e, index) => this.buildItemRow(saved.id, e, deptNames, index))
+    const items = employees.map((e, index) =>
+      this.buildItemRow(saved.id, e, deptNames, index, outstandingMap.get(e.id) ?? 0),
+    )
     await this.itemRepo.save(items)
     await this.recalcTotals(saved.id)
 
@@ -151,6 +198,7 @@ export class PayrollService {
     payroll.totalFund = totals.fund
     payroll.totalTax = totals.tax
     payroll.totalOtherDeduct = totals.otherDeduct
+    payroll.totalLoanDeduct = totals.loanDeduct
     payroll.totalNet = totals.net
     payroll.remark = dto.remark ?? null
     payroll.createdBy = operator.id
@@ -246,6 +294,7 @@ export class PayrollService {
       fund: this.sumRaw(items.map((i) => Number(i.fundPersonal))),
       tax: this.sumRaw(items.map((i) => Number(i.tax))),
       other: this.sumRaw(items.map((i) => Number(i.otherDeduct))),
+      loanDeduct: this.sumRaw(items.map((i) => Number(i.loanDeduct ?? 0))),
       net: this.sumRaw(items.map((i) => Number(i.net))),
     }
 
@@ -282,6 +331,19 @@ export class PayrollService {
       )
       entries.push({ summary: `${summary}-个税`, accountId: tax.id, credit: totals.tax })
     }
+    // 借款扣回：贷「其他应收款-员工」，按员工拆分辅助核算
+    const loanItems = items.filter((i) => toCents(Number(i.loanDeduct ?? 0)) > 0)
+    if (loanItems.length) {
+      const receivable = await this.requireAccount(undefined, DEFAULT_RECEIVABLE_CODE, '其他应收款科目')
+      for (const i of loanItems) {
+        entries.push({
+          summary: `${summary}-扣回借款`,
+          accountId: receivable.id,
+          employeeId: i.employeeId,
+          credit: Number(i.loanDeduct ?? 0),
+        })
+      }
+    }
 
     const voucher = await this.vouchersService.createFromSystem(
       {
@@ -302,6 +364,31 @@ export class PayrollService {
     payroll.bankAccountId = dto.bankAccountId ?? payroll.bankAccountId ?? null
     payroll.bankAccountName = bankAccount.name
     await this.repo.save(payroll)
+
+    // 工资扣回借款：凭证已贷 1221，这里补登记核销流水并按 FIFO 回写借款单已清偿金额
+    // （员工有多张未还清借款单时按借款日期先后自动分配）
+    const settleDate = String(dto.payDate ?? payroll.payDate ?? '').slice(0, 10)
+    for (const i of loanItems) {
+      try {
+        await this.settlementService.registerExisting(
+          {
+            settleType: 'payroll',
+            sourceId: id,
+            sourceNo: payroll.payrollNo,
+            employeeId: i.employeeId,
+            amount: Number(i.loanDeduct ?? 0),
+            settleDate,
+            summary: `${i.employeeName} 工资扣回借款`,
+            voucherId: voucher.id,
+            remark: `工资单 ${payroll.payrollNo} 扣回借款`,
+          },
+          operator,
+        )
+      } catch (err) {
+        // 核销登记失败不阻断发放（凭证已出账），但要把原因带出来人工核对
+        throw new BadRequestException(`工资已发放，但员工「${i.employeeName}」借款核销登记失败：${(err as Error).message}`)
+      }
+    }
 
     return this.findOne(id)
   }
@@ -352,8 +439,11 @@ export class PayrollService {
     employee: Employee,
     deptNames: Map<string, string>,
     index: number,
+    outstanding: number,
   ): PayrollItem {
     const base = Number(employee.baseSalary ?? 0)
+    // 生成时自动扣除员工欠款：扣回金额 = min(欠款余额, 应发工资)
+    const loanDeduct = Math.min(Math.max(outstanding, 0), base)
     return this.itemRepo.create({
       payrollId,
       employeeId: employee.id,
@@ -369,7 +459,8 @@ export class PayrollService {
       fundPersonal: 0,
       tax: 0,
       otherDeduct: 0,
-      net: base,
+      loanDeduct,
+      net: fromCents(toCents(base) - toCents(loanDeduct)),
       remark: null,
       sort: index + 1,
     })
@@ -410,9 +501,10 @@ export class PayrollService {
       const fund = toCents(item.fundPersonal ?? 0)
       const tax = toCents(item.tax ?? 0)
       const other = toCents(item.otherDeduct ?? 0)
+      const loanDeduct = toCents(item.loanDeduct ?? 0)
 
       const grossCents = base + performance + allowance + overtime
-      const deductCents = insurance + fund + tax + other
+      const deductCents = insurance + fund + tax + other + loanDeduct
       if (deductCents > grossCents) {
         throw new BadRequestException(
           `员工「${employeeName}」的代扣合计（${fromCents(deductCents)}）超过应发工资（${fromCents(grossCents)}）`,
@@ -436,6 +528,7 @@ export class PayrollService {
         fundPersonal: fromCents(fund),
         tax: fromCents(tax),
         otherDeduct: fromCents(other),
+        loanDeduct: fromCents(loanDeduct),
         net: fromCents(grossCents - deductCents),
         remark: item.remark ?? null,
         sort: index + 1,
@@ -470,6 +563,7 @@ export class PayrollService {
     fund: number
     tax: number
     otherDeduct: number
+    loanDeduct: number
     net: number
   } {
     return {
@@ -478,6 +572,7 @@ export class PayrollService {
       fund: this.sumRaw(items.map((i) => i.fundPersonal)),
       tax: this.sumRaw(items.map((i) => i.tax)),
       otherDeduct: this.sumRaw(items.map((i) => i.otherDeduct)),
+      loanDeduct: this.sumRaw(items.map((i) => Number(i.loanDeduct ?? 0))),
       net: this.sumRaw(items.map((i) => i.net)),
     }
   }
@@ -495,6 +590,7 @@ export class PayrollService {
     payroll.totalFund = totals.fund
     payroll.totalTax = totals.tax
     payroll.totalOtherDeduct = totals.otherDeduct
+    payroll.totalLoanDeduct = totals.loanDeduct
     payroll.totalNet = totals.net
     payroll.employeeCount = items.length
     await this.repo.save(payroll)
@@ -610,6 +706,7 @@ export class PayrollService {
       totalFund: payroll.totalFund,
       totalTax: payroll.totalTax,
       totalOtherDeduct: payroll.totalOtherDeduct,
+      totalLoanDeduct: payroll.totalLoanDeduct,
       totalNet: payroll.totalNet,
       status: payroll.status,
       statusLabel: this.statusLabel(payroll.status),
@@ -645,6 +742,7 @@ export class PayrollService {
         fundPersonal: i.fundPersonal,
         tax: i.tax,
         otherDeduct: i.otherDeduct,
+        loanDeduct: i.loanDeduct,
         net: i.net,
         remark: i.remark,
         sort: i.sort,

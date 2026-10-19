@@ -36,6 +36,11 @@ export class SaveCashFlowDto {
   @IsString()
   partnerId?: string
 
+  /** 员工辅助核算（对方科目为其他应收款-员工等带员工辅助的科目时必填） */
+  @IsOptional()
+  @IsString()
+  employeeId?: string
+
   @IsOptional()
   @IsString()
   departmentId?: string

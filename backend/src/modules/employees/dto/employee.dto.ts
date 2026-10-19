@@ -33,6 +33,10 @@ export class CreateEmployeeDto {
   gender?: string
 
   @IsOptional()
+  @IsIn(['full_time', 'part_time'], { message: '用工性质只能是全职或兼职' })
+  employmentType?: string
+
+  @IsOptional()
   @IsString()
   departmentId?: string
 
@@ -107,6 +111,10 @@ export class UpdateEmployeeDto {
   @IsOptional()
   @IsIn(['male', 'female', 'unknown'])
   gender?: string
+
+  @IsOptional()
+  @IsIn(['full_time', 'part_time'], { message: '用工性质只能是全职或兼职' })
+  employmentType?: string
 
   @IsOptional()
   @IsString()

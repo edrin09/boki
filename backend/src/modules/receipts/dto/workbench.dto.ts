@@ -37,6 +37,11 @@ export class UpdateDraftEntryDto {
   @IsString()
   projectId?: string
 
+  /** 员工辅助核算（其他应收款-员工 抵充借款分录必带，丢失会导致核销回写失败） */
+  @IsOptional()
+  @IsString()
+  employeeId?: string
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })

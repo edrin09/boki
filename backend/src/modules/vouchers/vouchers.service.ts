@@ -11,6 +11,7 @@ import { Account } from '../../entities/account.entity'
 import { Partner } from '../../entities/partner.entity'
 import { Department } from '../../entities/department.entity'
 import { Project } from '../../entities/project.entity'
+import { Employee } from '../../entities/hr.entity'
 import { VoucherSource, VoucherStatus } from '../../common/enums'
 import { toCents, fromCents } from '../../common/utils/money.util'
 import { toPeriod } from '../../common/utils/date.util'
@@ -29,6 +30,8 @@ interface NormalizedEntry {
   partnerId: string | null
   departmentId: string | null
   projectId: string | null
+  employeeId: string | null
+  employeeName: string | null
   debit: number
   credit: number
   sort: number
@@ -43,6 +46,7 @@ export class VouchersService {
     @InjectCompanyRepo(Partner) private readonly partnerRepo: CompanyScopedRepository<Partner>,
     @InjectCompanyRepo(Department) private readonly deptRepo: CompanyScopedRepository<Department>,
     @InjectCompanyRepo(Project) private readonly projectRepo: CompanyScopedRepository<Project>,
+    @InjectCompanyRepo(Employee) private readonly employeeRepo: CompanyScopedRepository<Employee>,
     @InjectCompanyRepo(Receipt) private readonly receiptRepo: CompanyScopedRepository<Receipt>,
     private readonly dataSource: DataSource,
   ) {}
@@ -113,7 +117,7 @@ export class VouchersService {
 
     // 批量加载辅助核算名称：列表页按名称渲染辅助核算，只有 ID 会导致该列显示为空
     const allEntries = list.flatMap((v) => entriesMap.get(v.id) ?? [])
-    const { partnerMap, deptMap, projectMap } = await this.loadAuxNames(allEntries)
+    const { partnerMap, deptMap, projectMap, employeeMap } = await this.loadAuxNames(allEntries)
 
     return {
       list: list.map((v) => ({
@@ -131,6 +135,8 @@ export class VouchersService {
           departmentName: deptMap.get(e.departmentId) ?? null,
           projectId: e.projectId,
           projectName: projectMap.get(e.projectId) ?? null,
+          employeeId: e.employeeId,
+          employeeName: employeeMap.get(e.employeeId) ?? e.employeeName ?? null,
           debit: e.debit,
           credit: e.credit,
           sort: e.sort,
@@ -552,8 +558,9 @@ export class VouchersService {
     const partnerIds = effective.map((e) => e.partnerId).filter(Boolean) as string[]
     const deptIds = effective.map((e) => e.departmentId).filter(Boolean) as string[]
     const projectIds = effective.map((e) => e.projectId).filter(Boolean) as string[]
+    const employeeIds = effective.map((e) => e.employeeId).filter(Boolean) as string[]
 
-    const [partners, depts, projects] = await Promise.all([
+    const [partners, depts, projects, employees] = await Promise.all([
       partnerIds.length
         ? this.partnerRepo.createQueryBuilder('p').where('p.id IN (:...ids)', { ids: partnerIds }).getMany()
         : Promise.resolve([]),
@@ -563,10 +570,14 @@ export class VouchersService {
       projectIds.length
         ? this.projectRepo.createQueryBuilder('pr').where('pr.id IN (:...ids)', { ids: projectIds }).getMany()
         : Promise.resolve([]),
+      employeeIds.length
+        ? this.employeeRepo.createQueryBuilder('e').where('e.id IN (:...ids)', { ids: employeeIds }).getMany()
+        : Promise.resolve([]),
     ])
     const partnerSet = new Set(partners.map((p) => p.id))
     const deptSet = new Set(depts.map((d) => d.id))
     const projectSet = new Set(projects.map((p) => p.id))
+    const employeeMap = new Map(employees.map((e) => [e.id, e.name]))
 
     const entries: NormalizedEntry[] = []
     let debit = 0
@@ -602,6 +613,9 @@ export class VouchersService {
       if (types.includes('project') && !e.projectId) {
         throw new BadRequestException(`第 ${rowNo} 行：科目「${account.fullName}」需指定项目`)
       }
+      if (types.includes('employee') && !e.employeeId) {
+        throw new BadRequestException(`第 ${rowNo} 行：科目「${account.fullName}」需指定员工`)
+      }
       if (e.partnerId && !partnerSet.has(e.partnerId)) {
         throw new BadRequestException(`第 ${rowNo} 行：往来单位不存在`)
       }
@@ -610,6 +624,9 @@ export class VouchersService {
       }
       if (e.projectId && !projectSet.has(e.projectId)) {
         throw new BadRequestException(`第 ${rowNo} 行：项目不存在`)
+      }
+      if (e.employeeId && !employeeMap.has(e.employeeId)) {
+        throw new BadRequestException(`第 ${rowNo} 行：员工不存在`)
       }
 
       debit += d
@@ -622,6 +639,8 @@ export class VouchersService {
         partnerId: e.partnerId || null,
         departmentId: e.departmentId || null,
         projectId: e.projectId || null,
+        employeeId: e.employeeId || null,
+        employeeName: e.employeeId ? (employeeMap.get(e.employeeId) ?? null) : null,
         debit: fromCents(d),
         credit: fromCents(c),
         sort: rowNo,
@@ -656,21 +675,25 @@ export class VouchersService {
     partnerMap: Map<string, string>
     deptMap: Map<string, string>
     projectMap: Map<string, string>
+    employeeMap: Map<string, string>
   }> {
     const partnerIds = entries.map((e) => e.partnerId).filter(Boolean) as string[]
     const deptIds = entries.map((e) => e.departmentId).filter(Boolean) as string[]
     const projectIds = entries.map((e) => e.projectId).filter(Boolean) as string[]
+    const employeeIds = entries.map((e) => e.employeeId).filter(Boolean) as string[]
 
-    const [partners, depts, projects] = await Promise.all([
+    const [partners, depts, projects, employees] = await Promise.all([
       partnerIds.length ? this.partnerRepo.find({ where: { id: In(partnerIds) } }) : Promise.resolve([]),
       deptIds.length ? this.deptRepo.find({ where: { id: In(deptIds) } }) : Promise.resolve([]),
       projectIds.length ? this.projectRepo.find({ where: { id: In(projectIds) } }) : Promise.resolve([]),
+      employeeIds.length ? this.employeeRepo.find({ where: { id: In(employeeIds) } }) : Promise.resolve([]),
     ])
 
     return {
       partnerMap: new Map(partners.map((p) => [p.id, p.name])),
       deptMap: new Map(depts.map((d) => [d.id, d.name])),
       projectMap: new Map(projects.map((p) => [p.id, p.name])),
+      employeeMap: new Map(employees.map((e) => [e.id, e.name])),
     }
   }
 
@@ -706,6 +729,8 @@ export class VouchersService {
         partnerId: e.partnerId,
         departmentId: e.departmentId,
         projectId: e.projectId,
+        employeeId: e.employeeId,
+        employeeName: e.employeeName,
         debit: e.debit,
         credit: e.credit,
         sort: e.sort,

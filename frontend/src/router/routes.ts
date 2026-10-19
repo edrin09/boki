@@ -105,6 +105,12 @@ export const businessRoutes: RouteRecordRaw[] = [
         meta: { title: '其他收支', permission: 'income-expense' },
       },
       {
+        path: '/cash/fixed-expense',
+        name: 'FixedExpense',
+        component: () => import('@/views/fixed-expense/index.vue'),
+        meta: { title: '固定费用', permission: 'fixed-expense' },
+      },
+      {
         path: '/cash/bank-stmt',
         name: 'BankStmt',
         component: () => import('@/views/cash-bank/bank-stmt.vue'),
@@ -367,6 +373,12 @@ export const businessRoutes: RouteRecordRaw[] = [
         name: 'SystemBackup',
         component: () => import('@/views/system/backup/index.vue'),
         meta: { title: '数据备份', permission: 'system:backup' },
+      },
+      {
+        path: 'ai',
+        name: 'SystemAiConfig',
+        component: () => import('@/views/system/ai.vue'),
+        meta: { title: 'AI模型设置', permission: 'system:ai-config' },
       },
       {
         path: 'profile',

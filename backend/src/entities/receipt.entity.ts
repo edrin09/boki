@@ -117,6 +117,13 @@ export class Receipt extends BaseEntity {
   @Column({ name: 'related_id', type: 'varchar', nullable: true, comment: '关联单据ID（报销单/凭证等，P16+ 使用）' })
   relatedId: string | null
 
+  /**
+   * 上传时的相对目录路径（浏览器 webkitRelativePath，如「采购单/张三/」）。
+   * 文件夹批量上传时用于智能判定用途与归属员工；单文件上传为空。
+   */
+  @Column({ name: 'folder_path', type: 'varchar', length: 500, nullable: true, comment: '上传相对目录路径（文件夹批量上传时用于智能判定）' })
+  folderPath: string | null
+
   @Column({ name: 'created_by', type: 'varchar', nullable: true })
   createdBy: string | null
 
@@ -125,6 +132,14 @@ export class Receipt extends BaseEntity {
 
   @Column({ name: 'voucher_id', type: 'varchar', nullable: true, comment: '关联凭证ID（草稿或已入账，P17 使用）' })
   voucherId: string | null
+
+  /**
+   * 关联的报销单ID列表（JSON 数组）。
+   * 上传目录归属员工（如「采购单/张三/」）时改走报销单流程：
+   * 有借款生成冲抵借款型、超出/无借款生成直接付款型，确认入账时审核报销单。
+   */
+  @Column({ name: 'claim_ids', type: 'text', nullable: true, comment: '关联报销单ID JSON数组（目录归属员工时生成）' })
+  claimIds: string | null
 
   @Column({ name: 'reject_reason', length: 200, nullable: true, comment: '驳回原因' })
   rejectReason: string | null

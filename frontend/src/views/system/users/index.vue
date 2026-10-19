@@ -71,7 +71,7 @@
           :total="total"
           layout="total, sizes, prev, pager, next"
           @current-change="load"
-          @size-change="reset"
+          @size-change="handleSize"
         />
       </div>
     </div>
@@ -148,9 +148,9 @@ import { companyApi, roleApi, userApi, type CompanyBrief } from '@/api'
 import { confirmDelete, ok, usePagedList } from '@/composables/useList'
 import { formatDateTime } from '@/utils/format'
 
-const query = reactive<Record<string, any>>({ page: 1, pageSize: 20, keyword: '' })
-const { list, total, loading, load, search, reset } = usePagedList({
+const { list, total, loading, query, load, search, handleSize, reset } = usePagedList({
   fetcher: (params) => userApi.list(params),
+  defaultParams: { page: 1, pageSize: 20, keyword: '' },
 })
 
 const roles = ref<any[]>([])
