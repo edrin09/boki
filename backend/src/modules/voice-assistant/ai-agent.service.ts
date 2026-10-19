@@ -346,7 +346,18 @@ export class AiAgentService {
       }
       case 'fund_balances': {
         const rows = await svc.bankRepo.list()
-        return { rows: obsRows(rows as unknown as Array<Record<string, unknown>>) }
+        // 资金账户出现负余额 = 账簿不完整（最常见：期初余额未录入），
+        // 此时数字不代表真实资金，必须附带提醒，避免 AI 报出吓人的负数让用户误判
+        const negative = rows.some((r) => Number((r as { amount?: number }).amount ?? 0) < 0)
+        return {
+          rows: obsRows(rows as unknown as Array<Record<string, unknown>>),
+          ...(negative
+            ? {
+                note:
+                  '注意：存在余额为负的资金账户。资产类账户余额为负说明账簿数据不完整（最常见原因是期初余额未录入，或银行流水未全部入账），该负数不代表真实资金。回答时必须明确告知用户：此数字是账面推算值、可能失真，请先在期初余额中补录资金账户的真实期初数并核对流水。',
+              }
+            : {}),
+        }
       }
       case 'loan_balances': {
         const { list } = await svc.settlementService.employeeBalances({

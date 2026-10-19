@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Boki 簿记 logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+    <linearGradient id="pageL" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E0E7FF"/>
+    </linearGradient>
+    <linearGradient id="pageR" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DBEAFE"/>
+    </linearGradient>
+  </defs>
+
+  <!-- app tile -->
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+
+  <!-- open ledger: left page = 借方, right page = 贷方 (mirror = 借贷平衡) -->
+  <path d="M128 99 C112 89 88 85 58 91 L58 153 C88 147 112 151 128 165 Z" fill="url(#pageL)"/>
+  <path d="M128 99 C144 89 168 85 198 91 L198 153 C168 147 144 151 128 165 Z" fill="url(#pageR)"/>
+
+  <!-- spine -->
+  <path d="M128 99 L128 165" stroke="#A5B4FC" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- journal entry lines -->
+  <g stroke="#4F46E5" stroke-width="4.5" stroke-linecap="round" opacity="0.8">
+    <path d="M73 113 H119"/>
+    <path d="M73 127 H104"/>
+    <path d="M73 141 H112"/>
+  </g>
+  <g stroke="#4F46E5" stroke-width="4.5" stroke-linecap="round" opacity="0.8">
+    <path d="M137 113 H183"/>
+    <path d="M152 127 H183"/>
+    <path d="M144 141 H183"/>
+  </g>
+
+  <!-- balance accent: 试算平衡 -->
+  <g stroke="#FBBF24" stroke-width="5" stroke-linecap="round">
+    <path d="M103 80 H153"/>
+  </g>
+  <circle cx="103" cy="80" r="4.5" fill="#FBBF24"/>
+  <circle cx="153" cy="80" r="4.5" fill="#FBBF24"/>
+</svg>

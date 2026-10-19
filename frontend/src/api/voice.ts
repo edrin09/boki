@@ -36,7 +36,7 @@ export const voiceApi = {
     // axios 全局 30s 会把还在思考的请求误杀，这里单独放宽到 5 分钟
     return post<VoiceQueryResult>('/voice/query', form, { timeout: 300000 })
   },
-  /** 只转写文字，不执行查询（松开空格后填入输入框，手动回车检索） */
+  /** 只转写文字，不执行查询（WS 终稿为空时的 REST 兜底） */
   transcribe: (blob: Blob, filename = 'recording.wav') => {
     const form = new FormData()
     form.append('audio', blob, filename)

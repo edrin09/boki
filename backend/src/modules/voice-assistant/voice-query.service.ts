@@ -315,7 +315,9 @@ export class VoiceQueryService {
         const amt = target
           ? (balances.balances as unknown as Map<string, Record<string, number>>).get(target.id)
           : undefined
-        if (amt) amount = fromCents(toCents(amt.closeDebit) - toCents(amt.closeCredit))
+        // computeBalances 返回的 Map 里金额单位是「分」，直接 fromCents 转元；
+        // 不能再过一次 toCents（等于 ×100，会把 -1.6万 算成 -160万）
+        if (amt) amount = fromCents(amt.closeDebit - amt.closeCredit)
       }
       return { name: b.name, typeLabel: b.type === 'cash' ? '现金' : '银行', amount }
     })
