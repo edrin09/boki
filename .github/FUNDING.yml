@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Boki 簿记 · 赞助入口
+# 文档：https://boki.app/sponsor
+# 品牌：brand/README.md
+#
+# 说明：
+#   - github / open_collective 优先，企业赞助走 Open Collective（可开票、账本透明）
+#   - custom 放国内渠道（爱发电 / 微信 / 支付宝说明页）
+#   - 未开通的项留空即可，GitHub 会自动忽略
+#
+# 开通后请把占位符替换为真实账号/链接，再提交本文件。
+
+github: [boki-io]          # TODO: 替换为 GitHub 组织或维护者账号
+open_collective: boki      # TODO: 替换为 Open Collective slug
+ko_fi:                     # 可选
+patreon:                   # 可选
+tidelift:                  # 可选
+liberapay:                 # 可选
+
+custom:
+  - "https://afdian.com/a/boki"      # TODO: 替换为爱发电主页
+  - "https://boki.app/sponsor"       # 赞助方案与权益
+  - "https://boki.app/donate"        # 微信 / 支付宝捐赠说明

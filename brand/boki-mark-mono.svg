@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="BOKI mono">
+  <defs>
+    <!-- black strokes are cut out of the glyph -->
+    <mask id="monoCut">
+      <rect width="256" height="256" fill="#ffffff"/>
+      <g stroke="#000000" stroke-width="9" stroke-linecap="round">
+        <path d="M73 113 H119"/>
+        <path d="M73 127 H104"/>
+        <path d="M73 141 H112"/>
+        <path d="M137 113 H183"/>
+        <path d="M152 127 H183"/>
+        <path d="M144 141 H183"/>
+        <path d="M128 99 L128 165"/>
+      </g>
+    </mask>
+  </defs>
+
+  <!-- currentColor: use anywhere, set color via CSS -->
+  <g fill="currentColor">
+    <path d="M128 99 C112 89 88 85 58 91 L58 153 C88 147 112 151 128 165 Z" mask="url(#monoCut)"/>
+    <path d="M128 99 C144 89 168 85 198 91 L198 153 C168 147 144 151 128 165 Z" mask="url(#monoCut)"/>
+  </g>
+
+  <!-- balance bar -->
+  <rect x="95" y="75.5" width="66" height="9" rx="4.5" fill="currentColor"/>
+  <circle cx="100" cy="80" r="5.5" fill="currentColor"/>
+  <circle cx="156" cy="80" r="5.5" fill="currentColor"/>
+</svg>

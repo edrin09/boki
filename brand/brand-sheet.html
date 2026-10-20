@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BOKI · 品牌规范</title>
+<style>
+  :root{
+    --indigo:#4F46E5; --sky:#0EA5E9; --gold:#FBBF24;
+    --ink:#0F172A; --slate:#64748B; --mist:#E0E7FF;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:56px 40px 72px;
+    background:#F1F5F9; color:var(--ink);
+    font-family:Inter,"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-size:44px;margin:0;letter-spacing:-1.5px;font-weight:800}
+  h1 span{color:var(--slate);font-weight:500;font-size:24px;letter-spacing:0;margin-left:14px}
+  .sub{color:var(--slate);margin-top:10px;font-size:15px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:38px}
+  .card{
+    background:#fff;border-radius:18px;padding:30px 32px;
+    box-shadow:0 1px 3px rgba(15,23,42,.07),0 8px 24px rgba(15,23,42,.04);
+  }
+  .card.dark{background:var(--ink)}
+  .card.wide{grid-column:1 / -1}
+  .label{
+    font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;
+    color:#94A3B8;margin-bottom:20px;
+  }
+  .dark .label{color:#64748B}
+  .row{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+  .lockup{display:flex;align-items:center;gap:22px}
+  .wordmark{font-size:58px;font-weight:800;letter-spacing:-2.5px;line-height:1}
+  .tagline{font-size:13px;font-weight:500;letter-spacing:.4px;color:var(--slate);margin-top:8px}
+  .dark .wordmark{color:#fff}
+  .dark .tagline{color:#94A3B8}
+  .swatches{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
+  .sw{border-radius:14px;height:104px;padding:14px;color:#fff;display:flex;flex-direction:column;justify-content:flex-end;font-size:12px;font-weight:600}
+  .sw small{opacity:.82;font-weight:500;margin-top:3px;font-family:ui-monospace,Consolas,monospace}
+  .rule{display:flex;gap:12px;align-items:flex-start;font-size:13px;color:#475569;line-height:1.7;margin-top:6px}
+  .rule b{color:var(--ink)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--indigo);margin-top:7px;flex:none}
+  .favrow{display:flex;align-items:flex-end;gap:26px}
+  .favrow figure{margin:0;text-align:center;font-size:11px;color:var(--slate)}
+  .hint{font-size:12px;color:#94A3B8;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>BOKI</h1>
+  <div class="sub">开源财务软件 · Brand Guidelines v1.0</div>
+
+  <!-- reusable symbols -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <linearGradient id="gBg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#4F46E5"/><stop offset="1" stop-color="#0EA5E9"/>
+      </linearGradient>
+      <linearGradient id="gBgD" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#312E81"/><stop offset="1" stop-color="#0C4A6E"/>
+      </linearGradient>
+      <linearGradient id="gL" x1="0" y1="0" x2=".6" y2="1">
+        <stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#E0E7FF"/>
+      </linearGradient>
+      <linearGradient id="gR" x1="0" y1="0" x2=".6" y2="1">
+        <stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#DBEAFE"/>
+      </linearGradient>
+      <mask id="mCut">
+        <rect width="256" height="256" fill="#fff"/>
+        <g stroke="#000" stroke-width="9" stroke-linecap="round">
+          <path d="M73 113 H119"/><path d="M73 127 H104"/><path d="M73 141 H112"/>
+          <path d="M137 113 H183"/><path d="M152 127 H183"/><path d="M144 141 H183"/>
+          <path d="M128 99 L128 165"/>
+        </g>
+      </mask>
+
+      <symbol id="sMark" viewBox="0 0 256 256">
+        <rect width="256" height="256" rx="56" fill="url(#gBg)"/>
+        <path d="M128 99 C112 89 88 85 58 91 L58 153 C88 147 112 151 128 165 Z" fill="url(#gL)"/>
+        <path d="M128 99 C144 89 168 85 198 91 L198 153 C168 147 144 151 128 165 Z" fill="url(#gR)"/>
+        <path d="M128 99 L128 165" stroke="#A5B4FC" stroke-width="2.5" stroke-linecap="round"/>
+        <g stroke="#4F46E5" stroke-width="4.5" stroke-linecap="round" opacity=".8">
+          <path d="M73 113 H119"/><path d="M73 127 H104"/><path d="M73 141 H112"/>
+        </g>
+        <g stroke="#4F46E5" stroke-width="4.5" stroke-linecap="round" opacity=".8">
+          <path d="M137 113 H183"/><path d="M152 127 H183"/><path d="M144 141 H183"/>
+        </g>
+        <g stroke="#FBBF24" stroke-width="5" stroke-linecap="round"><path d="M103 80 H153"/></g>
+        <circle cx="103" cy="80" r="4.5" fill="#FBBF24"/>
+        <circle cx="153" cy="80" r="4.5" fill="#FBBF24"/>
+      </symbol>
+
+      <symbol id="sMarkDark" viewBox="0 0 256 256">
+        <rect width="256" height="256" rx="56" fill="url(#gBgD)"/>
+        <path d="M128 99 C112 89 88 85 58 91 L58 153 C88 147 112 151 128 165 Z" fill="url(#gL)"/>
+        <path d="M128 99 C144 89 168 85 198 91 L198 153 C168 147 144 151 128 165 Z" fill="url(#gR)"/>
+        <path d="M128 99 L128 165" stroke="#818CF8" stroke-width="2.5" stroke-linecap="round"/>
+        <g stroke="#4338CA" stroke-width="4.5" stroke-linecap="round" opacity=".85">
+          <path d="M73 113 H119"/><path d="M73 127 H104"/><path d="M73 141 H112"/>
+        </g>
+        <g stroke="#4338CA" stroke-width="4.5" stroke-linecap="round" opacity=".85">
+          <path d="M137 113 H183"/><path d="M152 127 H183"/><path d="M144 141 H183"/>
+        </g>
+        <g stroke="#FBBF24" stroke-width="5" stroke-linecap="round"><path d="M103 80 H153"/></g>
+        <circle cx="103" cy="80" r="4.5" fill="#FBBF24"/>
+        <circle cx="153" cy="80" r="4.5" fill="#FBBF24"/>
+      </symbol>
+
+      <symbol id="sGlyph" viewBox="0 0 256 256">
+        <path d="M128 99 C112 89 88 85 58 91 L58 153 C88 147 112 151 128 165 Z" fill="url(#gL)"/>
+        <path d="M128 99 C144 89 168 85 198 91 L198 153 C168 147 144 151 128 165 Z" fill="url(#gR)"/>
+        <path d="M128 99 L128 165" stroke="#A5B4FC" stroke-width="2.5" stroke-linecap="round"/>
+        <g stroke="#4F46E5" stroke-width="4.5" stroke-linecap="round" opacity=".8">
+          <path d="M73 113 H119"/><path d="M73 127 H104"/><path d="M73 141 H112"/>
+        </g>
+        <g stroke="#4F46E5" stroke-width="4.5" stroke-linecap="round" opacity=".8">
+          <path d="M137 113 H183"/><path d="M152 127 H183"/><path d="M144 141 H183"/>
+        </g>
+        <g stroke="#FBBF24" stroke-width="5" stroke-linecap="round"><path d="M103 80 H153"/></g>
+        <circle cx="103" cy="80" r="4.5" fill="#FBBF24"/>
+        <circle cx="153" cy="80" r="4.5" fill="#FBBF24"/>
+      </symbol>
+
+      <symbol id="sMono" viewBox="0 0 256 256">
+        <g fill="currentColor">
+          <path d="M128 99 C112 89 88 85 58 91 L58 153 C88 147 112 151 128 165 Z" mask="url(#mCut)"/>
+          <path d="M128 99 C144 89 168 85 198 91 L198 153 C168 147 144 151 128 165 Z" mask="url(#mCut)"/>
+        </g>
+        <rect x="95" y="75.5" width="66" height="9" rx="4.5" fill="currentColor"/>
+        <circle cx="100" cy="80" r="5.5" fill="currentColor"/>
+        <circle cx="156" cy="80" r="5.5" fill="currentColor"/>
+      </symbol>
+
+      <symbol id="sFav" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="14" fill="url(#gBg)"/>
+        <path d="M32 24 C27.5 21 21.5 20 15 21.5 L15 39.5 C21.5 38 27.5 39 32 42 Z" fill="#FFFFFF"/>
+        <path d="M32 24 C36.5 21 42.5 20 49 21.5 L49 39.5 C42.5 38 36.5 39 32 42 Z" fill="#DBEAFE"/>
+        <path d="M32 24 L32 42" stroke="#A5B4FC" stroke-width="1.3" stroke-linecap="round"/>
+        <g stroke="#4338CA" stroke-width="2.4" stroke-linecap="round" opacity=".9">
+          <path d="M19 28.5 H28.5"/><path d="M19 33.5 H26"/>
+          <path d="M35.5 28.5 H45"/><path d="M38 33.5 H45"/>
+        </g>
+        <g stroke="#FBBF24" stroke-width="2.6" stroke-linecap="round"><path d="M25 18.5 H39"/></g>
+        <circle cx="25" cy="18.5" r="2.2" fill="#FBBF24"/>
+        <circle cx="39" cy="18.5" r="2.2" fill="#FBBF24"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <div class="grid">
+    <div class="card">
+      <div class="label">Primary lockup · Light</div>
+      <div class="lockup">
+        <svg viewBox="0 0 256 256" width="96" height="96"><use href="#sMark"/></svg>
+        <div>
+          <div class="wordmark">boki</div>
+          <div class="tagline">开源财务软件 · Open-source Accounting</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card dark">
+      <div class="label">Primary lockup · Dark</div>
+      <div class="lockup">
+        <svg viewBox="0 0 256 256" width="96" height="96"><use href="#sMark"/></svg>
+        <div>
+          <div class="wordmark">boki</div>
+          <div class="tagline">开源财务软件 · Open-source Accounting</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">App mark · Light / Dark</div>
+      <div class="row">
+        <svg viewBox="0 0 256 256" width="128" height="128"><use href="#sMark"/></svg>
+        <svg viewBox="0 0 256 256" width="128" height="128"><use href="#sMarkDark"/></svg>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Glyph / Mono</div>
+      <div class="row">
+        <svg viewBox="0 0 256 256" width="112" height="112"><use href="#sGlyph"/></svg>
+        <svg viewBox="0 0 256 256" width="112" height="112" style="color:#0F172A"><use href="#sMono"/></svg>
+        <svg viewBox="0 0 256 256" width="112" height="112" style="color:#4F46E5"><use href="#sMono"/></svg>
+      </div>
+      <div class="hint">Mono 使用 currentColor，可单色印刷 / 水印 / 深色底。</div>
+    </div>
+
+    <div class="card wide">
+      <div class="label">Favicon / App icon 16 · 32 · 64 · 128</div>
+      <div class="favrow">
+        <figure><svg viewBox="0 0 64 64" width="16" height="16"><use href="#sFav"/></svg><figcaption>16</figcaption></figure>
+        <figure><svg viewBox="0 0 64 64" width="32" height="32"><use href="#sFav"/></svg><figcaption>32</figcaption></figure>
+        <figure><svg viewBox="0 0 64 64" width="64" height="64"><use href="#sFav"/></svg><figcaption>64</figcaption></figure>
+        <figure><svg viewBox="0 0 64 64" width="128" height="128"><use href="#sFav"/></svg><figcaption>128</figcaption></figure>
+      </div>
+    </div>
+
+    <div class="card wide">
+      <div class="label">Palette</div>
+      <div class="swatches">
+        <div class="sw" style="background:#4F46E5">Indigo<small>#4F46E5</small></div>
+        <div class="sw" style="background:#0EA5E9">Sky<small>#0EA5E9</small></div>
+        <div class="sw" style="background:#FBBF24;color:#0F172A">Gold<small>#FBBF24</small></div>
+        <div class="sw" style="background:#0F172A">Ink<small>#0F172A</small></div>
+        <div class="sw" style="background:#64748B">Slate<small>#64748B</small></div>
+        <div class="sw" style="background:#E0E7FF;color:#0F172A">Mist<small>#E0E7FF</small></div>
+      </div>
+      <div style="margin-top:22px">
+        <div class="rule"><span class="dot"></span><div><b>左页 = 借方，右页 = 贷方</b>：两页完全镜像，表达「借贷必相等」。</div></div>
+        <div class="rule"><span class="dot"></span><div><b>金色平衡杠</b>：试算平衡（Trial Balance），也是金额/价值的视觉锚点。</div></div>
+        <div class="rule"><span class="dot"></span><div><b>最小尺寸</b>：App 图标 ≥ 32px；16px 使用简化版 favicon（已单独提供）。</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

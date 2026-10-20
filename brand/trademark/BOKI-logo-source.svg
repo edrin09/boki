@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000" role="img" aria-label="BOKI graphic mark">
+  <rect width="1000" height="1000" fill="#ffffff"/>
+  <g transform="translate(-48.57,-14.29) scale(4.2857)">
+    <!-- book pages (solid black) -->
+    <path d="M128 99 C112 89 88 85 58 91 L58 153 C88 147 112 151 128 165 Z" fill="#000000"/>
+    <path d="M128 99 C144 89 168 85 198 91 L198 153 C168 147 144 151 128 165 Z" fill="#000000"/>
+
+    <!-- entry lines cut out in white -->
+    <g stroke="#ffffff" stroke-width="9" stroke-linecap="round" fill="none">
+      <path d="M73 113 H119"/>
+      <path d="M73 127 H104"/>
+      <path d="M73 141 H112"/>
+      <path d="M137 113 H183"/>
+      <path d="M152 127 H183"/>
+      <path d="M144 141 H183"/>
+      <path d="M128 99 L128 165"/>
+    </g>
+
+    <!-- balance bar -->
+    <rect x="95" y="75.5" width="66" height="9" rx="4.5" fill="#000000"/>
+    <circle cx="100" cy="80" r="5.5" fill="#000000"/>
+    <circle cx="156" cy="80" r="5.5" fill="#000000"/>
+  </g>
+</svg>
