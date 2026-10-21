@@ -65,7 +65,7 @@ async function onSubmit() {
 
   loading.value = true
   try {
-    const company = await companyApi.create(form)
+    const company = await companyApi.bootstrap(form)
     // 创建成功后以创建者为所有者加入公司，切换签发带 companyId 的新令牌
     await userStore.switchCompany(company.id)
     ElMessage.success(`记账公司「${company.name}」创建成功`)

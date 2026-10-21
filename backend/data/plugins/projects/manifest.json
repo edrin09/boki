@@ -1,0 +1,42 @@
+{
+  "id": "projects",
+  "name": "项目管理",
+  "version": "1.0.0",
+  "apiVersion": "^1.0.0",
+  "engines": { "boki": ">=1.0.0" },
+  "kind": "domain",
+  "scopeMode": "scoped",
+  "trust": "official",
+  "author": "boki",
+  "license": "Apache-2.0",
+  "description": "项目档案、合同台账与合同 PDF 自动识别",
+  "dependencies": { "ocr": "^1.0.0" },
+  "permissions": [
+    "settings:project",
+    "project:create",
+    "project:update",
+    "project:delete"
+  ],
+  "contributes": {
+    "server": "server/index.js",
+    "client": "client/index.js",
+    "routes": [
+      {
+        "path": "/settings/projects",
+        "name": "SettingProjects",
+        "component": "ProjectsPage",
+        "meta": { "title": "项目管理", "permission": "settings:project" }
+      }
+    ],
+    "menu": [
+      {
+        "group": "settings",
+        "title": "项目管理",
+        "path": "/settings/projects",
+        "permission": "settings:project"
+      }
+    ],
+    "slots": []
+  },
+  "tables": ["fin_project"]
+}

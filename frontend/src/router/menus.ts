@@ -1,12 +1,31 @@
+import type { PluginMenuContribution } from '@/plugins/types'
+
 /** 菜单项定义 */
 export interface MenuNode {
   title: string
   icon?: string
+  /** 内核分组标识，插件菜单按此挂载 */
+  group?: string
+  /** 单页分组：插件贡献同组菜单时直接补全本节点，不再生成「分组 > 页面」两级 */
+  single?: boolean
   /** 叶子菜单的路由地址 */
   path?: string
   /** 访问所需权限标识 */
   permission?: string
   children?: MenuNode[]
+}
+
+/** 内核分组的默认标题（插件只给 group、且分组不存在时使用） */
+const GROUP_TITLES: Record<string, string> = {
+  dashboard: '工作台',
+  receipts: 'AI 智能记账',
+  voucher: '凭证管理',
+  cash: '资金往来',
+  books: '账簿查询',
+  hr: '薪酬报销',
+  reports: '财务报表',
+  settings: '基础资料',
+  system: '系统管理',
 }
 
 /**
@@ -17,22 +36,21 @@ export const MENUS: MenuNode[] = [
   {
     title: '工作台',
     icon: 'HomeFilled',
-    path: '/dashboard',
-    permission: 'dashboard',
+    // 单页入口由 report-pack 插件贡献（dashboard 不是内核页面）
+    group: 'dashboard',
+    single: true,
   },
   {
     title: 'AI 智能记账',
     icon: 'MagicStick',
+    group: 'receipts',
     permission: 'receipts',
-    children: [
-      { title: '上传记账', path: '/receipts/workbench', permission: 'receipts:workbench' },
-      { title: '票据列表', path: '/receipts/list', permission: 'receipt:list' },
-      { title: '归类规则', path: '/receipts/rules', permission: 'receipts:rules' },
-    ],
+    children: [],
   },
   {
     title: '凭证管理',
     icon: 'Tickets',
+    group: 'voucher',
     permission: 'voucher',
     children: [
       { title: '凭证列表', path: '/voucher/list', permission: 'voucher:list' },
@@ -42,17 +60,14 @@ export const MENUS: MenuNode[] = [
   {
     title: '资金往来',
     icon: 'Money',
+    group: 'cash',
     permission: 'cash',
-    children: [
-      { title: '现金银行', path: '/cash-bank', permission: 'cash-bank' },
-      { title: '应收应付', path: '/ar-ap', permission: 'ar-ap' },
-      { title: '其他收支', path: '/income-expense', permission: 'income-expense' },
-      { title: '固定费用', path: '/cash/fixed-expense', permission: 'fixed-expense' },
-    ],
+    children: [],
   },
   {
     title: '账簿查询',
     icon: 'Notebook',
+    group: 'books',
     permission: 'books',
     children: [
       { title: '总账', path: '/books/ledger', permission: 'books:ledger' },
@@ -64,57 +79,105 @@ export const MENUS: MenuNode[] = [
   {
     title: '薪酬报销',
     icon: 'UserFilled',
+    group: 'hr',
     permission: 'hr',
-    children: [
-      { title: '员工管理', path: '/hr/employees', permission: 'hr:employee' },
-      { title: '报销单', path: '/hr/expense-claims', permission: 'hr:expense-claim' },
-      { title: '借款单', path: '/hr/loans', permission: 'hr:loan' },
-      { title: '工资表', path: '/hr/payrolls', permission: 'hr:payroll' },
-    ],
+    children: [],
   },
   {
     title: '财务报表',
     icon: 'DataAnalysis',
+    group: 'reports',
     permission: 'reports',
-    children: [
-      { title: '资产负债表', path: '/reports/balance-sheet', permission: 'reports:balance-sheet' },
-      { title: '利润表', path: '/reports/profit-loss', permission: 'reports:profit-loss' },
-      { title: '票据台账', path: '/reports/ledger', permission: 'reports:ledger' },
-      { title: '现金流量简表', path: '/reports/cash-flow', permission: 'reports:cash-flow' },
-      { title: '费用结构分析', path: '/reports/expense-analysis', permission: 'reports:expense-analysis' },
-      { title: '一键月结', path: '/reports/monthly-close', permission: 'reports:monthly-close' },
-    ],
+    children: [],
   },
   {
     title: '基础资料',
     icon: 'FolderOpened',
+    group: 'settings',
     permission: 'settings',
     children: [
       { title: '会计科目', path: '/settings/accounts', permission: 'settings:account' },
       { title: '往来单位', path: '/settings/partners', permission: 'settings:partner' },
-      { title: '资金账户', path: '/settings/banks', permission: 'settings:bank' },
-      { title: '部门管理', path: '/settings/departments', permission: 'settings:department' },
-      { title: '项目管理', path: '/settings/projects', permission: 'settings:project' },
       { title: '期初余额', path: '/settings/initial-balance', permission: 'settings:initial-balance' },
       { title: '公司信息', path: '/settings/company', permission: 'settings:company' },
-      { title: '记账公司管理', path: '/settings/companies', permission: 'settings:company-manage' },
     ],
   },
   {
     title: '系统管理',
     icon: 'Setting',
+    group: 'system',
     permission: 'system',
     children: [
-      { title: '记账公司', path: '/system/companies', permission: 'system:company' },
-      { title: '用户管理', path: '/system/users', permission: 'system:user' },
-      { title: '角色管理', path: '/system/roles', permission: 'system:role' },
-      { title: '权限管理', path: '/system/permissions', permission: 'system:permission' },
       { title: '操作日志', path: '/system/logs', permission: 'system:log' },
       { title: '数据备份', path: '/system/backup', permission: 'system:backup' },
-      { title: 'AI模型设置', path: '/system/ai', permission: 'system:ai-config' },
+      { title: '插件管理', path: '/system/plugins', permission: 'system:plugin' },
     ],
   },
 ]
+
+function toMenuNode(item: PluginMenuContribution): MenuNode {
+  return {
+    title: item.title,
+    icon: item.icon,
+    path: item.path,
+    permission: item.permission,
+    children: item.children?.map(toMenuNode),
+  }
+}
+
+/**
+ * 合并插件菜单。
+ *
+ * - 带 `group` 的条目挂到对应内核分组下（分组不存在时按默认标题创建）
+ * - 不带 `group` 的条目作为完整菜单树追加
+ */
+export function mergePluginMenus(
+  base: MenuNode[],
+  contributions: PluginMenuContribution[],
+): MenuNode[] {
+  const result: MenuNode[] = base.map((item) => ({
+    ...item,
+    children: item.children ? [...item.children] : undefined,
+  }))
+
+  for (const contribution of contributions) {
+    const node = toMenuNode(contribution)
+    if (contribution.group) {
+      let group = result.find((item) => item.group === contribution.group)
+      if (!group) {
+        group = {
+          title: GROUP_TITLES[contribution.group] ?? contribution.group,
+          group: contribution.group,
+          children: [],
+        }
+        result.push(group)
+      }
+      // 单页分组（如 dashboard）：补全分组节点，避免出现「工作台 > 工作台」
+      if (group.single && !group.path && node.path && !node.children?.length) {
+        group.path = node.path
+        group.permission = node.permission
+        group.title = node.title
+        group.icon = group.icon ?? node.icon
+        continue
+      }
+      const children = group.children ?? (group.children = [])
+      if (node.children?.length) {
+        for (const child of node.children) {
+          if (child.path && children.some((c) => c.path === child.path)) continue
+          children.push(child)
+        }
+      } else if (!node.path || !children.some((c) => c.path === node.path)) {
+        children.push(node)
+      }
+      continue
+    }
+
+    if (node.path && result.some((item) => item.path === node.path)) continue
+    result.push(node)
+  }
+
+  return result
+}
 
 /** 按权限过滤菜单（移除无权限项及空分组） */
 export function filterMenus(menus: MenuNode[], permissions: string[]): MenuNode[] {

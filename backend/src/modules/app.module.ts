@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common'
+import { DynamicModule, Module } from '@nestjs/common'
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
-import { ConfigModule, ConfigService } from '@nestjs/config'
+import { ConfigModule } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { buildDatabaseOptions } from '../config/database.config'
 import { GlobalAuthGuard } from '../common/guards/global-auth.guard'
@@ -14,88 +14,65 @@ import { Account } from '../entities/account.entity'
 import { Company } from '../entities/company.entity'
 import { UserCompany } from '../entities/user-company.entity'
 import { AuthModule } from './auth/auth.module'
-import { UsersModule } from './users/users.module'
-import { RolesModule } from './roles/roles.module'
-import { PermissionsModule } from './permissions/permissions.module'
 import { AccountsModule } from './accounts/accounts.module'
 import { PartnersModule } from './partners/partners.module'
-import { BanksModule } from './banks/banks.module'
-import { DepartmentsModule } from './departments/departments.module'
-import { ProjectsModule } from './projects/projects.module'
 import { VouchersModule } from './vouchers/vouchers.module'
 import { InitialBalanceModule } from './initial-balance/initial-balance.module'
 import { BooksModule } from './books/books.module'
-import { ReportsModule } from './reports/reports.module'
-import { CashBankModule } from './cash-bank/cash-bank.module'
-import { ArApModule } from './ar-ap/ar-ap.module'
-import { IncomeExpenseModule } from './income-expense/income-expense.module'
-import { FixedExpenseModule } from './fixed-expense/fixed-expense.module'
 import { SystemModule } from './system/system.module'
-import { EmployeesModule } from './employees/employees.module'
-import { ExpenseClaimsModule } from './expense-claims/expense-claims.module'
-import { LoansModule } from './loans/loans.module'
-import { BankStmtModule } from './bank-stmt/bank-stmt.module'
-import { PayrollModule } from './payroll/payroll.module'
-import { OcrModule } from './ocr/ocr.module'
-import { ReceiptsModule } from './receipts/receipts.module'
-import { ExtractModule } from './extract/extract.module'
-import { CompaniesModule } from './companies/companies.module'
-import { VoiceAssistantModule } from './voice-assistant/voice-assistant.module'
-import { AiModule } from './ai/ai.module'
+import { SetupModule } from './setup/setup.module'
 import { CompanyReposModule } from '../common/company/company-repos.module'
 import { CompanyScopeInterceptor } from '../common/company/company-scope.interceptor'
+import { PluginsModule } from '../plugins/plugins.module'
 
-@Module({
-  imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: ['.env.local', '.env'],
-      ignoreEnvFile: false,
-    }),
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: () => buildDatabaseOptions(),
-    }),
-    TypeOrmModule.forFeature([Permission, Role, User, Account, Company, UserCompany]),
-    CompanyReposModule,
-    CompaniesModule,
-    AuthModule,
-    UsersModule,
-    RolesModule,
-    PermissionsModule,
-    AccountsModule,
-    PartnersModule,
-    BanksModule,
-    DepartmentsModule,
-    ProjectsModule,
-    VouchersModule,
-    InitialBalanceModule,
-    BooksModule,
-    ReportsModule,
-    CashBankModule,
-    ArApModule,
-    IncomeExpenseModule,
-    FixedExpenseModule,
-    SystemModule,
-    EmployeesModule,
-    ExpenseClaimsModule,
-    LoansModule,
-    BankStmtModule,
-    PayrollModule,
-    OcrModule,
-    ReceiptsModule,
-    ExtractModule,
-    VoiceAssistantModule,
-  ],
-  providers: [
-    { provide: APP_GUARD, useClass: GlobalAuthGuard },
-    { provide: APP_GUARD, useClass: PermissionsGuard },
-    // 注意：RolesGuard 此前未注册，导致 @RequireRoles('admin') 形同虚设
-    { provide: APP_GUARD, useClass: RolesGuard },
-    // 多公司隔离：守卫通过后写入公司上下文
-    { provide: APP_INTERCEPTOR, useClass: CompanyScopeInterceptor },
-    SeedService,
-  ],
-})
-export class AppModule {}
+/** 内核模块（迁移完成后只保留记账底座与系统管理） */
+const CORE_MODULES = [
+  SetupModule,
+  AuthModule,
+  AccountsModule,
+  PartnersModule,
+  VouchersModule,
+  InitialBalanceModule,
+  BooksModule,
+  SystemModule,
+]
+
+@Module({})
+export class AppModule {
+  /**
+   * 创建应用根模块。
+   *
+   * @param pluginModules  已启用插件的 Nest 模块（按依赖顺序）
+   * @param pluginEntities 已安装插件的 TypeORM 实体（含已停用，避免同步时误删表）
+   */
+  static register(pluginModules: any[] = [], pluginEntities: any[] = []): DynamicModule {
+    return {
+      module: AppModule,
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          envFilePath: ['.env.local', '.env'],
+          ignoreEnvFile: false,
+        }),
+        TypeOrmModule.forRootAsync({
+          imports: [ConfigModule],
+          useFactory: () => buildDatabaseOptions(pluginEntities),
+        }),
+        TypeOrmModule.forFeature([Permission, Role, User, Account, Company, UserCompany]),
+        CompanyReposModule,
+        ...CORE_MODULES,
+        PluginsModule,
+        ...pluginModules,
+      ],
+      providers: [
+        { provide: APP_GUARD, useClass: GlobalAuthGuard },
+        { provide: APP_GUARD, useClass: PermissionsGuard },
+        // 注意：RolesGuard 此前未注册，导致 @RequireRoles('admin') 形同虚设
+        { provide: APP_GUARD, useClass: RolesGuard },
+        // 多公司隔离：守卫通过后写入公司上下文
+        { provide: APP_INTERCEPTOR, useClass: CompanyScopeInterceptor },
+        SeedService,
+      ],
+    }
+  }
+}

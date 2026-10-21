@@ -101,7 +101,7 @@ function similarity(expected, actual) {
 }
 
 async function main() {
-  const { OcrEngine } = require('../dist/modules/ocr/ocr.engine.js')
+  const { OcrEngine } = require('../data/plugins/ocr/server/modules/ocr/engine/ocr.engine.js')
   const engine = new OcrEngine()
   await engine.onModuleInit()
   if (!engine.isReady()) {

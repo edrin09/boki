@@ -980,6 +980,14 @@ export const PERMISSION_SEED: SeedPermissionNode[] = [
         path: '/system/ai',
         sort: 6,
       },
+      {
+        code: 'system:plugin',
+        name: '插件管理',
+        module: 'plugin',
+        type: PermissionType.MENU,
+        path: '/system/plugins',
+        sort: 7,
+      },
     ],
   },
   {

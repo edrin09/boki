@@ -1,0 +1,40 @@
+{
+  "id": "ar-ap",
+  "name": "应收应付",
+  "version": "1.0.0",
+  "apiVersion": "^1.0.0",
+  "engines": { "boki": ">=1.0.0" },
+  "kind": "domain",
+  "scopeMode": "scoped",
+  "trust": "official",
+  "author": "boki",
+  "license": "Apache-2.0",
+  "description": "应收应付往来余额、核销记录与自动凭证",
+  "dependencies": { "banks": "^1.0.0" },
+  "permissions": [
+    "ar-ap",
+    "ar-ap:write-off"
+  ],
+  "contributes": {
+    "server": "server/index.js",
+    "client": "client/index.js",
+    "routes": [
+      {
+        "path": "/ar-ap",
+        "name": "ArAp",
+        "component": "ArApPage",
+        "meta": { "title": "应收应付", "permission": "ar-ap" }
+      }
+    ],
+    "menu": [
+      {
+        "group": "cash",
+        "title": "应收应付",
+        "path": "/ar-ap",
+        "permission": "ar-ap"
+      }
+    ],
+    "slots": []
+  },
+  "tables": ["fin_write_off"]
+}

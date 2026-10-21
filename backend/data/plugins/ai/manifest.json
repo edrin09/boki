@@ -1,0 +1,32 @@
+{
+  "id": "ai",
+  "name": "AI 增强",
+  "version": "1.0.0",
+  "apiVersion": "^1.0.0",
+  "engines": { "boki": ">=1.0.0" },
+  "kind": "ai",
+  "scopeMode": "scoped",
+  "trust": "official",
+  "author": "boki",
+  "license": "Apache-2.0",
+  "description": "AI 模型接入配置与连接测试（仅迁移现有能力，不新增 AI 功能）",
+  "dependencies": {},
+  "permissions": ["system:ai-config"],
+  "contributes": {
+    "server": "server/index.js",
+    "client": "client/index.js",
+    "routes": [
+      {
+        "path": "/system/ai",
+        "name": "SystemAiConfig",
+        "component": "SystemAiPage",
+        "meta": { "title": "AI模型设置", "permission": "system:ai-config" }
+      }
+    ],
+    "menu": [
+      { "group": "system", "title": "AI模型设置", "path": "/system/ai", "permission": "system:ai-config" }
+    ],
+    "slots": []
+  },
+  "tables": []
+}

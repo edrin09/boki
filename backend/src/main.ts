@@ -1,12 +1,16 @@
 import 'reflect-metadata'
+// 必须早于 AppModule：避免 sherpa-onnx 抢先加载 ONNX Runtime DLL
+import './plugins/ocr-native.preload'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { Logger, ValidationPipe } from '@nestjs/common'
-import { NestFactory } from '@nestjs/core'
-import { Reflector } from '@nestjs/core'
+import { NestFactory, Reflector } from '@nestjs/core'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { NextFunction, Request, Response } from 'express'
 import { AppModule } from './modules/app.module'
+import { loadPluginRuntime } from './plugins/plugin.loader'
+import { clearSyncRequired } from './plugins/plugin.state'
+import { syncRequiredMarker } from './plugins/plugin.paths'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { LogInterceptor } from './common/interceptors/log.interceptor'
 import { TransformInterceptor } from './common/interceptors/transform.interceptor'
@@ -14,9 +18,21 @@ import { SystemService } from './modules/system/system.service'
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap')
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    bufferLogs: false,
-  })
+
+  // 插件运行时：先加载已启用插件，再把模块与实体交给 Nest / TypeORM
+  const runtime = loadPluginRuntime()
+  for (const error of runtime.errors) {
+    logger.warn(`插件 ${error.id} 未加载：${error.message}`)
+  }
+  if (runtime.plugins.length) {
+    logger.log(`已启用插件：${runtime.plugins.map((p) => `${p.manifest.id}@${p.manifest.version}`).join(', ')}`)
+  }
+  const pendingSync = fs.existsSync(syncRequiredMarker())
+
+  const app = await NestFactory.create<NestExpressApplication>(
+    AppModule.register(runtime.modules, runtime.entities),
+    { bufferLogs: false },
+  )
 
   const prefix = process.env.APP_PREFIX || 'api'
   app.setGlobalPrefix(prefix)
@@ -52,17 +68,8 @@ async function bootstrap(): Promise<void> {
   const port = Number(process.env.APP_PORT || 3000)
   await app.listen(port, '0.0.0.0')
 
-  // 流式语音识别 WebSocket（同端口、/api/voice/stream，握手校验 JWT）
-  const { VoiceAsrService } = await import('./modules/voice-assistant/voice-asr.service')
-  const { createVoiceStreamServer } = await import('./modules/voice-assistant/voice-stream.server')
-  const { JwtService } = await import('@nestjs/jwt')
-  createVoiceStreamServer(
-    app.getHttpServer(),
-    app.get(VoiceAsrService, { strict: false }),
-    app.get(JwtService, { strict: false }),
-    prefix,
-    (err) => logger.warn(`语音流会话异常: ${err.message}`),
-  )
+  // schema 同步已完成，清理一次性标记
+  if (pendingSync) clearSyncRequired()
 
   logger.log(`应用已启动: http://localhost:${port}/${prefix}`)
   logger.log(`接口文档: http://localhost:${port}/${prefix}`)

@@ -14,3 +14,14 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+interface Window {
+  Vue: typeof import('vue')
+  VueRouter: typeof import('vue-router')
+  Pinia: typeof import('pinia')
+  ElementPlus: typeof import('element-plus')
+  ElementPlusIconsVue: typeof import('@element-plus/icons-vue')
+  axios: typeof import('axios').default
+  dayjs: typeof import('dayjs')
+  XLSX: typeof import('xlsx')
+}

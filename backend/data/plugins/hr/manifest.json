@@ -1,0 +1,95 @@
+{
+  "id": "hr",
+  "name": "薪酬报销",
+  "version": "1.0.0",
+  "apiVersion": "^1.0.0",
+  "engines": { "boki": ">=1.0.0" },
+  "kind": "domain",
+  "scopeMode": "scoped",
+  "trust": "official",
+  "author": "boki",
+  "license": "Apache-2.0",
+  "description": "员工档案、报销单、借款单、工资表与凭证生成",
+  "dependencies": { "banks": "^1.0.0", "departments": "^1.0.0", "ocr": "^1.0.0" },
+  "permissions": [
+    "hr",
+    "hr:employee",
+    "hr:employee:create",
+    "hr:employee:update",
+    "hr:employee:delete",
+    "hr:expense-claim",
+    "hr:expense-claim:create",
+    "hr:expense-claim:update",
+    "hr:expense-claim:delete",
+    "hr:expense-claim:approve",
+    "hr:expense-claim:pay",
+    "hr:loan",
+    "hr:loan:create",
+    "hr:loan:update",
+    "hr:loan:delete",
+    "hr:loan:approve",
+    "hr:loan:repay",
+    "hr:payroll",
+    "hr:payroll:create",
+    "hr:payroll:update",
+    "hr:payroll:delete",
+    "hr:payroll:approve",
+    "hr:payroll:pay"
+  ],
+  "contributes": {
+    "server": "server/index.js",
+    "client": "client/index.js",
+    "routes": [
+      {
+        "path": "/hr/employees",
+        "name": "HrEmployees",
+        "component": "HrEmployeesPage",
+        "meta": { "title": "员工管理", "permission": "hr:employee" }
+      },
+      {
+        "path": "/hr/expense-claims",
+        "name": "HrExpenseClaims",
+        "component": "HrExpenseClaimsPage",
+        "meta": { "title": "报销单", "permission": "hr:expense-claim" }
+      },
+      {
+        "path": "/hr/loans",
+        "name": "HrLoans",
+        "component": "HrLoansPage",
+        "meta": { "title": "借款单", "permission": "hr:loan" }
+      },
+      {
+        "path": "/hr/payrolls",
+        "name": "HrPayrolls",
+        "component": "HrPayrollsPage",
+        "meta": { "title": "工资表", "permission": "hr:payroll" }
+      },
+      {
+        "path": "/hr/payrolls/:id/edit",
+        "name": "HrPayrollEdit",
+        "component": "HrPayrollEditPage",
+        "meta": {
+          "title": "编辑工资明细",
+          "permission": "hr:payroll:update",
+          "activeMenu": "/hr/payrolls"
+        }
+      }
+    ],
+    "menu": [
+      { "group": "hr", "title": "员工管理", "path": "/hr/employees", "permission": "hr:employee" },
+      { "group": "hr", "title": "报销单", "path": "/hr/expense-claims", "permission": "hr:expense-claim" },
+      { "group": "hr", "title": "借款单", "path": "/hr/loans", "permission": "hr:loan" },
+      { "group": "hr", "title": "工资表", "path": "/hr/payrolls", "permission": "hr:payroll" }
+    ],
+    "slots": []
+  },
+  "tables": [
+    "fin_employee",
+    "fin_expense_claim",
+    "fin_expense_claim_item",
+    "fin_payroll",
+    "fin_payroll_item",
+    "fin_loan",
+    "fin_employee_settlement"
+  ]
+}

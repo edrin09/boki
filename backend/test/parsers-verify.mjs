@@ -7,7 +7,7 @@
 import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 
-const { parseDocument } = require('../dist/modules/receipts/parsers/parser.registry.js')
+const { parseDocument } = require('../data/plugins/ocr/server/modules/ocr/parsers/parser.registry.js')
 
 let passed = 0
 let failed = 0

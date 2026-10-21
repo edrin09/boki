@@ -26,7 +26,7 @@ export const constantRoutes: RouteRecordRaw[] = [
   },
   {
     path: '/',
-    redirect: '/dashboard',
+    redirect: '/voucher/list',
   },
   {
     path: '/:pathMatch(.*)*',
@@ -42,20 +42,6 @@ export const constantRoutes: RouteRecordRaw[] = [
  * 顶层统一使用 AppLayout，children 承载具体页面
  */
 export const businessRoutes: RouteRecordRaw[] = [
-  {
-    path: '/dashboard',
-    component: AppLayout,
-    meta: { title: '工作台', permission: 'dashboard' },
-    children: [
-      {
-        path: '',
-        name: 'Dashboard',
-        component: () => import('@/views/dashboard/index.vue'),
-        meta: { title: '工作台' },
-      },
-    ],
-  },
-
   // ============ 凭证管理 ============
   {
     path: '/voucher',
@@ -74,47 +60,6 @@ export const businessRoutes: RouteRecordRaw[] = [
         name: 'VoucherCreate',
         component: () => import('@/views/voucher/create/index.vue'),
         meta: { title: '手动录入', permission: 'voucher:create' },
-      },
-    ],
-  },
-
-  // ============ 资金往来 ============
-  {
-    path: '/cash',
-    component: AppLayout,
-    redirect: '/cash-bank',
-    meta: { title: '资金往来', permission: 'cash' },
-    children: [
-      { path: '', redirect: '/cash-bank' },
-      {
-        path: '/cash-bank',
-        name: 'CashBank',
-        component: () => import('@/views/cash-bank/index.vue'),
-        meta: { title: '现金银行', permission: 'cash-bank' },
-      },
-      {
-        path: '/ar-ap',
-        name: 'ArAp',
-        component: () => import('@/views/ar-ap/index.vue'),
-        meta: { title: '应收应付', permission: 'ar-ap' },
-      },
-      {
-        path: '/income-expense',
-        name: 'IncomeExpense',
-        component: () => import('@/views/income-expense/index.vue'),
-        meta: { title: '其他收支', permission: 'income-expense' },
-      },
-      {
-        path: '/cash/fixed-expense',
-        name: 'FixedExpense',
-        component: () => import('@/views/fixed-expense/index.vue'),
-        meta: { title: '固定费用', permission: 'fixed-expense' },
-      },
-      {
-        path: '/cash/bank-stmt',
-        name: 'BankStmt',
-        component: () => import('@/views/cash-bank/bank-stmt.vue'),
-        meta: { title: '银行流水', permission: 'bank-stmt' },
       },
     ],
   },
@@ -154,123 +99,6 @@ export const businessRoutes: RouteRecordRaw[] = [
     ],
   },
 
-  // ============ 薪酬报销 ============
-  {
-    path: '/hr',
-    component: AppLayout,
-    redirect: '/hr/employees',
-    meta: { title: '薪酬报销', permission: 'hr' },
-    children: [
-      { path: '', redirect: '/hr/employees' },
-      {
-        path: 'employees',
-        name: 'HrEmployees',
-        component: () => import('@/views/hr/employees/index.vue'),
-        meta: { title: '员工管理', permission: 'hr:employee' },
-      },
-      {
-        path: 'expense-claims',
-        name: 'HrExpenseClaims',
-        component: () => import('@/views/hr/expense-claims/index.vue'),
-        meta: { title: '报销单', permission: 'hr:expense-claim' },
-      },
-      {
-        path: 'loans',
-        name: 'HrLoans',
-        component: () => import('@/views/hr/loans/index.vue'),
-        meta: { title: '借款单', permission: 'hr:loan' },
-      },
-      {
-        path: 'payrolls',
-        name: 'HrPayrolls',
-        component: () => import('@/views/hr/payrolls/index.vue'),
-        meta: { title: '工资表', permission: 'hr:payroll' },
-      },
-      {
-        path: 'payrolls/:id/edit',
-        name: 'HrPayrollEdit',
-        component: () => import('@/views/hr/payrolls/edit.vue'),
-        meta: { title: '编辑工资明细', permission: 'hr:payroll:update', activeMenu: '/hr/payrolls' },
-      },
-    ],
-  },
-
-  // ============ 票据智能记账 ============
-  {
-    path: '/receipts',
-    component: AppLayout,
-    redirect: '/receipts/workbench',
-    meta: { title: 'AI 智能记账', permission: 'receipts' },
-    children: [
-      { path: '', redirect: '/receipts/workbench' },
-      {
-        path: 'list',
-        name: 'ReceiptList',
-        component: () => import('@/views/receipts/list.vue'),
-        meta: { title: '票据列表', permission: 'receipt:list' },
-      },
-      {
-        path: 'workbench',
-        name: 'ReceiptWorkbench',
-        component: () => import('@/views/receipts/workbench.vue'),
-        meta: { title: '上传记账', permission: 'receipts:workbench' },
-      },
-      {
-        path: 'rules',
-        name: 'ReceiptRules',
-        component: () => import('@/views/receipts/rules.vue'),
-        meta: { title: '归类规则', permission: 'receipts:rules' },
-      },
-    ],
-  },
-
-  // ============ 财务报表 ============
-  {
-    path: '/reports',
-    component: AppLayout,
-    redirect: '/reports/balance-sheet',
-    meta: { title: '财务报表', permission: 'reports' },
-    children: [
-      { path: '', redirect: '/reports/balance-sheet' },
-      {
-        path: 'balance-sheet',
-        name: 'ReportBalanceSheet',
-        component: () => import('@/views/reports/balance-sheet/index.vue'),
-        meta: { title: '资产负债表', permission: 'reports:balance-sheet' },
-      },
-      {
-        path: 'profit-loss',
-        name: 'ReportProfitLoss',
-        component: () => import('@/views/reports/profit-loss/index.vue'),
-        meta: { title: '利润表', permission: 'reports:profit-loss' },
-      },
-      {
-        path: 'ledger',
-        name: 'ReportLedger',
-        component: () => import('@/views/reports/ledger.vue'),
-        meta: { title: '票据台账', permission: 'reports:ledger' },
-      },
-      {
-        path: 'cash-flow',
-        name: 'ReportCashFlow',
-        component: () => import('@/views/reports/cash-flow.vue'),
-        meta: { title: '现金流量简表', permission: 'reports:cash-flow' },
-      },
-      {
-        path: 'expense-analysis',
-        name: 'ReportExpenseAnalysis',
-        component: () => import('@/views/reports/expense-analysis.vue'),
-        meta: { title: '费用结构分析', permission: 'reports:expense-analysis' },
-      },
-      {
-        path: 'monthly-close',
-        name: 'ReportMonthlyClose',
-        component: () => import('@/views/reports/monthly-close.vue'),
-        meta: { title: '一键月结', permission: 'reports:monthly-close' },
-      },
-    ],
-  },
-
   // ============ 基础资料 ============
   {
     path: '/settings',
@@ -292,24 +120,6 @@ export const businessRoutes: RouteRecordRaw[] = [
         meta: { title: '往来单位', permission: 'settings:partner' },
       },
       {
-        path: 'banks',
-        name: 'SettingBanks',
-        component: () => import('@/views/settings/banks/index.vue'),
-        meta: { title: '资金账户', permission: 'settings:bank' },
-      },
-      {
-        path: 'departments',
-        name: 'SettingDepartments',
-        component: () => import('@/views/settings/departments/index.vue'),
-        meta: { title: '部门管理', permission: 'settings:department' },
-      },
-      {
-        path: 'projects',
-        name: 'SettingProjects',
-        component: () => import('@/views/settings/projects/index.vue'),
-        meta: { title: '项目管理', permission: 'settings:project' },
-      },
-      {
         path: 'initial-balance',
         name: 'SettingInitialBalance',
         component: () => import('@/views/settings/initial-balance/index.vue'),
@@ -321,12 +131,6 @@ export const businessRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/settings/company.vue'),
         meta: { title: '公司信息', permission: 'settings:company' },
       },
-      {
-        path: 'companies',
-        name: 'SettingCompanies',
-        component: () => import('@/views/system/companies/index.vue'),
-        meta: { title: '记账公司', permission: 'settings:company-manage' },
-      },
     ],
   },
 
@@ -334,34 +138,11 @@ export const businessRoutes: RouteRecordRaw[] = [
   {
     path: '/system',
     component: AppLayout,
-    redirect: '/system/users',
+    // 用户/角色/权限页面已迁入 iam 插件，内核兜底指向操作日志
+    redirect: '/system/logs',
     meta: { title: '系统管理', permission: 'system' },
     children: [
-      { path: '', redirect: '/system/users' },
-      {
-        path: 'companies',
-        name: 'SystemCompanies',
-        component: () => import('@/views/system/companies/index.vue'),
-        meta: { title: '记账公司', permission: 'system:company' },
-      },
-      {
-        path: 'users',
-        name: 'SystemUsers',
-        component: () => import('@/views/system/users/index.vue'),
-        meta: { title: '用户管理', permission: 'system:user' },
-      },
-      {
-        path: 'roles',
-        name: 'SystemRoles',
-        component: () => import('@/views/system/roles/index.vue'),
-        meta: { title: '角色管理', permission: 'system:role' },
-      },
-      {
-        path: 'permissions',
-        name: 'SystemPermissions',
-        component: () => import('@/views/system/permissions/index.vue'),
-        meta: { title: '权限管理', permission: 'system:permission' },
-      },
+      { path: '', redirect: '/system/logs' },
       {
         path: 'logs',
         name: 'SystemLogs',
@@ -375,10 +156,10 @@ export const businessRoutes: RouteRecordRaw[] = [
         meta: { title: '数据备份', permission: 'system:backup' },
       },
       {
-        path: 'ai',
-        name: 'SystemAiConfig',
-        component: () => import('@/views/system/ai.vue'),
-        meta: { title: 'AI模型设置', permission: 'system:ai-config' },
+        path: 'plugins',
+        name: 'SystemPlugins',
+        component: () => import('@/views/system/plugins/index.vue'),
+        meta: { title: '插件管理', permission: 'system:plugin' },
       },
       {
         path: 'profile',

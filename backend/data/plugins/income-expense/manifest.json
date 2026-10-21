@@ -1,0 +1,58 @@
+{
+  "id": "income-expense",
+  "name": "其他收支",
+  "version": "1.0.0",
+  "apiVersion": "^1.0.0",
+  "engines": { "boki": ">=1.0.0" },
+  "kind": "domain",
+  "scopeMode": "scoped",
+  "trust": "official",
+  "author": "boki",
+  "license": "Apache-2.0",
+  "description": "其他收入/支出单据、固定费用模板与自动生成凭证",
+  "dependencies": { "banks": "^1.0.0" },
+  "permissions": [
+    "income-expense",
+    "income-expense:create",
+    "income-expense:update",
+    "income-expense:delete",
+    "fixed-expense",
+    "fixed-expense:create",
+    "fixed-expense:update",
+    "fixed-expense:delete"
+  ],
+  "contributes": {
+    "server": "server/index.js",
+    "client": "client/index.js",
+    "routes": [
+      {
+        "path": "/income-expense",
+        "name": "IncomeExpense",
+        "component": "IncomeExpensePage",
+        "meta": { "title": "其他收支", "permission": "income-expense" }
+      },
+      {
+        "path": "/cash/fixed-expense",
+        "name": "FixedExpense",
+        "component": "FixedExpensePage",
+        "meta": { "title": "固定费用", "permission": "fixed-expense" }
+      }
+    ],
+    "menu": [
+      {
+        "group": "cash",
+        "title": "其他收支",
+        "path": "/income-expense",
+        "permission": "income-expense"
+      },
+      {
+        "group": "cash",
+        "title": "固定费用",
+        "path": "/cash/fixed-expense",
+        "permission": "fixed-expense"
+      }
+    ],
+    "slots": []
+  },
+  "tables": ["fin_income_expense", "fin_fixed_expense", "fin_fixed_expense_log"]
+}

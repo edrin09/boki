@@ -83,7 +83,12 @@ const main = async () => {
   const stamp = Date.now().toString().slice(-6)
   const partner = await request('POST', '/partners', {
     token,
-    body: { code: `C${stamp}`, name: `测试客户${stamp}`, type: 'customer' },
+    body: {
+      code: `C${stamp}`,
+      name: `测试客户${stamp}`,
+      taxNo: `91310000SMOKE${stamp}`,
+      type: 'customer',
+    },
   })
   ok('新增客户成功', partner.status === 201 && partner.json?.data?.id, JSON.stringify(partner.json))
   const partnerId = partner.json?.data?.id

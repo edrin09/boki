@@ -62,8 +62,8 @@
       </main>
     </div>
 
-    <!-- 语音助手悬浮入口 -->
-    <VoiceAssistant v-permission="'voice:use'" />
+    <!-- 插件全局插槽（语音助手等浮动入口；未安装插件时为空） -->
+    <PluginSlot name="layout.floating" />
   </div>
 </template>
 
@@ -74,9 +74,10 @@ import { ElMessageBox } from 'element-plus'
 import { Fold, Expand, ArrowDown, User, SwitchButton } from '@element-plus/icons-vue'
 import MenuItem from './MenuItem.vue'
 import CompanySwitcher from './CompanySwitcher.vue'
-import VoiceAssistant from '../voice/VoiceAssistant.vue'
+import PluginSlot from '@/components/PluginSlot.vue'
 import { useUserStore } from '@/stores/user'
-import { filterMenus, MENUS, type MenuNode } from '@/router/menus'
+import { filterMenus, mergePluginMenus, MENUS, type MenuNode } from '@/router/menus'
+import { getPluginMenus, pluginRuntimeVersion } from '@/plugins/runtime'
 import { currentPeriod, periodLabel } from '@/utils/format'
 
 const route = useRoute()
@@ -85,10 +86,15 @@ const userStore = useUserStore()
 
 const collapsed = ref(false)
 
-/** 按权限过滤后的菜单 */
-const menus = computed<MenuNode[]>(() =>
-  filterMenus(MENUS, userStore.profile?.permissions ?? []),
-)
+/** 内核 + 插件菜单，按权限过滤 */
+const menus = computed<MenuNode[]>(() => {
+  // 读取版本号以在插件加载完成后重新计算
+  pluginRuntimeVersion.value
+  return filterMenus(
+    mergePluginMenus(MENUS, getPluginMenus()),
+    userStore.profile?.permissions ?? [],
+  )
+})
 
 const activeMenu = computed(() => (route.meta.activeMenu as string) || route.path)
 

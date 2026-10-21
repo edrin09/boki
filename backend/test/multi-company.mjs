@@ -90,7 +90,12 @@ async function main() {
     const basePartner = await call('/partners', {
       method: 'POST',
       token: tokenA,
-      body: { name: `基线客户${stamp}`, type: 'customer' },
+      body: {
+        code: `C${stamp}`,
+        name: `基线客户${stamp}`,
+        taxNo: `91310000BASE${stamp}`,
+        type: 'customer',
+      },
     })
     ok(basePartner.status === 201, '默认公司新增基线往来单位')
     if (basePartner.data?.id) createdPartners.push(basePartner.data.id)
@@ -158,7 +163,12 @@ async function main() {
     const newPartner = await call('/partners', {
       method: 'POST',
       token: tokenB,
-      body: { name: `隔离验证客户${stamp}`, type: 'customer' },
+      body: {
+        code: `B${stamp}`,
+        name: `隔离验证客户${stamp}`,
+        taxNo: `91310000ISO${stamp}`,
+        type: 'customer',
+      },
     })
     ok(newPartner.status === 201 && newPartner.data?.id, '新公司可新增往来单位')
     const partnerIdB = newPartner.data?.id
@@ -167,7 +177,11 @@ async function main() {
     const dupeCode = await call('/partners', {
       method: 'POST',
       token: tokenB,
-      body: { name: '同编码往来单位', code: basePartner.data?.code },
+      body: {
+        name: '同编码往来单位',
+        code: basePartner.data?.code,
+        taxNo: `91310000DUP${stamp}`,
+      },
     })
     ok(dupeCode.status === 201, '新公司可复用默认公司已占用的编码', `status=${dupeCode.status}`)
 
@@ -196,7 +210,7 @@ async function main() {
     const crossUpdate = await call(`/partners/${partnerIdB}`, {
       method: 'PUT',
       token: tokenA2,
-      body: { name: '越权改名' },
+      body: { name: '越权改名', taxNo: `91310000CROSS${stamp}` },
     })
     ok(crossUpdate.status === 404, '跨公司修改返回 404', `status=${crossUpdate.status}`)
 

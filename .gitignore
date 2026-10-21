@@ -54,3 +54,4 @@ desktop/build/icon.ico
 # 验证脚本产物
 backend/test/output/
 /.workbuddy
+/.trae

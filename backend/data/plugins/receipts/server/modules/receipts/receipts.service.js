@@ -1,0 +1,582 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ReceiptsService = void 0;
+exports.resolveUploadDir = resolveUploadDir;
+const crypto = __importStar(require("node:crypto"));
+const fs = __importStar(require("node:fs"));
+const path = __importStar(require("node:path"));
+const node_crypto_1 = require("node:crypto");
+const common_1 = require("@nestjs/common");
+const dayjs_1 = __importDefault(require("dayjs"));
+const receipt_entity_1 = require("@core/entities/receipt.entity");
+const company_repository_1 = require("@core/common/company/company.repository");
+const company_repo_decorator_1 = require("@core/common/company/company-repo.decorator");
+const parser_registry_1 = require("@plugin/ocr/server/modules/ocr/parsers/parser.registry");
+const document_parse_service_1 = require("@plugin/ocr/server/modules/ocr/document-parse.service");
+const classify_service_1 = require("./classify.service");
+const workbench_service_1 = require("./workbench.service");
+const party_sync_service_1 = require("./party-sync.service");
+const system_service_1 = require("@core/modules/system/system.service");
+const vouchers_service_1 = require("@core/modules/vouchers/vouchers.service");
+const expense_claims_service_1 = require("@plugin/hr/server/modules/expense-claims/expense-claims.service");
+const filename_util_1 = require("@core/common/utils/filename.util");
+const folder_intent_util_1 = require("./folder-intent.util");
+const enums_1 = require("@core/common/enums");
+/** 上传根目录（相对 backend，与数据库同层） */
+function resolveUploadDir() {
+    const raw = process.env.UPLOAD_DIR || './data/uploads';
+    return path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw);
+}
+/** 目录期间（如 202610）→ 月末日期（如 2026-10-31），用作开票日期兜底 */
+function periodHintToDate(periodHint) {
+    if (!periodHint)
+        return null;
+    const y = periodHint.slice(0, 4);
+    const m = periodHint.slice(4, 6);
+    const last = (0, dayjs_1.default)(`${y}-${m}-01`).endOf('month').format('YYYY-MM-DD');
+    return last;
+}
+let ReceiptsService = class ReceiptsService {
+    receiptRepo;
+    parser;
+    classify;
+    workbench;
+    systemService;
+    partySync;
+    vouchers;
+    expenseClaims;
+    logger = new common_1.Logger('ReceiptsService');
+    constructor(receiptRepo, parser, classify, workbench, systemService, partySync, vouchers, expenseClaims) {
+        this.receiptRepo = receiptRepo;
+        this.parser = parser;
+        this.classify = classify;
+        this.workbench = workbench;
+        this.systemService = systemService;
+        this.partySync = partySync;
+        this.vouchers = vouchers;
+        this.expenseClaims = expenseClaims;
+    }
+    /** 解析票据上关联的报销单ID列表（JSON 数组，容错解析） */
+    claimIdListOf(claimIds) {
+        if (!claimIds)
+            return [];
+        try {
+            const arr = JSON.parse(claimIds);
+            return Array.isArray(arr) ? arr.filter((x) => typeof x === 'string') : [];
+        }
+        catch {
+            return [];
+        }
+    }
+    async processUpload(files, user, folderPaths) {
+        // 自动记账策略（按当前记账公司配置），关闭时退化为纯识别
+        const policy = await this.resolveAutoPostPolicy();
+        const results = [];
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            try {
+                results.push(await this.processOne(file, user, policy, folderPaths?.[i] ?? null));
+            }
+            catch (err) {
+                const fileName = (0, filename_util_1.recoverFilename)(file.originalname) ?? file.originalname;
+                this.logger.error('票据处理失败 ' + fileName + ': ' + err.message);
+                results.push({ fileName, status: 'failed', message: err.message });
+            }
+        }
+        return results;
+    }
+    /** 读取当前公司的自动生成草稿策略 */
+    async resolveAutoPostPolicy() {
+        try {
+            const info = await this.systemService.getCompanyInfo();
+            return {
+                enabled: info.autoPostEnabled !== 0,
+                threshold: Number.isFinite(Number(info.autoPostThreshold))
+                    ? Number(info.autoPostThreshold)
+                    : 0.8,
+            };
+        }
+        catch {
+            // 读不到公司信息时保守处理：只识别，不自动建草稿
+            return { enabled: false, threshold: 0.8 };
+        }
+    }
+    async processOne(file, user, policy, relativePath = null) {
+        const sha256 = crypto.createHash('sha256').update(file.buffer).digest('hex');
+        // 目录意图：来自上传时的相对路径（文件夹批量上传），纯计算不落库
+        const folder = (0, folder_intent_util_1.parseFolderIntent)(relativePath);
+        // 1. sha256 去重
+        const byHash = await this.receiptRepo.findOne({ where: { sha256 } });
+        if (byHash) {
+            return {
+                fileName: (0, filename_util_1.recoverFilename)(file.originalname) ?? file.originalname,
+                status: 'duplicate',
+                receiptId: byHash.id,
+                message: '文件内容与已有票据重复（sha256 一致），已跳过',
+            };
+        }
+        // 2. 解析（PDF 优先文本层，否则渲染后 OCR；图片直接 OCR）
+        const { result, rawText, pageCount, source } = await this.parser.parse(file.buffer, file.mimetype);
+        // 3. 发票代码+号码组合去重
+        const dupInvoice = await this.findDuplicateInvoice(result);
+        if (dupInvoice) {
+            return {
+                fileName: (0, filename_util_1.recoverFilename)(file.originalname) ?? file.originalname,
+                status: 'duplicate',
+                receiptId: dupInvoice.id,
+                message: `发票（代码 ${dupInvoice.invoiceCode ?? '-'} / 号码 ${dupInvoice.invoiceNo ?? '-'}）已存在`,
+            };
+        }
+        // 4. 落盘
+        const storagePath = await this.saveUpload(file.buffer, file.originalname, file.mimetype);
+        // 5. 保存识别记录
+        const fields = result.fields;
+        const receipt = this.receiptRepo.create({
+            fileName: (0, filename_util_1.recoverFilename)(file.originalname) ?? file.originalname,
+            mimeType: file.mimetype,
+            receiptType: result.type,
+            receiptTypeName: result.typeName,
+            storagePath,
+            sha256,
+            pageCount,
+            rawText: rawText.slice(0, 200_000),
+            structured: JSON.stringify({ fields }),
+            confidence: result.confidence,
+            status: 'parsed',
+            folderPath: folder.raw || null,
+            // 目录给出期间时，作为开票日期的兜底（OCR 漏识别日期很常见）
+            issueDate: stringOf(fields.find((f) => f.key === 'issue_date')?.value) ?? periodHintToDate(folder.periodHint),
+            amount: numberOf(fields.find((f) => f.key === 'total_amount')?.value)
+                ?? numberOf(fields.find((f) => f.key === 'amount')?.value)
+                ?? null,
+            taxAmount: numberOf(fields.find((f) => f.key === 'tax_amount')?.value) ?? null,
+            invoiceCode: stringOf(fields.find((f) => f.key === 'invoice_code')?.value) ?? null,
+            invoiceNo: stringOf(fields.find((f) => f.key === 'invoice_no')?.value) ?? null,
+            sellerName: stringOf(fields.find((f) => f.key === 'seller_name')?.value) ?? null,
+            buyerName: stringOf(fields.find((f) => f.key === 'buyer_name')?.value) ?? null,
+            sellerTaxNo: stringOf(fields.find((f) => f.key === 'seller_tax_no')?.value) ?? null,
+            buyerTaxNo: stringOf(fields.find((f) => f.key === 'buyer_tax_no')?.value) ?? null,
+            createdBy: user?.id ?? null,
+            createdByName: user?.name ?? null,
+        });
+        await this.receiptRepo.save(receipt);
+        // 购销双方识别信息同步入库往来单位（按纳税人识别号去重），失败不阻断上传
+        try {
+            await this.partySync.syncBoth(fieldMap(fields));
+        }
+        catch (err) {
+            this.logger.warn(`往来单位同步失败: ${err.message}`);
+        }
+        // 上传阶段即评估能否自动入账：让用户在结果里就看到"可用/需人工"，
+        // 而不是到生成草稿时才收到 400。
+        const verdict = await this.evaluateBookable(receipt);
+        receipt.bookable = verdict.bookable ? 1 : 0;
+        receipt.blockReason = verdict.reason;
+        await this.receiptRepo.save(receipt);
+        // 方案A：可归类 + 金额有效 + 置信度达标 → 直接生成凭证草稿，
+        // 用户只需点一次「确认入账」。低置信度宁可多问一句。
+        const auto = await this.autoGenerateDraft(receipt, result.confidence, policy, user);
+        return {
+            fileName: (0, filename_util_1.recoverFilename)(file.originalname) ?? file.originalname,
+            status: 'parsed',
+            receiptId: receipt.id,
+            receiptType: result.type,
+            receiptTypeName: result.typeName,
+            confidence: result.confidence,
+            bookable: verdict.bookable,
+            suggestKind: verdict.kind,
+            suggestKindLabel: verdict.kindLabel,
+            blockReason: verdict.reason,
+            drafted: auto.drafted,
+            draftMessage: auto.message,
+            draft: auto.draft,
+            claims: auto.claims,
+            fields: fields.map((f) => ({ key: f.key, label: f.label, value: f.value, confidence: f.confidence })),
+            folder: folder.matched
+                ? {
+                    path: folder.raw,
+                    purpose: folder.purpose,
+                    purposeLabel: folder.purposeLabel,
+                    purposeHit: folder.purposeHit,
+                    ownerName: folder.ownerName,
+                    periodHint: folder.periodHint,
+                }
+                : null,
+        };
+    }
+    /**
+     * 按策略决定是否自动生成凭证草稿。
+     * 任一环节失败都不阻断上传：票据已入库，用户仍可在工作台手工生成。
+     */
+    async autoGenerateDraft(receipt, confidence, policy, user) {
+        if (!policy.enabled) {
+            return { drafted: false, message: '未开启自动生成草稿，请在工作台确认', draft: null, claims: null };
+        }
+        if (!receipt.bookable) {
+            return { drafted: false, message: '该单据无法自动归类，请人工处理', draft: null, claims: null };
+        }
+        if (confidence < policy.threshold) {
+            const pct = (confidence * 100).toFixed(0);
+            return {
+                drafted: false,
+                message: `识别置信度 ${pct}% 低于阈值 ${(policy.threshold * 100).toFixed(0)}%，已保留为待确认`,
+                draft: null,
+                claims: null,
+            };
+        }
+        try {
+            const detail = await this.workbench.generateDraft(receipt.id, {
+                id: user?.id ?? 'system',
+                nickname: user?.name ?? '系统',
+            });
+            const d = detail?.draft;
+            // 目录归属员工流程：改生成报销单（冲抵借款型 + 直接付款型），没有凭证草稿
+            const claimList = Array.isArray(detail?.claims) ? detail.claims : [];
+            if (claimList.length) {
+                return {
+                    drafted: true,
+                    message: null,
+                    draft: null,
+                    claims: claimList.map((c) => ({
+                        id: c.id,
+                        claimNo: c.claimNo,
+                        claimType: c.claimType,
+                        claimTypeLabel: c.claimTypeLabel,
+                        totalAmount: Number(c.totalAmount) || 0,
+                        status: c.status,
+                        statusLabel: c.statusLabel,
+                    })),
+                };
+            }
+            return {
+                drafted: true,
+                message: null,
+                draft: d
+                    ? {
+                        voucherId: d.id,
+                        voucherNo: d.voucherNo,
+                        voucherDate: d.voucherDate,
+                        entries: (d.entries ?? []).map((e) => ({
+                            summary: e.summary,
+                            accountCode: e.accountCode,
+                            accountName: e.accountName,
+                            debit: Number(e.debit) || 0,
+                            credit: Number(e.credit) || 0,
+                        })),
+                    }
+                    : null,
+                claims: null,
+            };
+        }
+        catch (err) {
+            const message = `自动生成草稿失败：${err.message}`;
+            this.logger.warn(`票据 ${receipt.id} 自动建草稿失败: ${err.message}`);
+            return { drafted: false, message, draft: null, claims: null };
+        }
+    }
+    /**
+     * 评估一张已入库票据能否自动生成凭证。
+     * 规则与工作台生成草稿保持一致：先要能归类，再要有有效金额。
+     */
+    async evaluateBookable(receipt) {
+        let kind = null;
+        let kindLabel = null;
+        try {
+            const suggestion = await this.classify.suggest(receipt, { countHit: false });
+            kind = suggestion.kind;
+            kindLabel = suggestion.kindLabel;
+            if (!suggestion.entries.length) {
+                return {
+                    bookable: false,
+                    reason: suggestion.message ?? '该单据暂不支持自动归类，请人工处理',
+                    kind,
+                    kindLabel,
+                };
+            }
+            // 只要有一条分录能取到非零金额，就认为可自动入账。
+            // 各单据的金额字段不同（发票 total_amount / 工资 gross_amount /
+            // 对账单 fee_amount），按归类模板实际用到的字段判断，
+            // 避免出现"识别对了却判定不可记账"。
+            // 红字发票金额为负数（红冲），同样可入账，因此只排除 0。
+            const fields = fieldMap(this.parseFieldArray(receipt));
+            const hasAmount = suggestion.entries.some((tpl) => {
+                const v = numberOf(fields[tpl.amountSource]);
+                return v !== null && v !== 0;
+            });
+            if (!hasAmount) {
+                return { bookable: false, reason: '未识别到有效金额，请人工补录金额后再生成凭证', kind, kindLabel };
+            }
+            return { bookable: true, reason: null, kind, kindLabel };
+        }
+        catch (err) {
+            return { bookable: false, reason: err.message, kind, kindLabel };
+        }
+    }
+    parseFieldArray(receipt) {
+        if (!receipt.structured)
+            return [];
+        try {
+            const parsed = JSON.parse(receipt.structured);
+            return Array.isArray(parsed.fields) ? parsed.fields : [];
+        }
+        catch {
+            return [];
+        }
+    }
+    async findDuplicateInvoice(result) {
+        const code = stringOf(result.fields.find((f) => f.key === 'invoice_code')?.value);
+        const no = stringOf(result.fields.find((f) => f.key === 'invoice_no')?.value);
+        if (!code && !no)
+            return null;
+        // 数电票（全电发票）只有 20 位号码、无发票代码：仅按号码查重，避免照片+扫描件重复入账
+        if (!code && no.length >= 20) {
+            return this.receiptRepo.findOne({ where: { invoiceNo: no } });
+        }
+        // 老式发票代码+号码都识别到才组合查重；缺代码的短号码不查（跨代码可能重号，避免误判）
+        if (!code || !no)
+            return null;
+        return this.receiptRepo.findOne({ where: { invoiceCode: code, invoiceNo: no } });
+    }
+    async saveUpload(buffer, originalName, mimeType) {
+        const month = (0, dayjs_1.default)().format('YYYYMM');
+        const dir = path.join(resolveUploadDir(), month);
+        fs.mkdirSync(dir, { recursive: true });
+        const ext = path.extname(originalName) || extFromMime(mimeType);
+        const fileName = `${(0, node_crypto_1.randomUUID)()}${ext}`;
+        await fs.promises.writeFile(path.join(dir, fileName), buffer);
+        return `uploads/${month}/${fileName}`;
+    }
+    async list(query) {
+        const page = Math.max(1, query.page ?? 1);
+        const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
+        const qb = this.receiptRepo.createQueryBuilder('r').orderBy('r.createdAt', 'DESC');
+        if (query.receiptType)
+            qb.andWhere('r.receiptType = :receiptType', { receiptType: query.receiptType });
+        if (query.startDate)
+            qb.andWhere('r.issueDate >= :startDate', { startDate: query.startDate });
+        if (query.endDate)
+            qb.andWhere('r.issueDate <= :endDate', { endDate: query.endDate });
+        if (query.keyword) {
+            qb.andWhere('(r.fileName LIKE :kw OR r.sellerName LIKE :kw OR r.buyerName LIKE :kw OR r.rawText LIKE :kw)', {
+                kw: `%${query.keyword}%`,
+            });
+        }
+        const [rows, total] = await qb
+            .skip((page - 1) * pageSize)
+            .take(pageSize)
+            .getManyAndCount();
+        return {
+            items: rows.map((r) => this.toView(r)),
+            total,
+            page,
+            pageSize,
+        };
+    }
+    async findOne(id) {
+        const r = await this.receiptRepo.findOne({ where: { id } });
+        return r ? this.toView(r) : null;
+    }
+    /**
+     * 删除未入账票据：仅 parsed/drafted/rejected/failed 可删。
+     * 已确认入账（或关联凭证已审核）的票据拒绝删除，避免账簿与票据脱节。
+     * drafted 状态的关联草稿凭证（含分录）一并删除。
+     */
+    async remove(id) {
+        const r = await this.receiptRepo.findOne({ where: { id } });
+        if (!r)
+            throw new common_1.NotFoundException('票据不存在');
+        if (r.status === 'confirmed') {
+            throw new common_1.BadRequestException('该票据已确认入账，不能删除；如需调整请到凭证管理反审核或红冲处理');
+        }
+        // 目录归属员工流程：删除还挂在草稿态的关联报销单（已审核的报销单先去报销单里处理）
+        for (const cid of this.claimIdListOf(r.claimIds)) {
+            const claim = await this.expenseClaims.findOne(cid).catch(() => null);
+            if (!claim)
+                continue;
+            if (claim.status === 'draft') {
+                await this.expenseClaims.remove(cid);
+            }
+            else {
+                throw new common_1.BadRequestException(`关联报销单 ${claim.claimNo} 已审核，请先在报销单中删除后再删除票据`);
+            }
+        }
+        if (r.voucherId) {
+            try {
+                await this.vouchers.remove(r.voucherId); // 仅草稿可删，已审核会抛错兜底
+            }
+            catch (err) {
+                throw new common_1.BadRequestException(`关联凭证无法删除：${err.message}`);
+            }
+        }
+        await this.receiptRepo.remove(r);
+        const abs = path.join(resolveUploadDir(), '..', r.storagePath);
+        fs.promises.unlink(abs).catch(() => undefined);
+    }
+    /**
+     * 修正识别结果（仅未入账票据）：票据类型、进项/销项方向。
+     * 方向修正写入 directionOverride，归类时优先采用；修正后重新评估能否自动入账。
+     */
+    async update(id, dto) {
+        const r = await this.receiptRepo.findOne({ where: { id } });
+        if (!r)
+            throw new common_1.NotFoundException('票据不存在');
+        if (r.status === 'confirmed') {
+            throw new common_1.BadRequestException('该票据已确认入账，不能修正；如需调整请到凭证管理反审核后处理');
+        }
+        if (dto.receiptType) {
+            if (!Object.values(enums_1.ReceiptType).includes(dto.receiptType)) {
+                throw new common_1.BadRequestException(`未知票据类型: ${dto.receiptType}`);
+            }
+            r.receiptType = dto.receiptType;
+            const parser = parser_registry_1.PARSERS.find((p) => p.type === dto.receiptType);
+            r.receiptTypeName = parser?.typeName ?? '未识别';
+        }
+        if (dto.direction !== undefined) {
+            r.directionOverride = dto.direction;
+        }
+        // 修正后重新评估能否自动入账，让票据重新参与自动记账流程
+        const verdict = await this.evaluateBookable(r);
+        r.bookable = verdict.bookable ? 1 : 0;
+        r.blockReason = verdict.reason;
+        await this.receiptRepo.save(r);
+        return this.findOne(id);
+    }
+    toView(r) {
+        let fields = [];
+        let fieldsRaw = null;
+        if (r.structured) {
+            try {
+                const parsed = JSON.parse(r.structured);
+                fields = parsed.fields ?? [];
+                fieldsRaw = parsed.fields ?? null;
+            }
+            catch {
+                fieldsRaw = r.structured;
+            }
+        }
+        return {
+            id: r.id,
+            fileName: (0, filename_util_1.recoverFilename)(r.fileName) ?? r.fileName,
+            mimeType: r.mimeType,
+            receiptType: r.receiptType,
+            receiptTypeName: r.receiptTypeName,
+            storagePath: r.storagePath,
+            sha256: r.sha256,
+            pageCount: r.pageCount,
+            confidence: r.confidence,
+            status: r.status,
+            bookable: r.bookable === null ? null : Boolean(r.bookable),
+            blockReason: r.blockReason ?? null,
+            issueDate: r.issueDate,
+            amount: r.amount,
+            taxAmount: r.taxAmount,
+            invoiceCode: r.invoiceCode,
+            invoiceNo: r.invoiceNo,
+            sellerName: r.sellerName,
+            buyerName: r.buyerName,
+            sellerTaxNo: r.sellerTaxNo,
+            buyerTaxNo: r.buyerTaxNo,
+            voucherId: r.voucherId,
+            directionOverride: r.directionOverride ?? null,
+            folderPath: r.folderPath ?? null,
+            rejectReason: r.rejectReason,
+            confirmedByName: r.confirmedByName,
+            confirmedAt: r.confirmedAt,
+            rejectedAt: r.rejectedAt,
+            createdAt: r.createdAt,
+            rawText: r.rawText,
+            fields,
+            fieldsRaw,
+            types: parser_registry_1.PARSERS.map((p) => ({ type: p.type, typeName: p.typeName })),
+        };
+    }
+};
+exports.ReceiptsService = ReceiptsService;
+exports.ReceiptsService = ReceiptsService = __decorate([
+    (0, common_1.Injectable)(),
+    __param(0, (0, company_repo_decorator_1.InjectCompanyRepo)(receipt_entity_1.Receipt)),
+    __metadata("design:paramtypes", [company_repository_1.CompanyScopedRepository,
+        document_parse_service_1.DocumentParseService,
+        classify_service_1.ClassifyService,
+        workbench_service_1.ReceiptWorkbenchService,
+        system_service_1.SystemService,
+        party_sync_service_1.PartySyncService,
+        vouchers_service_1.VouchersService,
+        expense_claims_service_1.ExpenseClaimsService])
+], ReceiptsService);
+function stringOf(v) {
+    if (v === null || v === undefined)
+        return null;
+    return String(v);
+}
+function numberOf(v) {
+    if (v === null || v === undefined)
+        return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+}
+function fieldMap(fields) {
+    const map = {};
+    for (const f of fields)
+        map[f.key] = f.value;
+    return map;
+}
+const MIME_EXT = {
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/webp': '.webp',
+    'image/bmp': '.bmp',
+    'image/tiff': '.tiff',
+    'application/pdf': '.pdf',
+};
+function extFromMime(mime) {
+    return MIME_EXT[mime] ?? '.bin';
+}

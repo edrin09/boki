@@ -23,10 +23,10 @@
           <el-tag v-if="item.status !== 1" size="small" type="danger" effect="plain">已停用</el-tag>
         </el-dropdown-item>
 
-        <el-dropdown-item command="manage" divided>
+        <el-dropdown-item v-if="canManage" command="manage" divided>
           <el-icon><Setting /></el-icon>公司管理
         </el-dropdown-item>
-        <el-dropdown-item v-if="userStore.isAdmin" command="create">
+        <el-dropdown-item v-if="canManage && userStore.isAdmin" command="create">
           <el-icon><Plus /></el-icon>新建公司
         </el-dropdown-item>
       </el-dropdown-menu>
@@ -48,6 +48,9 @@ const basicStore = useBasicStore()
 
 const currentName = computed(() => userStore.companyName || '未选择公司')
 
+/** 公司管理页由 multi-company 插件贡献；未安装/无权限时不展示入口 */
+const canManage = computed(() => router.hasRoute('SystemCompanies'))
+
 /** 切换公司后需清空按公司缓存的基础档案，再回到工作台 */
 async function onCommand(command: string) {
   if (command === 'manage') {
@@ -66,7 +69,7 @@ async function onCommand(command: string) {
     basicStore.reset()
     ElMessage.success(`已切换到「${userStore.companyName}」`)
     // 令牌已变更、权限与基础档案已重载，整页刷新最稳妥
-    window.location.href = '/dashboard'
+    window.location.href = '/'
   } catch {
     ElMessage.error('切换公司失败，请重试')
   }

@@ -1,0 +1,57 @@
+{
+  "id": "multi-company",
+  "name": "多公司管理",
+  "version": "1.0.0",
+  "apiVersion": "^1.0.0",
+  "engines": { "boki": ">=1.0.0" },
+  "kind": "platform",
+  "scopeMode": "global",
+  "trust": "official",
+  "author": "boki",
+  "license": "Apache-2.0",
+  "description": "记账公司（账套）档案、成员授权与多账套管理（公司上下文与登录仍在内核）",
+  "dependencies": { "iam": "^1.0.0" },
+  "permissions": [
+    "settings:company-manage",
+    "system:company",
+    "company:view",
+    "company:create",
+    "company:update",
+    "company:delete",
+    "company:member"
+  ],
+  "contributes": {
+    "server": "server/index.js",
+    "client": "client/index.js",
+    "routes": [
+      {
+        "path": "/settings/companies",
+        "name": "SettingCompanies",
+        "component": "MultiCompanyPage",
+        "meta": { "title": "记账公司", "permission": "settings:company-manage" }
+      },
+      {
+        "path": "/system/companies",
+        "name": "SystemCompanies",
+        "component": "MultiCompanyPage",
+        "meta": { "title": "记账公司", "permission": "system:company" }
+      }
+    ],
+    "menu": [
+      {
+        "group": "settings",
+        "title": "记账公司管理",
+        "path": "/settings/companies",
+        "permission": "settings:company-manage"
+      },
+      {
+        "group": "system",
+        "title": "记账公司",
+        "path": "/system/companies",
+        "permission": "system:company"
+      }
+    ],
+    "slots": []
+  },
+  "tables": []
+}

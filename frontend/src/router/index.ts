@@ -2,6 +2,11 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { constantRoutes, businessRoutes } from './routes'
 import { getToken } from '@/api'
 import { useUserStore } from '@/stores/user'
+import {
+  ensurePluginsLoaded,
+  getPluginRoutes,
+  resetPluginRuntime,
+} from '@/plugins/runtime'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -11,6 +16,9 @@ const router = createRouter({
 
 /** 业务路由是否已挂载 */
 let businessMounted = false
+
+/** 动态挂载的路由卸载函数 */
+let removeRouteFns: Array<() => void> = []
 
 /** 按当前用户权限过滤业务路由 */
 function filterRoutes(routes: RouteRecordRaw[], permissions: string[]): RouteRecordRaw[] {
@@ -33,24 +41,34 @@ function filterRoutes(routes: RouteRecordRaw[], permissions: string[]): RouteRec
   return result
 }
 
+/** 内核 + 插件路由 */
+function allBusinessRoutes(): RouteRecordRaw[] {
+  return [...businessRoutes, ...getPluginRoutes()]
+}
+
 /** 挂载业务路由（登录后调用一次） */
 export function mountBusinessRoutes(): void {
   if (businessMounted) return
   const userStore = useUserStore()
   const permissions = userStore.profile?.permissions ?? []
-  const routes = filterRoutes(businessRoutes, permissions)
-  routes.forEach((route) => router.addRoute(route))
+  const routes = filterRoutes(allBusinessRoutes(), permissions)
+  routes.forEach((route) => removeRouteFns.push(router.addRoute(route)))
   businessMounted = true
 }
 
 export function resetBusinessRoutes(): void {
+  removeRouteFns.forEach((fn) => fn())
+  removeRouteFns = []
   businessMounted = false
+  resetPluginRuntime()
 }
 
 /** 首个可访问的路径 */
 export function firstAccessiblePath(permissions: string[]): string {
-  for (const route of filterRoutes(businessRoutes, permissions)) {
-    if (route.path === '/dashboard') return route.path
+  const routes = filterRoutes(allBusinessRoutes(), permissions)
+  // 工作台由插件贡献，登录后优先回到工作台（插件未安装时自然跳过）
+  if (routes.some((route) => route.path === '/dashboard')) return '/dashboard'
+  for (const route of routes) {
     const child = route.children?.find((c) => !c.path.startsWith('/'))
     if (child?.path) return `${route.path}/${child.path}`.replace(/\/+/g, '/')
     if (route.path.startsWith('/')) return route.path
@@ -75,6 +93,7 @@ router.beforeEach(async (to, _from, next) => {
         }
       }
       if (userStore.isLoggedIn) {
+        await ensurePluginsLoaded()
         mountBusinessRoutes()
         return next(userStore.profile?.permissions ? firstAccessiblePath(userStore.profile.permissions) : '/403')
       }
@@ -98,6 +117,7 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   if (!businessMounted) {
+    await ensurePluginsLoaded()
     mountBusinessRoutes()
     // 必须按 path 重新解析：此时 to 可能仍指向 404 兜底路由（name=NotFound），
     // 若沿用 to.name 会再次命中 NotFound 而无法进入真实页面。

@@ -39,7 +39,9 @@ export const authApi = {
 
 // ============ 记账公司管理 ============
 export const companyApi = {
-  /** 我可管理的公司 */
+  /** 内核建账入口：仅当系统还没有任何记账公司时可用（零插件也能建账套） */
+  bootstrap: (data: any) => post<any>('/companies/bootstrap', data),
+  /** 我可管理的公司（multi-company 插件） */
   mine: () => get<CompanyBrief[]>('/companies'),
   detail: (id: string) => get<any>(`/companies/${id}`),
   create: (data: any) => post<any>('/companies', data),
@@ -481,4 +483,59 @@ export const reportApi = {
   expenseAnalysis: (params?: Record<string, any>) => get<any>('/reports/expense-analysis', params),
   monthlyClose: (params?: Record<string, any>) => get<any>('/reports/monthly-close', params),
   overview: (params?: Record<string, any>) => get<any>('/reports/overview', params),
+}
+
+// ============ 插件市场 / 插件管理 ============
+export interface PluginManifest {
+  id: string
+  name: string
+  version: string
+  apiVersion: string
+  description?: string
+  icon?: string
+  author?: string
+  license?: string
+  trust?: string
+  scopeMode?: string
+  kind?: string
+  dependencies?: Record<string, string>
+  permissions?: string[]
+  contributes?: Record<string, any>
+}
+
+export interface MarketPlugin {
+  manifest: PluginManifest
+  installed: boolean
+  enabled: boolean
+  installedVersion?: string
+  hasUpdate: boolean
+}
+
+export interface InstalledPlugin {
+  manifest: PluginManifest
+  enabled: boolean
+  installedAt: string
+  dir: string
+  catalogVersion?: string
+  hasUpdate?: boolean
+}
+
+export interface PluginActionResult {
+  id: string
+  restartRequired: boolean
+  installed?: string[]
+  enabled?: boolean
+  keepData?: boolean
+}
+
+export const pluginApi = {
+  installed: () => get<InstalledPlugin[]>('/plugins'),
+  manifests: () => get<PluginManifest[]>('/plugins/manifests'),
+  detail: (id: string) => get<{ manifest: PluginManifest; installed: boolean; enabled: boolean }>(`/plugins/${id}`),
+  catalog: () => get<MarketPlugin[]>('/market/catalog'),
+  install: (id: string) => post<PluginActionResult>(`/market/plugins/${id}/install`),
+  enable: (id: string) => post<PluginActionResult>(`/plugins/${id}/enable`),
+  disable: (id: string) => post<PluginActionResult>(`/plugins/${id}/disable`),
+  uninstall: (id: string, keepData = true) =>
+    del<PluginActionResult>(`/plugins/${id}?keepData=${keepData}`),
 }

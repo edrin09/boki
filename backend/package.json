@@ -24,6 +24,7 @@
     "test:parsers": "node test/parsers-verify.mjs",
     "test:extract": "node test/extract-verify.mjs",
     "test:reports": "node test/reports-verify.mjs http://127.0.0.1:3000/api",
+    "test:plugins": "node test/plugins.mjs",
     "models:fetch": "node scripts/fetch-ocr-models.mjs",
     "models:fetch-asr": "node scripts/fetch-asr-streaming-model.mjs",
     "test:voice-stream": "node test/voice-stream-smoke.mjs"
