@@ -23,6 +23,7 @@
   "contributes": {
     "server": "server/index.js",
     "client": "client/index.js",
+    "style": "client/style.css",
     "routes": [
       {
         "path": "/settings/companies",

@@ -43,6 +43,7 @@ import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { mountBusinessRoutes, firstAccessiblePath } from '@/router'
+import { ensurePluginsLoaded } from '@/plugins/runtime'
 
 const route = useRoute()
 const router = useRouter()
@@ -71,6 +72,9 @@ async function onSubmit() {
   loading.value = true
   try {
     await userStore.login(form.username, form.password)
+    // 先加载插件（携带插件路由/菜单/插槽），再挂载业务路由；
+    // 否则插件贡献的工作台、语音助手等要到刷新后才出现
+    await ensurePluginsLoaded()
     mountBusinessRoutes()
     ElMessage.success('登录成功')
 
