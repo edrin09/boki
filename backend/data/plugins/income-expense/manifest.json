@@ -10,7 +10,8 @@
   "author": "boki",
   "license": "Apache-2.0",
   "description": "其他收入/支出单据、固定费用模板与自动生成凭证",
-  "dependencies": { "banks": "^1.0.0" },
+  "dependencies": {},
+  "optionalDependencies": { "banks": "^1.0.0" },
   "permissions": [
     "income-expense",
     "income-expense:create",

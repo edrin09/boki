@@ -10,7 +10,8 @@
   "author": "boki",
   "license": "Apache-2.0",
   "description": "记账公司（账套）档案、成员授权与多账套管理（公司上下文与登录仍在内核）",
-  "dependencies": { "iam": "^1.0.0" },
+  "dependencies": {},
+  "optionalDependencies": { "iam": "^1.0.0" },
   "permissions": [
     "settings:company-manage",
     "system:company",

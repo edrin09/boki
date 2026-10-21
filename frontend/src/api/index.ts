@@ -499,6 +499,8 @@ export interface PluginManifest {
   scopeMode?: string
   kind?: string
   dependencies?: Record<string, string>
+  /** 软依赖：仅共享数据/接口，停用后相关功能降级，不拦截、不隐藏 */
+  optionalDependencies?: Record<string, string>
   permissions?: string[]
   contributes?: Record<string, any>
 }
@@ -518,6 +520,8 @@ export interface InstalledPlugin {
   dir: string
   catalogVersion?: string
   hasUpdate?: boolean
+  /** 硬依赖中缺失（未安装/未启用）的项；此时插件会从菜单隐藏 */
+  missingDependencies?: string[]
 }
 
 export interface PluginActionResult {

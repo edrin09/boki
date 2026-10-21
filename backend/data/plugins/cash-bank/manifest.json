@@ -10,7 +10,8 @@
   "author": "boki",
   "license": "Apache-2.0",
   "description": "现金银行收付款、内部转账与银行对账单智能入账",
-  "dependencies": { "banks": "^1.0.0" },
+  "dependencies": {},
+  "optionalDependencies": { "banks": "^1.0.0" },
   "permissions": [
     "cash-bank",
     "cash-bank:create",

@@ -26,7 +26,8 @@
         type="info"
         show-icon
         :closable="false"
-        title="安装插件会自动安装缺失的依赖；卸载被依赖的插件会被拒绝。"
+        title="停用/启用只影响该插件自身，不会牵连其它插件；依赖缺失的插件会自动从菜单隐藏，补齐依赖后自动恢复。"
+        description="安装插件会自动安装缺失的硬依赖。"
         class="tip"
       />
 
@@ -46,19 +47,41 @@
             <el-tag size="small" effect="plain">{{ row.manifest.kind || 'domain' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="依赖" min-width="150">
+        <el-table-column label="依赖" min-width="170">
           <template #default="{ row }">
-            <span v-if="!depNames(row.manifest).length" class="muted">无</span>
-            <el-tag v-for="dep in depNames(row.manifest)" :key="dep" size="small" class="dep-tag">
+            <span v-if="!hardDeps(row.manifest).length && !softDeps(row.manifest).length" class="muted">无</span>
+            <el-tag
+              v-for="dep in hardDeps(row.manifest)"
+              :key="`h-${dep}`"
+              size="small"
+              class="dep-tag"
+              :type="row.missingDependencies?.includes(dep) ? 'danger' : 'info'"
+            >
               {{ dep }}
+            </el-tag>
+            <el-tag
+              v-for="dep in softDeps(row.manifest)"
+              :key="`s-${dep}`"
+              size="small"
+              effect="plain"
+              class="dep-tag"
+            >
+              {{ dep }}（可选）
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100">
+        <el-table-column label="状态" width="150">
           <template #default="{ row }">
             <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
               {{ row.enabled ? '已启用' : '已停用' }}
             </el-tag>
+            <el-tooltip
+              v-if="row.enabled && row.missingDependencies?.length"
+              :content="`缺少依赖：${row.missingDependencies.join('、')}；该插件已自动从菜单隐藏`"
+              placement="top"
+            >
+              <el-tag type="warning" size="small" class="dep-tag">依赖缺失</el-tag>
+            </el-tooltip>
           </template>
         </el-table-column>
         <el-table-column label="更新时间" width="170">
@@ -151,8 +174,19 @@ function formatTime(value?: string): string {
   return date.toLocaleString('zh-CN', { hour12: false })
 }
 
-function depNames(manifest: PluginManifest): string[] {
+function hardDeps(manifest: PluginManifest): string[] {
   return Object.keys(manifest.dependencies ?? {})
+}
+
+function softDeps(manifest: PluginManifest): string[] {
+  return Object.keys(manifest.optionalDependencies ?? {})
+}
+
+/** 已启用、且硬依赖该插件的插件：停用后它们会被自动隐藏（不会被停用） */
+function hiddenDependents(id: string): string[] {
+  return installed.value
+    .filter((p) => p.enabled && p.manifest.id !== id && hardDeps(p.manifest).includes(id))
+    .map((p) => p.manifest.name)
 }
 
 async function loadAll(): Promise<void> {
@@ -177,7 +211,7 @@ function afterAction(message: string): void {
 
 async function onInstall(id: string): Promise<void> {
   const item = catalog.value.find((p) => p.manifest.id === id)
-  const deps = depNames(item?.manifest ?? ({} as PluginManifest))
+  const deps = hardDeps(item?.manifest ?? ({} as PluginManifest))
   const extra = deps.length ? `\n依赖：${deps.join(', ')}（缺失时自动安装）` : ''
   await ElMessageBox.confirm(
     `确定安装插件「${item?.manifest.name ?? id}」？${extra}\n安装后需重启后端生效。`,
@@ -195,8 +229,12 @@ async function onEnable(row: InstalledPlugin): Promise<void> {
 }
 
 async function onDisable(row: InstalledPlugin): Promise<void> {
+  const dependents = hiddenDependents(row.manifest.id)
+  const extra = dependents.length
+    ? `\n依赖它的插件（${dependents.join('、')}）会被自动隐藏，但不会被停用。`
+    : ''
   await ElMessageBox.confirm(
-    `确定停用插件「${row.manifest.name}」？停用后其页面与接口在重启后不可用，数据保留。`,
+    `确定停用插件「${row.manifest.name}」？\n停用只影响该插件自身，其它插件照常运行；数据保留，重启后端后生效。${extra}`,
     '停用插件',
     { type: 'warning' },
   )
@@ -205,8 +243,13 @@ async function onDisable(row: InstalledPlugin): Promise<void> {
 }
 
 async function onUninstall(row: InstalledPlugin): Promise<void> {
+  const dependents = hiddenDependents(row.manifest.id)
+  const extra = dependents.length
+    ? `\n依赖它的插件（${dependents.join('、')}）会被自动隐藏，但不会被卸载。`
+    : ''
   const action = await ElMessageBox.confirm(
-    `确定卸载插件「${row.manifest.name}」？\n选择「保留数据」仅删除代码；选择「删除数据」将同时删除该插件的业务表（不可恢复）。`,
+    `确定卸载插件「${row.manifest.name}」？${extra}\n` +
+      '选择「保留数据」仅删除代码；选择「删除数据」将同时删除该插件的业务表（不可恢复）。',
     '卸载插件',
     {
       type: 'warning',

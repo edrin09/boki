@@ -10,7 +10,8 @@
   "author": "boki",
   "license": "Apache-2.0",
   "description": "资产负债表、利润表、票据台账、现金流量简表、费用结构分析、一键月结与经营看板",
-  "dependencies": {
+  "dependencies": {},
+  "optionalDependencies": {
     "hr": "^1.0.0",
     "receipts": "^1.0.0",
     "income-expense": "^1.0.0"

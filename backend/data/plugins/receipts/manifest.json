@@ -10,7 +10,8 @@
   "author": "boki",
   "license": "Apache-2.0",
   "description": "票据上传、OCR 解析、智能归类、批量记账与归类规则",
-  "dependencies": { "ocr": "^1.0.0", "hr": "^1.0.0", "departments": "^1.0.0" },
+  "dependencies": { "ocr": "^1.0.0", "hr": "^1.0.0" },
+  "optionalDependencies": { "departments": "^1.0.0" },
   "permissions": [
     "receipts",
     "receipts:workbench",

@@ -15,7 +15,10 @@ export interface PluginManifest {
   description?: string
   homepage?: string
   icon?: string
+  /** 硬依赖：插件代码直接 import 了对方模块，缺了无法加载；安装时自动补齐 */
   dependencies?: Record<string, string>
+  /** 软依赖：仅用到对方的数据表或接口，缺了只是相关功能降级；不参与拦截与隐藏 */
+  optionalDependencies?: Record<string, string>
   permissions?: string[]
   contributes?: {
     server?: string
@@ -97,6 +100,8 @@ export interface InstalledPluginInfo {
   dir: string
   catalogVersion?: string
   hasUpdate?: boolean
+  /** 硬依赖中当前未安装或未启用的项（插件仍可启用，但会从菜单隐藏） */
+  missingDependencies?: string[]
 }
 
 export interface CatalogPluginInfo {

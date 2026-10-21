@@ -10,7 +10,8 @@
   "author": "boki",
   "license": "Apache-2.0",
   "description": "员工档案、报销单、借款单、工资表与凭证生成",
-  "dependencies": { "banks": "^1.0.0", "departments": "^1.0.0", "ocr": "^1.0.0" },
+  "dependencies": { "ocr": "^1.0.0" },
+  "optionalDependencies": { "banks": "^1.0.0", "departments": "^1.0.0" },
   "permissions": [
     "hr",
     "hr:employee",

@@ -71,18 +71,51 @@ export class PluginsService {
         dir: path.join(pluginsRootDir(), id),
         catalogVersion: catalog?.version,
         hasUpdate: !!catalog && catalog.version !== manifest.version,
+        missingDependencies: Object.keys(manifest.dependencies ?? {}).filter(
+          (dep) => !state.plugins[dep]?.enabled,
+        ),
       })
     }
     return result
   }
 
-  /** 前端运行时使用：只返回已启用的 manifest */
+  /**
+   * 前端运行时使用：返回已启用、且硬依赖都满足的 manifest。
+   *
+   * 依赖缺失的插件只从清单中剔除（前端菜单/路由/插槽随之消失），
+   * 不改动它的 enabled 状态；依赖恢复后自动回来。
+   */
   enabledManifests(): PluginManifest[] {
     const state = readState()
-    return Object.entries(state.plugins)
-      .filter(([, entry]) => entry.enabled)
-      .map(([id]) => readInstalledManifest(id))
-      .filter((m): m is PluginManifest => !!m)
+    const enabled = new Map<string, PluginManifest>()
+    for (const [id, entry] of Object.entries(state.plugins)) {
+      if (!entry.enabled) continue
+      const manifest = readInstalledManifest(id)
+      if (manifest) enabled.set(id, manifest)
+    }
+
+    // 注意：visiting 只跟踪当前递归路径（进出成对），否则菱形依赖
+    // （如 receipts -> ocr 且 receipts -> hr -> ocr）会被误判成环。
+    const resolved = new Map<string, boolean>()
+    const resolvable = (id: string, visiting: Set<string>): boolean => {
+      const cached = resolved.get(id)
+      if (cached !== undefined) return cached
+      if (visiting.has(id)) return false
+      const manifest = enabled.get(id)
+      if (!manifest) {
+        resolved.set(id, false)
+        return false
+      }
+      visiting.add(id)
+      const ok = Object.keys(manifest.dependencies ?? {}).every((dep) => resolvable(dep, visiting))
+      visiting.delete(id)
+      resolved.set(id, ok)
+      return ok
+    }
+
+    return [...enabled.entries()]
+      .filter(([id]) => resolvable(id, new Set()))
+      .map(([, manifest]) => manifest)
   }
 
   detail(id: string): { manifest: PluginManifest; installed: boolean; enabled: boolean } {
@@ -148,6 +181,12 @@ export class PluginsService {
     visiting.delete(id)
   }
 
+  /**
+   * 启用插件。
+   *
+   * 不因依赖缺失而拦截：缺硬依赖时插件会被 `enabledManifests()` 隐藏，
+   * 装好/启用依赖后自动出现在菜单里。
+   */
   enable(id: string): { id: string; enabled: true; restartRequired: true; missing: string[] } {
     this.assertInstalled(id)
     const state = readState()
@@ -155,21 +194,19 @@ export class PluginsService {
     const missing = Object.keys(manifest.dependencies ?? {}).filter(
       (dep) => !state.plugins[dep]?.enabled,
     )
-    if (missing.length) {
-      throw new BadRequestException(`依赖插件未启用：${missing.join(', ')}`)
-    }
     setEntry(id, { ...state.plugins[id], enabled: true, version: manifest.version })
-    return { id, enabled: true, restartRequired: true, missing: [] }
+    return { id, enabled: true, restartRequired: true, missing }
   }
 
+  /**
+   * 停用插件。
+   *
+   * 只停用它自己，不拦截、不牵连依赖它的插件：
+   * - 依赖它的插件若真需要它的代码，会被 `enabledManifests()` 自动隐藏
+   * - 只是共享数据的插件（如报表读票据表）继续正常工作
+   */
   disable(id: string): { id: string; enabled: false; restartRequired: true } {
     this.assertInstalled(id)
-    const dependents = this.findDependents(id, true)
-    if (dependents.length) {
-      throw new BadRequestException(
-        `以下插件依赖 ${id}，请先停用：${dependents.join(', ')}`,
-      )
-    }
     const state = readState()
     setEntry(id, { ...state.plugins[id], enabled: false })
     return { id, enabled: false, restartRequired: true }
@@ -180,12 +217,6 @@ export class PluginsService {
     keepData: boolean,
   ): Promise<{ id: string; keepData: boolean; restartRequired: true }> {
     this.assertInstalled(id)
-    const dependents = this.findDependents(id, false)
-    if (dependents.length) {
-      throw new BadRequestException(
-        `以下插件依赖 ${id}，请先卸载：${dependents.join(', ')}`,
-      )
-    }
 
     if (!keepData) {
       await this.dropPluginTables(id)
@@ -248,20 +279,6 @@ export class PluginsService {
       }
     }
     walk(source, target)
-  }
-
-  private findDependents(id: string, onlyEnabled: boolean): string[] {
-    const state = readState()
-    const result: string[] = []
-    for (const [pid, entry] of Object.entries(state.plugins)) {
-      if (pid === id) continue
-      if (onlyEnabled && !entry.enabled) continue
-      const manifest = readInstalledManifest(pid)
-      if (manifest?.dependencies && Object.prototype.hasOwnProperty.call(manifest.dependencies, id)) {
-        result.push(pid)
-      }
-    }
-    return result
   }
 
   /** 卸载且删除数据：按实体元数据找到表名并 DROP */

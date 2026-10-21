@@ -10,7 +10,8 @@
   "author": "boki",
   "license": "Apache-2.0",
   "description": "应收应付往来余额、核销记录与自动凭证",
-  "dependencies": { "banks": "^1.0.0" },
+  "dependencies": {},
+  "optionalDependencies": { "banks": "^1.0.0" },
   "permissions": [
     "ar-ap",
     "ar-ap:write-off"
