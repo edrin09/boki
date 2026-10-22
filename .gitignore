@@ -57,3 +57,10 @@ desktop/build/icon.ico
 backend/test/output/
 /.workbuddy
 /.trae
+
+# 本地营销资产（不进版本库，仅本地保留；可免费或收费分发，不上公开仓库）
+# 含：插件市场 marketplace、官网 website、横幅 banner、启动脚本 starts
+marketplace/
+website/
+starts/
+banner/
