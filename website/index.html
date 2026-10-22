@@ -106,7 +106,8 @@
     }
     .hero-sub { font-size: 17px; color: var(--slate); max-width: 540px; margin-bottom: 30px; }
     .hero-sub strong { color: var(--ink); font-weight: 600; }
-    .cta-row { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 26px; }
+    .cta-row { display: flex; flex-wrap: nowrap; gap: 10px; margin-bottom: 26px; }
+    .cta-row .btn { padding: 10px 13px; font-size: 13.5px; gap: 6px; }
     .hero-meta { font-size: 13px; color: var(--slate); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
     .hero-meta b { color: var(--ink); font-weight: 600; }
     .hero-meta .sep { color: var(--border); }
@@ -429,6 +430,8 @@
       .plugins-grid { grid-template-columns: repeat(2, 1fr); }
       .mockup-body { grid-template-columns: 104px 1fr; }
       .mockup-table .tr { grid-template-columns: 1fr .8fr 1.2fr .7fr .7fr; font-size: 9.5px; padding: 6px 8px; }
+      .cta-row { flex-wrap: wrap; }
+      .cta-row .btn { flex: 1 1 40%; }
     }
 
     @media (max-width: 520px) {
@@ -443,7 +446,6 @@
       .community-grid { grid-template-columns: 1fr; }
       .footer-grid { grid-template-columns: 1fr; gap: 28px; }
       .footer-bottom { justify-content: flex-start; }
-      .cta-row .btn { flex: 1; }
     }
 
     /* 下载选择弹窗 */
