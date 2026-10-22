@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BOKI — 离线优先的开源财务软件 | 数据主权在你自己手里</title>
+  <meta name="description" content="BOKI 是离线优先的开源财务软件：复式记账内核 + 插件化架构，数据 / 语音识别 / 大模型三层全离线，SQLite 单文件、无云端依赖、无埋点，账本永远只属于你。" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      --indigo: #4F46E5;
+      --indigo-deep: #4338CA;
+      --sky: #0EA5E9;
+      --gold: #FBBF24;
+      --ink: #0F172A;
+      --slate: #64748B;
+      --mist: #E0E7FF;
+      --bg: #FFFFFF;
+      --bg-soft: #F8FAFC;
+      --border: #E2E8F0;
+      --radius: 14px;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, .05);
+      --shadow-md: 0 8px 24px rgba(15, 23, 42, .08);
+      --shadow-lg: 0 24px 60px rgba(15, 23, 42, .14);
+      --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font);
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+    img { max-width: 100%; display: block; }
+    a { color: inherit; text-decoration: none; }
+    section { scroll-margin-top: 76px; }
+
+    .container { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+
+    /* ============ 导航 ============ */
+    .site-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(255, 255, 255, .86);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid transparent;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .site-nav.scrolled { border-bottom-color: var(--border); box-shadow: var(--shadow-sm); }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 22px; letter-spacing: -1.5px; }
+    .nav-brand img { width: 32px; height: 32px; }
+    .nav-links { display: flex; align-items: center; gap: 30px; list-style: none; }
+    .nav-links a { font-size: 14.5px; color: var(--slate); font-weight: 500; transition: color .15s; }
+    .nav-links a:hover, .nav-links a.active { color: var(--indigo); }
+    .nav-cta { display: flex; align-items: center; gap: 12px; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      font-weight: 600; font-size: 14.5px; border-radius: 10px; cursor: pointer;
+      padding: 10px 20px; border: 1px solid transparent; transition: all .18s; white-space: nowrap;
+      font-family: var(--font);
+    }
+    .btn-primary { background: linear-gradient(135deg, var(--indigo), var(--sky)); color: #fff; box-shadow: 0 4px 14px rgba(79, 70, 229, .35); }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(79, 70, 229, .45); }
+    .btn-outline { background: #fff; border-color: var(--border); color: var(--ink); }
+    .btn-outline:hover { border-color: var(--indigo); color: var(--indigo); }
+    .btn-ghost { background: var(--bg-soft); color: var(--ink); }
+    .btn-ghost:hover { background: var(--mist); color: var(--indigo-deep); }
+    .btn svg { width: 17px; height: 17px; flex-shrink: 0; }
+    .nav-toggle {
+      display: none; background: none; border: 1px solid var(--border); border-radius: 8px;
+      width: 40px; height: 40px; cursor: pointer; align-items: center; justify-content: center; color: var(--ink);
+    }
+    .mobile-menu {
+      display: none; border-top: 1px solid var(--border); background: #fff;
+      padding: 12px 24px 20px;
+    }
+    .mobile-menu.open { display: block; }
+    .mobile-menu a { display: block; padding: 12px 4px; font-size: 15px; color: var(--ink); font-weight: 500; border-bottom: 1px solid var(--bg-soft); }
+    .mobile-menu a:last-of-type { border-bottom: none; }
+    .mobile-menu .btn { width: 100%; margin-top: 12px; }
+
+    /* ============ Hero ============ */
+    .hero {
+      padding: 148px 0 88px;
+      background:
+        radial-gradient(640px 320px at 88% -10%, rgba(14, 165, 233, .10), transparent 60%),
+        radial-gradient(560px 300px at -8% 0%, rgba(79, 70, 229, .10), transparent 60%),
+        var(--bg);
+    }
+    .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+      color: var(--indigo-deep); background: var(--mist); border-radius: 999px; padding: 6px 14px; margin-bottom: 22px;
+    }
+    .hero-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--indigo); }
+    .hero-lockup { width: 300px; max-width: 80%; margin-bottom: 26px; }
+    .hero h1 { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.22; font-weight: 800; letter-spacing: -1px; margin-bottom: 18px; }
+    .hero h1 .grad {
+      background: linear-gradient(120deg, var(--indigo), var(--sky));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .hero-sub { font-size: 17px; color: var(--slate); max-width: 540px; margin-bottom: 30px; }
+    .hero-sub strong { color: var(--ink); font-weight: 600; }
+    .cta-row { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 26px; }
+    .hero-meta { font-size: 13px; color: var(--slate); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+    .hero-meta b { color: var(--ink); font-weight: 600; }
+    .hero-meta .sep { color: var(--border); }
+
+    /* ---- 界面示意（纯 CSS 绘制的产品 mockup） ---- */
+    .mockup {
+      background: #fff; border: 1px solid var(--border); border-radius: 16px;
+      box-shadow: var(--shadow-lg); overflow: hidden;
+    }
+    .mockup-chrome {
+      display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+      background: var(--bg-soft); border-bottom: 1px solid var(--border);
+    }
+    .mockup-chrome .dots { display: flex; gap: 6px; }
+    .mockup-chrome .dots i { width: 10px; height: 10px; border-radius: 50%; background: #cbd5e1; }
+    .mockup-chrome .url {
+      flex: 1; font-family: var(--mono); font-size: 11px; color: var(--slate);
+      background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; text-align: center;
+    }
+    .mockup-body { display: grid; grid-template-columns: 132px 1fr; min-height: 340px; }
+    .mockup-sider { background: #1F2937; padding: 14px 10px; }
+    .mockup-sider .ms-logo {
+      display: flex; align-items: center; gap: 7px; color: #fff; font-weight: 800; font-size: 14px;
+      letter-spacing: -.5px; background: var(--indigo); border-radius: 8px; padding: 7px 9px; margin-bottom: 12px;
+    }
+    .mockup-sider .ms-logo img { width: 16px; height: 16px; }
+    .mockup-sider a {
+      display: block; font-size: 11.5px; color: #cbd5e1; padding: 6px 9px; border-radius: 6px; margin-bottom: 2px;
+    }
+    .mockup-sider a.on { background: rgba(79, 70, 229, .35); color: #fff; }
+    .mockup-sider a .plug { float: right; font-size: 9px; background: var(--gold); color: #78350f; border-radius: 4px; padding: 0 4px; font-weight: 700; }
+    .mockup-main { padding: 16px 18px; background: var(--bg-soft); }
+    .mockup-main .mm-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .mockup-main .mm-title { font-size: 13.5px; font-weight: 700; }
+    .mockup-main .mm-actions { display: flex; gap: 6px; }
+    .mockup-main .mm-actions i { font-style: normal; font-size: 10px; background: #fff; border: 1px solid var(--border); border-radius: 5px; padding: 2px 8px; color: var(--slate); }
+    .mockup-main .mm-actions i.pri { background: var(--indigo); border-color: var(--indigo); color: #fff; }
+    .mockup-table { background: #fff; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; font-size: 10.5px; }
+    .mockup-table .tr { display: grid; grid-template-columns: 1.1fr .8fr 1.6fr .8fr .8fr; padding: 7px 12px; border-bottom: 1px solid var(--bg-soft); color: var(--ink); }
+    .mockup-table .tr:last-child { border-bottom: none; }
+    .mockup-table .th { background: var(--bg-soft); color: var(--slate); font-weight: 600; }
+    .mockup-table .num { font-family: var(--mono); text-align: right; }
+    .mockup-table .sum { color: var(--indigo-deep); font-weight: 600; }
+    .mockup-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 10.5px; color: var(--slate); }
+    .mockup-foot .tag-ok { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 5px; padding: 2px 8px; font-weight: 600; }
+    .mockup-foot .tag-gold { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; border-radius: 5px; padding: 2px 8px; font-weight: 600; }
+
+    /* ---- 全离线 ---- */
+    .offline-section { background: var(--bg-soft); }
+    .offline-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+    .offline-card {
+      position: relative; background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 30px 28px 26px; overflow: hidden; transition: transform .18s, box-shadow .18s;
+    }
+    .offline-card::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+      background: linear-gradient(90deg, var(--indigo), var(--sky));
+    }
+    .offline-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+    .offline-card .oicon {
+      width: 48px; height: 48px; border-radius: 12px; background: var(--mist); color: var(--indigo);
+      display: flex; align-items: center; justify-content: center; margin-bottom: 18px;
+    }
+    .offline-card .oicon svg { width: 24px; height: 24px; }
+    .offline-card h3 { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+    .offline-card .oflag {
+      display: inline-block; font-size: 11.5px; font-weight: 700; color: #047857;
+      background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 999px; padding: 2px 10px; margin-bottom: 14px;
+    }
+    .offline-card p { font-size: 14px; color: var(--slate); margin-bottom: 18px; }
+    .offline-card .ocode {
+      display: block; font-family: var(--mono); font-size: 11.5px; background: var(--bg-soft);
+      border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--indigo-deep);
+      overflow-x: auto; white-space: nowrap;
+    }
+
+    /* ============ 数据带 ============ */
+    .stats { background: var(--bg-soft); border-block: 1px solid var(--border); padding: 44px 0; }
+    .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; text-align: center; }
+    .stat b { display: block; font-size: clamp(26px, 3vw, 36px); font-weight: 800; letter-spacing: -1px;
+      background: linear-gradient(120deg, var(--indigo), var(--sky)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .stat span { font-size: 13px; color: var(--slate); }
+
+    /* ============ 通用 section ============ */
+    .section { padding: 88px 0; }
+    .section-head { max-width: 640px; margin: 0 auto 52px; text-align: center; }
+    .eyebrow {
+      display: inline-block; font-size: 12.5px; font-weight: 700; letter-spacing: 2px;
+      color: var(--indigo); text-transform: uppercase; margin-bottom: 12px;
+    }
+    .section-head h2 { font-size: clamp(26px, 3.2vw, 36px); font-weight: 800; letter-spacing: -.6px; margin-bottom: 14px; }
+    .section-head p { color: var(--slate); font-size: 16px; }
+
+    /* ---- 特性 ---- */
+    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+    .feature-card {
+      background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 28px 26px; transition: transform .18s, box-shadow .18s, border-color .18s;
+    }
+    .feature-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: var(--mist); }
+    .feature-icon {
+      width: 46px; height: 46px; border-radius: 12px; background: var(--mist);
+      display: flex; align-items: center; justify-content: center; color: var(--indigo); margin-bottom: 18px;
+    }
+    .feature-icon svg { width: 23px; height: 23px; }
+    .feature-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+    .feature-card p { font-size: 14px; color: var(--slate); }
+
+    /* ---- 插件 ---- */
+    .plugins-section { background: var(--bg-soft); }
+    .plugins-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .plugin-card {
+      background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .plugin-card:hover { border-color: var(--indigo); box-shadow: var(--shadow-sm); }
+    .plugin-card .pid {
+      font-family: var(--mono); font-size: 11px; color: var(--indigo-deep); background: var(--mist);
+      display: inline-block; border-radius: 5px; padding: 1px 7px; margin-bottom: 8px; font-weight: 600;
+    }
+    .plugin-card h4 { font-size: 14.5px; font-weight: 700; margin-bottom: 3px; }
+    .plugin-card p { font-size: 12.5px; color: var(--slate); line-height: 1.55; }
+    .plugins-note {
+      text-align: center; margin-top: 34px; font-size: 14px; color: var(--slate);
+    }
+    .plugins-note a { color: var(--indigo); font-weight: 600; }
+
+    /* ---- 架构 ---- */
+    .arch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+    .arch-points { list-style: none; }
+    .arch-points li { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px dashed var(--border); }
+    .arch-points li:last-child { border-bottom: none; }
+    .arch-points .no {
+      flex-shrink: 0; width: 26px; height: 26px; border-radius: 8px; background: var(--indigo); color: #fff;
+      font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 2px;
+    }
+    .arch-points b { display: block; font-size: 15px; margin-bottom: 2px; }
+    .arch-points span { font-size: 13.5px; color: var(--slate); }
+    .arch-diagram { display: grid; gap: 10px; }
+    .arch-layer {
+      border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; background: #fff;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .arch-layer .lt { font-size: 13.5px; font-weight: 700; white-space: nowrap; }
+    .arch-layer .ld { font-size: 12px; color: var(--slate); }
+    .arch-layer .licon {
+      flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    }
+    .arch-layer .licon svg { width: 19px; height: 19px; }
+    .arch-layer.core { background: linear-gradient(135deg, rgba(79,70,229,.08), rgba(14,165,233,.08)); border-color: var(--mist); }
+    .arch-layer.core .licon { background: var(--indigo); color: #fff; }
+    .arch-layer.runtime .licon { background: var(--mist); color: var(--indigo-deep); }
+    .arch-layer.plugins .licon { background: #fffbeb; color: #b45309; }
+    .arch-layer.data .licon { background: #ecfdf5; color: #047857; }
+    .arch-arrow { text-align: center; color: var(--slate); font-size: 16px; line-height: 1; }
+    .plugin-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .plugin-chips i {
+      font-style: normal; font-family: var(--mono); font-size: 10.5px; background: var(--bg-soft);
+      border: 1px solid var(--border); border-radius: 5px; padding: 1px 7px; color: var(--slate);
+    }
+
+    /* ---- 下载 ---- */
+    .download-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+    .download-card {
+      position: relative; background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 26px 24px; display: flex; flex-direction: column; gap: 10px; transition: transform .18s, box-shadow .18s;
+    }
+    .download-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+    .download-card .dicon {
+      width: 44px; height: 44px; border-radius: 11px; display: flex; align-items: center; justify-content: center;
+      background: var(--mist); color: var(--indigo);
+    }
+    .download-card .dicon svg { width: 22px; height: 22px; }
+    .download-card h3 { font-size: 16px; font-weight: 700; }
+    .download-card p { font-size: 13px; color: var(--slate); flex: 1; }
+    .download-card .dcode {
+      font-family: var(--mono); font-size: 11.5px; background: var(--bg-soft); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 12px; color: var(--indigo-deep); overflow-x: auto; white-space: nowrap;
+    }
+    .download-card .rec {
+      position: absolute; top: 16px; right: 16px; font-size: 11px; font-weight: 700; color: #92400e;
+      background: #fef3c7; border: 1px solid #fde68a; border-radius: 999px; padding: 2px 10px;
+    }
+    .download-note { text-align: center; margin-top: 26px; font-size: 13px; color: var(--slate); }
+
+    /* ---- 赞助 ---- */
+    .sponsors-section { background: var(--bg-soft); }
+    .tiers-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+    table.tiers { width: 100%; border-collapse: collapse; min-width: 640px; font-size: 14px; }
+    table.tiers th, table.tiers td { padding: 13px 18px; text-align: left; border-bottom: 1px solid var(--bg-soft); }
+    table.tiers th { background: var(--bg-soft); font-size: 13px; color: var(--slate); font-weight: 600; }
+    table.tiers tr:last-child td { border-bottom: none; }
+    table.tiers td:first-child { font-weight: 700; white-space: nowrap; }
+    table.tiers td .price { color: var(--indigo-deep); font-weight: 600; font-family: var(--mono); font-size: 13px; }
+    .sponsors-note {
+      margin-top: 26px; display: flex; flex-wrap: wrap; gap: 10px 28px; align-items: center; justify-content: center;
+      font-size: 14px; color: var(--slate);
+    }
+    .sponsors-note b { color: var(--ink); }
+
+    /* ---- 安全边界 ---- */
+    .sec-wrap { display: grid; grid-template-columns: 1.1fr .9fr; gap: 24px; align-items: start; }
+    .sec-col {
+      border: 1px solid var(--border); border-radius: var(--radius); padding: 26px 26px 10px;
+      background: #fff; box-shadow: var(--shadow-sm);
+    }
+    .sec-col.gap { background: var(--bg-soft); border-style: dashed; box-shadow: none; }
+    .sec-title { font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 9px; margin-bottom: 18px; letter-spacing: -.2px; }
+    .sec-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .sec-dot.ok { background: #16A34A; box-shadow: 0 0 0 4px rgba(22, 163, 74, .14); }
+    .sec-dot.warn { background: #D97706; box-shadow: 0 0 0 4px rgba(217, 119, 6, .14); }
+    .sec-list { list-style: none; }
+    .sec-list li { position: relative; padding: 0 0 16px 24px; }
+    .sec-list li::before {
+      content: "✓"; position: absolute; left: 0; top: -1px; color: #16A34A; font-weight: 800; font-size: 13px;
+    }
+    .sec-list li.bad::before { content: "!"; color: #D97706; }
+    .sec-list li b { display: block; font-size: 14px; font-weight: 700; margin-bottom: 1px; }
+    .sec-list li span { font-size: 13px; color: var(--slate); }
+    .sec-list li span code {
+      font-family: var(--mono); font-size: 11.5px; background: #fff;
+      border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px;
+    }
+    .sec-plan { border-top: 1px dashed var(--border); padding: 16px 0 18px; margin-top: 2px; }
+    .plan-chip {
+      display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--indigo-deep);
+      background: var(--mist); border-radius: 999px; padding: 3px 11px; margin-bottom: 10px;
+    }
+    .sec-plan p { font-size: 13px; color: var(--slate); }
+    .sec-plan p b { color: var(--ink); }
+
+    /* ---- 商业支持 ---- */
+    .biz-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-bottom: 24px; }
+    .biz-card {
+      border: 1px solid var(--border); border-radius: var(--radius); padding: 24px;
+      background: #fff; display: flex; gap: 16px; transition: border-color .15s, transform .15s;
+    }
+    .biz-card:hover { border-color: var(--indigo); transform: translateY(-3px); }
+    .biz-card .bicon {
+      width: 42px; height: 42px; border-radius: 11px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--mist), #fff); color: var(--indigo-deep);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .biz-card .bicon svg { width: 21px; height: 21px; }
+    .biz-card h3 { font-size: 15.5px; font-weight: 700; margin-bottom: 5px; }
+    .biz-card p { font-size: 13.5px; color: var(--slate); }
+    .biz-cta {
+      border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-soft);
+      padding: 22px 26px; display: flex; flex-wrap: wrap; gap: 14px 24px;
+      align-items: center; justify-content: space-between;
+    }
+    .biz-cta p { font-size: 14px; color: var(--slate); }
+    .biz-cta p b { color: var(--ink); font-weight: 700; }
+
+    /* ---- 社区 ---- */
+    .community-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+    .community-card {
+      border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 22px; background: #fff;
+      transition: border-color .15s, transform .15s;
+    }
+    .community-card:hover { border-color: var(--indigo); transform: translateY(-3px); }
+    .community-card .cicon {
+      width: 40px; height: 40px; border-radius: 10px; background: var(--mist); color: var(--indigo);
+      display: flex; align-items: center; justify-content: center; margin-bottom: 14px;
+    }
+    .community-card .cicon svg { width: 20px; height: 20px; }
+    .community-card h3 { font-size: 15.5px; font-weight: 700; margin-bottom: 6px; }
+    .community-card p { font-size: 13px; color: var(--slate); }
+
+    /* ---- 页脚 ---- */
+    .site-footer { border-top: 1px solid var(--border); background: var(--bg-soft); padding: 56px 0 32px; }
+    .footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 36px; margin-bottom: 40px; }
+    .footer-brand img.lockup { width: 240px; margin-bottom: 14px; }
+    .footer-brand p { font-size: 13px; color: var(--slate); max-width: 300px; }
+    .footer-col h4 { font-size: 13px; font-weight: 700; margin-bottom: 14px; color: var(--ink); }
+    .footer-col a { display: block; font-size: 13.5px; color: var(--slate); padding: 5px 0; transition: color .15s; }
+    .footer-col a:hover { color: var(--indigo); }
+    .footer-bottom {
+      border-top: 1px solid var(--border); padding-top: 24px;
+      display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; justify-content: space-between;
+      font-size: 12.5px; color: var(--slate);
+    }
+    .footer-bottom .lic { display: flex; gap: 16px; flex-wrap: wrap; }
+
+    /* ============ 响应式 ============ */
+    @media (max-width: 1024px) {
+      .nav-links { gap: 18px; }
+      .nav-links a { font-size: 13.5px; }
+      .hero-grid { grid-template-columns: 1fr; gap: 44px; }
+      .hero { padding-top: 128px; }
+      .hero-lockup { width: 260px; }
+      .stats-grid { grid-template-columns: repeat(3, 1fr); row-gap: 32px; }
+      .offline-grid { grid-template-columns: 1fr 1fr; }
+      .sec-wrap { grid-template-columns: 1fr; }
+      .biz-grid { grid-template-columns: 1fr; }
+      .features-grid { grid-template-columns: repeat(2, 1fr); }
+      .plugins-grid { grid-template-columns: repeat(3, 1fr); }
+      .download-grid { grid-template-columns: repeat(2, 1fr); }
+      .community-grid { grid-template-columns: repeat(2, 1fr); }
+      .arch-grid { grid-template-columns: 1fr; gap: 36px; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 768px) {
+      .nav-links, .nav-cta .btn { display: none; }
+      .nav-toggle { display: inline-flex; }
+      .section { padding: 64px 0; }
+      .plugins-grid { grid-template-columns: repeat(2, 1fr); }
+      .mockup-body { grid-template-columns: 104px 1fr; }
+      .mockup-table .tr { grid-template-columns: 1fr .8fr 1.2fr .7fr .7fr; font-size: 9.5px; padding: 6px 8px; }
+    }
+
+    @media (max-width: 520px) {
+      .container { padding: 0 18px; }
+      .hero { padding: 112px 0 64px; }
+      .hero-lockup { width: 220px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .features-grid { grid-template-columns: 1fr; }
+      .plugins-grid { grid-template-columns: 1fr; }
+      .download-grid { grid-template-columns: 1fr; }
+      .offline-grid { grid-template-columns: 1fr; }
+      .community-grid { grid-template-columns: 1fr; }
+      .footer-grid { grid-template-columns: 1fr; gap: 28px; }
+      .footer-bottom { justify-content: flex-start; }
+      .cta-row .btn { flex: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ================= 导航 ================= -->
+  <header class="site-nav" id="siteNav">
+    <div class="container nav-inner">
+      <a class="nav-brand" href="#top" aria-label="BOKI 首页">
+        <img src="assets/boki-mark.svg" alt="BOKI 标志" />
+        <span>boki</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#features">特性</a></li>
+        <li><a href="#offline">离线</a></li>
+        <li><a href="#security">安全</a></li>
+        <li><a href="#plugins">插件</a></li>
+        <li><a href="#architecture">架构</a></li>
+        <li><a href="#download">下载</a></li>
+        <li><a href="#commercial">商业</a></li>
+        <li><a href="#sponsors">赞助</a></li>
+      </ul>
+      <div class="nav-cta">
+        <a class="btn btn-outline" href="https://github.com/edrin09/boki" aria-label="GitHub 仓库">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+          GitHub
+        </a>
+        <a class="btn btn-primary" href="#download">下载 BOKI</a>
+        <button class="nav-toggle" id="navToggle" aria-label="打开菜单" aria-expanded="false" aria-controls="mobileMenu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+      </div>
+    </div>
+    <nav class="mobile-menu" id="mobileMenu">
+      <a href="#features">特性</a>
+      <a href="#offline">离线</a>
+      <a href="#security">安全</a>
+      <a href="#plugins">插件</a>
+      <a href="#architecture">架构</a>
+      <a href="#download">下载</a>
+      <a href="#commercial">商业支持</a>
+      <a href="#sponsors">赞助</a>
+      <a href="#community">社区</a>
+      <a class="btn btn-primary" href="https://github.com/edrin09/boki">GitHub 源码</a>
+    </nav>
+  </header>
+
+  <main id="top">
+
+    <!-- ================= Hero ================= -->
+    <section class="hero">
+      <div class="container hero-grid">
+        <div>
+          <span class="hero-badge"><span class="dot"></span>AGPL-3.0 开源 · 离线优先 · 零云端依赖 · 无埋点</span>
+          <img class="hero-lockup" src="assets/boki-lockup.svg" alt="BOKI — 开源财务软件" />
+          <h1>你的账本<br /><span class="grad">只属于你</span></h1>
+          <p class="hero-sub">
+            BOKI 是<strong>离线优先</strong>的开源财务软件：复式记账内核 + 插件化架构。<strong>数据、语音识别、大模型三层全离线</strong>——
+            SQLite 单文件、本地 OCR、本地流式 ASR，<strong>断网能用，数据不出机器</strong>，没有云端、没有埋点、不接受任何回传。
+          </p>
+          <div class="cta-row">
+            <a class="btn btn-primary" href="#download">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              下载 BOKI
+            </a>
+            <a class="btn btn-outline" href="https://github.com/edrin09/boki">
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+              GitHub 源码
+            </a>
+            <a class="btn btn-ghost" href="#plugins">插件市场 →</a>
+          </div>
+          <p class="hero-meta">
+            <b>Vue 3</b><span class="sep">·</span><b>NestJS</b><span class="sep">·</span><b>SQLite</b><span class="sep">·</span>
+            <b>免环境安装包</b><span class="sep">·</span><b>内网 / 断网可用</b>
+          </p>
+        </div>
+
+        <!-- 界面示意（CSS 绘制，非截图） -->
+        <div class="mockup" role="img" aria-label="BOKI 界面示意：侧边菜单 + 凭证列表">
+          <div class="mockup-chrome">
+            <span class="dots"><i></i><i></i><i></i></span>
+            <span class="url">http://127.0.0.1:9300</span>
+          </div>
+          <div class="mockup-body">
+            <aside class="mockup-sider">
+              <div class="ms-logo"><img src="assets/boki-mark.svg" alt="" />boki</div>
+              <a href="#features">工作台</a>
+              <a class="on" href="#features">凭证管理</a>
+              <a href="#features">现金银行</a>
+              <a href="#features">应收应付</a>
+              <a href="#features">薪酬报销</a>
+              <a href="#features">账簿查询</a>
+              <a href="#features">财务报表</a>
+              <a href="#features">系统管理</a>
+              <a href="#plugins">插件<span class="plug">14</span></a>
+            </aside>
+            <div class="mockup-main">
+              <div class="mm-head">
+                <span class="mm-title">凭证列表 · 2026 年 10 月</span>
+                <span class="mm-actions"><i class="pri">+ 新增凭证</i><i>导出 Excel</i></span>
+              </div>
+              <div class="mockup-table">
+                <div class="tr th"><span>凭证号</span><span>日期</span><span>摘要</span><span class="num">借方</span><span class="num">贷方</span></div>
+                <div class="tr"><span class="sum">记-001</span><span>10-21</span><span>支付第四季度房租</span><span class="num">12,000.00</span><span class="num"></span></div>
+                <div class="tr"><span></span><span></span><span style="padding-left:14px;color:var(--slate)">银行存款 · 招商银行</span><span class="num"></span><span class="num">12,000.00</span></div>
+                <div class="tr"><span class="sum">记-002</span><span>10-21</span><span>销售商品一批</span><span class="num">50,000.00</span><span class="num"></span></div>
+                <div class="tr"><span></span><span></span><span style="padding-left:14px;color:var(--slate)">主营业务收入</span><span class="num"></span><span class="num">44,247.79</span></div>
+                <div class="tr"><span></span><span></span><span style="padding-left:14px;color:var(--slate)">应交税费 · 应交增值税</span><span class="num"></span><span class="num">5,752.21</span></div>
+              </div>
+              <div class="mockup-foot">
+                <span class="tag-ok">✓ 借贷平衡</span>
+                <span class="tag-gold">试算平衡</span>
+                <span>已审核 · 禁止修改</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 全离线 ================= -->
+    <section class="section offline-section" id="offline">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Offline First</span>
+          <h2>三层全离线：数据、语音、大模型</h2>
+          <p>财务数据最敏感。BOKI 的核心能力全部可以在断网、内网环境运行，一个字节都不出机器。</p>
+        </div>
+        <div class="offline-grid">
+          <div class="offline-card">
+            <span class="oicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
+            <h3>数据离线</h3>
+            <span class="oflag">100% 本地</span>
+            <p>SQLite 单文件（WAL 模式）承载全部账务数据，一键备份 / 恢复；无任何外部服务依赖，财务数据不出机器。</p>
+            <span class="ocode">financial.db · 单文件 · 零配置</span>
+          </div>
+          <div class="offline-card">
+            <span class="oicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 18v4"/></svg></span>
+            <h3>语音识别离线</h3>
+            <span class="oflag">音频不上传</span>
+            <p>流式中文语音识别基于 sherpa-onnx（zipformer-zh int8，约 160MB）在本地完整解码，说话内容不经过任何服务器。</p>
+            <span class="ocode">npm run models:fetch-asr</span>
+          </div>
+          <div class="offline-card">
+            <span class="oicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg></span>
+            <h3>大模型可选离线</h3>
+            <span class="oflag">免 API Key</span>
+            <p>AI 插件内置 Ollama / llama.cpp / vLLM 本地大模型预设（OpenAI 兼容协议）；想接 DeepSeek / 通义 / Kimi 等云端模型也随时可切。</p>
+            <span class="ocode">ollama pull qwen2.5:1.5b-instruct</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 安全边界 ================= -->
+    <section class="section" id="security">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Security &amp; Data Sovereignty</span>
+          <h2>先把边界说清楚，再谈安全</h2>
+          <p>我们不写「银行级 AES-256 零知识加密」这类话术。下面这张清单是当前代码的真实状态——做到的写做到，没做的明确标出来。</p>
+        </div>
+        <div class="sec-wrap">
+          <div class="sec-col">
+            <h3 class="sec-title"><span class="sec-dot ok"></span>已经做到的</h3>
+            <ul class="sec-list">
+              <li><b>部署边界在你手里</b><span>单机 / 内网自部署，前后端同源单端口；无云端依赖、无第三方 SDK 回传，代码中不含埋点与遥测。</span></li>
+              <li><b>口令不落明文</b><span>口令以 <code>bcrypt</code> 加盐散列存储；JWT 短期令牌由本机签发，不经过第三方。</span></li>
+              <li><b>授权双层校验</b><span>RBAC 覆盖菜单级 + 操作级权限，前端指令与后端守卫同时校验，改前端绕不过去。</span></li>
+              <li><b>多公司硬隔离</b><span>业务表全部带 <code>company_id</code>，仓储层强制追加过滤；令牌内 <code>companyId</code> 由服务端签名，无法伪造。</span></li>
+              <li><b>操作留痕</b><span>登录、增删改、审核等动作本地留存操作日志，可查询、可清理。</span></li>
+              <li><b>数据随时能带走</b><span>全部数据就是一个 <code>financial.db</code>，可整目录拷走、一键备份、离线搬到另一台机器。</span></li>
+            </ul>
+          </div>
+          <div class="sec-col gap">
+            <h3 class="sec-title"><span class="sec-dot warn"></span>还没做到的（如实标注）</h3>
+            <ul class="sec-list">
+              <li class="bad"><b>数据库加密</b><span><code>financial.db</code> 当前是明文文件——拿到文件就能用任意 SQLite 工具直读。</span></li>
+              <li class="bad"><b>密钥 / 主密码登录</b><span>尚无「免用户名口令、单 Key 解锁」与零知识主密码体系。</span></li>
+              <li class="bad"><b>敏感字段加密</b><span>金额、往来单位等字段未做列级加密。</span></li>
+              <li class="bad"><b>MFA 与备份加密</b><span>当前仅单因子口令；备份出的 <code>.db</code> 文件本身未加密。</span></li>
+            </ul>
+            <div class="sec-plan">
+              <span class="plan-chip">规划中 · 以插件形式交付</span>
+              <p><b>加密路线</b>：主密码 / 恢复密钥解锁 → SQLCipher 库级加密 → 敏感字段列级加密。装不装由你决定，不装就保持现在的零配置体验。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 数据带 ================= -->
+    <section class="stats">
+      <div class="container stats-grid">
+        <div class="stat"><b>14</b><span>官方插件</span></div>
+        <div class="stat"><b>8</b><span>内核模块（自 29 收口）</span></div>
+        <div class="stat"><b>250+</b><span>端到端测试断言</span></div>
+        <div class="stat"><b>0</b><span>外部服务依赖</span></div>
+        <div class="stat"><b>100%</b><span>离线可用</span></div>
+      </div>
+    </section>
+
+    <!-- ================= 特性 ================= -->
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Features</span>
+          <h2>为「记账」这件事做到位</h2>
+          <p>不做大而全的 ERP，只把小微企业每天要用的记账能力做扎实。</p>
+        </div>
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M12 6v7"/><path d="M8.5 9.5h7"/></svg></div>
+            <h3>复式记账强校验</h3>
+            <p>每张凭证至少 2 条分录，借方合计 = 贷方合计，前后端双重校验，不平衡无法保存；明细科目限制、辅助核算必填。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a1 1 0 0 0 1-1v-3"/><path d="M9 12h12"/><path d="M15 8l3 4-3 4"/></svg></div>
+            <h3>插件化架构</h3>
+            <p>内核只留记账引擎，14 个官方插件即装即用、即卸即净；不装的插件在界面里不留一丝痕迹。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+            <h3>离线私有化</h3>
+            <p>数据 / 语音 / 大模型三层全离线：SQLite 单文件、本地 OCR、本地流式 ASR、可选本地大模型，内网 / 断网环境完整可用。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01M9 12v.01M9 15v.01M9 18v.01"/></svg></div>
+            <h3>多公司隔离</h3>
+            <p>一个账号管理多家记账公司，所有业务表带 company_id 全链路隔离，令牌内公司标识由服务端签名保证不可伪造。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h4"/></svg></div>
+            <h3>票据智能记账</h3>
+            <p>上传电子发票 PDF / 扫描件，自动解析类型、金额、税额、购销方；sha256 去重、归类规则，确认后一键生成凭证。</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3z"/></svg></div>
+            <h3>AI 会计员</h3>
+            <p>AI 插件提供模型配置（本地 / 云端可选），语音插件支持自然语言查账记账，悬浮入口即问即答。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 插件 ================= -->
+    <section class="section plugins-section" id="plugins">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Plugins</span>
+          <h2>16 个官方插件，想要什么装什么</h2>
+          <p>在「系统管理 → 插件」页面一键安装、停用、卸载；插件源码全部开源，照着写就能扩展自己的。</p>
+        </div>
+        <div class="plugins-grid">
+          <div class="plugin-card"><span class="pid">banks</span><h4>资金账户</h4><p>库存现金 / 银行存款账户档案</p></div>
+          <div class="plugin-card"><span class="pid">departments</span><h4>部门</h4><p>部门档案与辅助核算</p></div>
+          <div class="plugin-card"><span class="pid">projects</span><h4>项目</h4><p>项目档案与核算</p></div>
+          <div class="plugin-card"><span class="pid">cash-bank</span><h4>现金银行</h4><p>收款 / 付款 / 转账，自动生成凭证</p></div>
+          <div class="plugin-card"><span class="pid">bank-stmt</span><h4>银行流水</h4><p>流水导入与核对</p></div>
+          <div class="plugin-card"><span class="pid">ar-ap</span><h4>应收应付</h4><p>余额查询与往来核销</p></div>
+          <div class="plugin-card"><span class="pid">income-expense</span><h4>其他收支</h4><p>其他收入 / 支出单据</p></div>
+          <div class="plugin-card"><span class="pid">fixed-expense</span><h4>固定费用</h4><p>房租等周期性费用计划</p></div>
+          <div class="plugin-card"><span class="pid">hr</span><h4>薪酬报销</h4><p>员工 / 报销 / 借款 / 工资表</p></div>
+          <div class="plugin-card"><span class="pid">receipts</span><h4>票据智能记账</h4><p>上传 / 解析 / 去重 / 待确认工作台</p></div>
+          <div class="plugin-card"><span class="pid">ocr</span><h4>离线 OCR</h4><p>PP-OCRv4 本地推理与票据解析器</p></div>
+          <div class="plugin-card"><span class="pid">report-pack</span><h4>报表包</h4><p>资产负债 / 利润 / 台账 / 现金流 / 月结 / 看板</p></div>
+          <div class="plugin-card"><span class="pid">ai</span><h4>AI 模型</h4><p>本地 / 云端模型配置</p></div>
+          <div class="plugin-card"><span class="pid">voice</span><h4>语音助手</h4><p>自然语言记账查询</p></div>
+          <div class="plugin-card"><span class="pid">iam</span><h4>用户权限</h4><p>用户 / 角色 / 权限管理面</p></div>
+          <div class="plugin-card"><span class="pid">multi-company</span><h4>多公司</h4><p>记账公司管理与成员授权</p></div>
+        </div>
+        <p class="plugins-note">想写自己的插件？见 <a href="https://github.com/edrin09/boki/blob/main/docs/%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%E4%B8%8E%E8%BF%81%E7%A7%BB%E6%8C%87%E5%8D%97.md">插件开发与迁移指南</a>，manifest 声明路由 / 菜单 / 插槽 / 权限即可。</p>
+      </div>
+    </section>
+
+    <!-- ================= 架构 ================= -->
+    <section class="section" id="architecture">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Architecture</span>
+          <h2>内核做减法，生态做加法</h2>
+          <p>后端业务模块从 29 个收口到 8 个，前端页面从 45 个收口到 18 个——内核只保留记账必需的引擎。</p>
+        </div>
+        <div class="arch-grid">
+          <ul class="arch-points">
+            <li>
+              <span class="no">1</span>
+              <div><b>内核 = 复式记账引擎</b><span>科目、凭证、期初、公司上下文、权限种子——零插件状态下仍可完成「登录 → 建账套 → 记账」完整闭环。</span></div>
+            </li>
+            <li>
+              <span class="no">2</span>
+              <div><b>插件运行时</b><span>manifest 校验 → 动态注册后端 AppModule / 前端路由 / 菜单 / 插槽 → 静态资产注入，全程热插拔。</span></div>
+            </li>
+            <li>
+              <span class="no">3</span>
+              <div><b>插件市场</b><span>系统内浏览 catalog、查看详情、安装 / 卸载 / 启停；卸载时按需保留或清除插件数据。</span></div>
+            </li>
+            <li>
+              <span class="no">4</span>
+              <div><b>依赖与安全</b><span>插件声明依赖自动带上；卸载被依赖插件会被拦截；权限点逐插件声明，越权访问被守卫拦截。</span></div>
+            </li>
+          </ul>
+          <div class="arch-diagram" aria-label="BOKI 分层架构示意">
+            <div class="arch-layer plugins">
+              <span class="licon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+              <div><div class="lt">插件层 · 14 个官方插件</div><div class="ld">页面 / 接口 / 菜单 / 插槽，按需安装</div></div>
+            </div>
+            <div class="arch-arrow">▼ manifest 贡献</div>
+            <div class="arch-layer runtime">
+              <span class="licon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg></span>
+              <div><div class="lt">插件运行时</div><div class="ld">manifest 校验 · 动态注册 · 生命周期管理</div></div>
+            </div>
+            <div class="arch-arrow">▼ 动态挂载</div>
+            <div class="arch-layer core">
+              <span class="licon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+              <div><div class="lt">记账内核</div><div class="ld">复式记账 · 科目 · 期初 · 公司上下文 · RBAC</div></div>
+            </div>
+            <div class="arch-arrow">▼ TypeORM</div>
+            <div class="arch-layer data">
+              <span class="licon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
+              <div><div class="lt">SQLite（WAL）</div><div class="ld">单文件 · 零配置 · 一键备份 / 恢复</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 下载 ================= -->
+    <section class="section" id="download" style="background:var(--bg-soft)">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Download</span>
+          <h2>选一种方式开始</h2>
+          <p>内网办公推荐免环境安装包；开发与自备服务器走源码。</p>
+        </div>
+        <div class="download-grid">
+          <div class="download-card">
+            <span class="rec">推荐</span>
+            <span class="dicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></span>
+            <h3>Windows 免环境安装包</h3>
+            <p>单个 BOKI-Setup.exe。未装 Node、未装数据库、不能联网的机器装完即用；那台机器同时充当局域网服务器。</p>
+            <span class="dcode">desktop/release/BOKI-Setup.exe</span>
+          </div>
+          <div class="download-card">
+            <span class="dicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13 5l-2 14"/></svg></span>
+            <h3>源码运行</h3>
+            <p>两个终端跑起后端（3000）与前端（5173），适合开发、二次开发与自备 Linux / 云主机部署。</p>
+            <span class="dcode">npm i &amp;&amp; npm run dev</span>
+          </div>
+          <div class="download-card">
+            <span class="dicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 19h16"/></svg></span>
+            <h3>离线模型</h3>
+            <p>OCR 模型约 25MB、流式语音识别约 160MB，首次使用前下载；缺失时服务照常启动，仅识别 / 语音类功能提示未就绪。</p>
+            <span class="dcode">npm run models:fetch &amp;&amp; npm run models:fetch-asr</span>
+          </div>
+          <div class="download-card">
+            <span class="dicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg></span>
+            <h3>Docker / 服务器</h3>
+            <p>后端托管前端静态文件即可同源单端口；Nginx 反代 /api 到 3000 端口，PM2 常驻。</p>
+            <span class="dcode">WEB_DIST_DIR=… node dist/main.js</span>
+          </div>
+        </div>
+        <p class="download-note">当前提供 Windows 安装包；macOS / Linux 请走源码运行，桌面壳多平台打包已在路线图中。</p>
+      </div>
+    </section>
+
+    <!-- ================= 商业支持 ================= -->
+    <section class="section" id="commercial">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Enterprise</span>
+          <h2>企业级支持与商业授权</h2>
+          <p>开源版已包含完整记账能力与透明的安全边界。需要更强保障，或要把 BOKI 集成进闭源产品时，可以购买商业支持。</p>
+        </div>
+        <div class="biz-grid">
+          <div class="biz-card">
+            <span class="bicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-5h6v5"/><path d="M9 10h.01M15 10h.01"/></svg></span>
+            <div>
+              <h3>企业私有化部署</h3>
+              <p>在内网 / 专属服务器搭建完全隔离的实例，含部署方案、冷备策略与安全基线检查。</p>
+            </div>
+          </div>
+          <div class="biz-card">
+            <span class="bicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4l2 2-2 2 2 2-3 3-2-2-1.15 1.15"/></svg></span>
+            <div>
+              <h3>高级权限与审计</h3>
+              <p>细颗粒度角色权限、完整操作审计追踪、MFA 二次验证与登录设备管控。</p>
+            </div>
+          </div>
+          <div class="biz-card">
+            <span class="bicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></span>
+            <div>
+              <h3>商业授权许可</h3>
+              <p>允许把本系统集成进闭源商业产品，<strong>豁免 AGPL-3.0 的传染性</strong>，不必公开自有代码。</p>
+            </div>
+          </div>
+          <div class="biz-card">
+            <span class="bicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2" y="14" width="4" height="6" rx="2"/><rect x="18" y="14" width="4" height="6" rx="2"/><path d="M20 20v1a2 2 0 0 1-2 2h-4"/></svg></span>
+            <div>
+              <h3>专属技术支持</h3>
+              <p>SLA 保障的响应时效、版本升级协助、历史数据迁移与性能调优。</p>
+            </div>
+          </div>
+        </div>
+        <div class="biz-cta">
+          <p><b>获取企业版报价或定制方案</b> · 请说明规模、部署环境与合规要求</p>
+          <a class="btn btn-primary" href="mailto:hello@boki.app?subject=BOKI%20%E4%BC%81%E4%B8%9A%E7%89%88%E5%92%A8%E8%AF%A2">hello@boki.app</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 赞助 ================= -->
+    <section class="section sponsors-section" id="sponsors">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Sponsors</span>
+          <h2>让 BOKI 持续走下去</h2>
+          <p>BOKI 靠社区支持长期维护。赞助不影响技术决策、不换取代码投票权。</p>
+        </div>
+        <div class="tiers-table-wrap">
+          <table class="tiers">
+            <thead>
+              <tr><th>档位</th><th>面向</th><th>金额（示例）</th><th>权益</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>支持者</td><td>个人</td><td><span class="price">¥10–50 / 月</span></td><td>名字进鸣谢榜</td></tr>
+              <tr><td>挚友</td><td>个人</td><td><span class="price">¥100 / 月</span></td><td>鸣谢榜 + 社群专属身份</td></tr>
+              <tr><td>青铜</td><td>小团队</td><td><span class="price">¥500 / 月</span></td><td>README 小 logo + 官网赞助墙</td></tr>
+              <tr><td>白银</td><td>公司</td><td><span class="price">¥2,000 / 月</span></td><td>README 中大 logo + 官网卡片 + 简介外链</td></tr>
+              <tr><td>黄金</td><td>企业</td><td><span class="price">¥10,000 / 月</span></td><td>官网首屏 logo + 发布公告提及</td></tr>
+              <tr><td>基础设施伙伴</td><td>云 / 存储 / CDN</td><td><span class="price">资源置换</span></td><td>伙伴卡片 + 文档致谢</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="sponsors-note">
+          <span><b>GitHub Sponsors</b> · 个人与企业月度</span>
+          <span><b>Open Collective</b> · 企业赞助可开票、账本透明</span>
+          <span><b>爱发电 / 微信 / 支付宝</b> · 国内个人小额</span>
+          <span>企业赞助请联系 <b>hello@boki.app</b></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 社区 ================= -->
+    <section class="section" id="community">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Community</span>
+          <h2>来一起搭积木</h2>
+          <p>写插件是成本最低的贡献方式——新票据版式、新报表、新皮肤、新语言包都受欢迎。</p>
+        </div>
+        <div class="community-grid">
+          <a class="community-card" href="https://github.com/edrin09/boki">
+            <span class="cicon"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></span>
+            <h3>GitHub</h3>
+            <p>主仓库、Issues / Discussions、Release 与 CI。</p>
+          </a>
+          <a class="community-card" href="https://gitee.com/edrin/boki">
+            <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg></span>
+            <h3>码云镜像</h3>
+            <p>国内快速克隆，GitHub 访问慢时可用。</p>
+          </a>
+          <a class="community-card" href="https://github.com/edrin09/boki/blob/main/docs/%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%E4%B8%8E%E8%BF%81%E7%A7%BB%E6%8C%87%E5%8D%97.md">
+            <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 12h6M9 16h4"/></svg></span>
+            <h3>插件开发指南</h3>
+            <p>manifest、运行时 API、迁移方法论，照做即可产出插件。</p>
+          </a>
+          <a class="community-card" href="https://github.com/edrin09/boki/blob/main/docs/%E5%BC%80%E5%8F%91%E8%BF%9B%E5%BA%A6.md">
+            <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></span>
+            <h3>开发进度</h3>
+            <p>14 个插件交付状态、测试矩阵与已知边界，全部公开。</p>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================= 页脚 ================= -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img class="lockup" src="assets/boki-lockup.svg" alt="BOKI — 开源财务软件" />
+          <p>离线优先 · 复式记账内核 · 插件化。数据不出机器，账本只属于你。</p>
+        </div>
+        <div class="footer-col">
+          <h4>产品</h4>
+          <a href="#features">核心特性</a>
+          <a href="#offline">离线能力</a>
+          <a href="#security">安全边界</a>
+          <a href="#plugins">插件市场</a>
+          <a href="#download">下载</a>
+        </div>
+        <div class="footer-col">
+          <h4>社区</h4>
+          <a href="https://github.com/edrin09/boki">GitHub</a>
+          <a href="https://gitee.com/edrin/boki">码云镜像</a>
+          <a href="#commercial">商业支持</a>
+          <a href="#sponsors">赞助档位</a>
+          <a href="mailto:hello@boki.app">联系我们</a>
+        </div>
+        <div class="footer-col">
+          <h4>资源</h4>
+          <a href="https://github.com/edrin09/boki/blob/main/docs/%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%E4%B8%8E%E8%BF%81%E7%A7%BB%E6%8C%87%E5%8D%97.md">插件开发指南</a>
+          <a href="https://github.com/edrin09/boki/blob/main/docs/%E5%BC%80%E5%8F%91%E8%BF%9B%E5%BA%A6.md">开发进度</a>
+          <a href="https://github.com/edrin09/boki/blob/main/docs/%E6%8F%92%E4%BB%B6%E5%8C%96%E4%B8%8E%E5%BC%80%E6%BA%90%E5%8C%96%E6%94%B9%E9%80%A0%E6%96%B9%E6%A1%88.md">改造方案</a>
+          <a href="https://github.com/edrin09/boki/blob/main/brand/README.md">品牌规范</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© <span id="year">2026</span> BOKI · 开源财务软件</span>
+        <span class="lic">
+          <span>内核 AGPL-3.0</span><span>官方插件 Apache-2.0</span><span>闭源商用需商业授权</span><span>商标归 BOKI 所有</span>
+        </span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var nav = document.getElementById('siteNav');
+      var toggle = document.getElementById('navToggle');
+      var menu = document.getElementById('mobileMenu');
+
+      function onScroll() {
+        nav.classList.toggle('scrolled', window.scrollY > 8);
+      }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+
+      toggle.addEventListener('click', function () {
+        var open = menu.classList.toggle('open');
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        toggle.setAttribute('aria-label', open ? '关闭菜单' : '打开菜单');
+      });
+      menu.querySelectorAll('a').forEach(function (a) {
+        a.addEventListener('click', function () {
+          menu.classList.remove('open');
+          toggle.setAttribute('aria-expanded', 'false');
+        });
+      });
+
+      // 导航高亮当前 section
+      var links = Array.prototype.slice.call(document.querySelectorAll('.nav-links a'));
+      var sections = links
+        .map(function (a) { return document.querySelector(a.getAttribute('href')); })
+        .filter(Boolean);
+      if ('IntersectionObserver' in window && sections.length) {
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) {
+              links.forEach(function (a) {
+                a.classList.toggle('active', a.getAttribute('href') === '#' + e.target.id);
+              });
+            }
+          });
+        }, { rootMargin: '-30% 0px -60% 0px' });
+        sections.forEach(function (s) { io.observe(s); });
+      }
+
+      document.getElementById('year').textContent = new Date().getFullYear();
+    })();
+  </script>
+</body>
+</html>

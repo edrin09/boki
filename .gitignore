@@ -45,25 +45,16 @@ backend/models/ocr/*.onnx
 backend/models/ocr/*.txt
 backend/models/asr/
 
-# 桌面壳（Electron）中间产物 —— 逐项性质与删除代价见「打包与更新指南.md · 八、中间产物与目录说明」
-# 注意：安装包 BOKI-Setup-<version>.exe 也落在 desktop/release/ 下，
-# 因此同样不进版本库，交付件需另行归档。
-desktop/node_modules/
-desktop/stage/
-desktop/release/
-desktop/build/icon.ico
-
 # 验证脚本产物
 backend/test/output/
 /.workbuddy
 /.trae
 
 # 本地营销资产（不进版本库，仅本地保留；可免费或收费分发，不上公开仓库）
-# 含：插件市场 marketplace、官网 website、横幅 banner、启动脚本 starts
+# 含：插件市场 marketplace、启动脚本 starts
+# 注：官网 website/ 已改为公开托管（GitHub Pages，见 .github/workflows/pages.yml），不再本地仅存
 marketplace/
-website/
 starts/
-banner/
 
 # 品牌资产（含商标/知识产权内部方案，不进公开仓库，仅本地保留）
 brand/
