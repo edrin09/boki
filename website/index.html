@@ -445,6 +445,40 @@
       .footer-bottom { justify-content: flex-start; }
       .cta-row .btn { flex: 1; }
     }
+
+    /* 下载选择弹窗 */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(15, 23, 42, .55); backdrop-filter: blur(3px);
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      position: relative; width: 100%; max-width: 420px;
+      background: #fff; border-radius: 18px; padding: 30px 26px 26px;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, .28);
+      animation: modal-pop .18s ease-out;
+    }
+    @keyframes modal-pop { from { transform: translateY(12px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+    .modal h3 { margin: 0 0 6px; font-size: 19px; color: var(--ink); }
+    .modal-sub { margin: 0 0 18px; font-size: 13px; color: var(--slate); }
+    .modal-close {
+      position: absolute; top: 14px; right: 16px; width: 30px; height: 30px;
+      border: none; background: #f1f5f9; border-radius: 8px; cursor: pointer;
+      font-size: 20px; line-height: 1; color: var(--slate);
+    }
+    .modal-close:hover { background: #e2e8f0; }
+    .modal-choices { display: grid; gap: 12px; }
+    .choice {
+      display: flex; align-items: center; gap: 14px; text-decoration: none;
+      padding: 14px 16px; border: 1.5px solid #e2e8f0; border-radius: 12px;
+      color: var(--ink); transition: border-color .15s, box-shadow .15s, transform .1s;
+    }
+    .choice:hover { border-color: var(--indigo); box-shadow: 0 6px 18px rgba(79, 70, 229, .12); transform: translateY(-1px); }
+    .choice svg { width: 26px; height: 26px; flex: none; color: var(--indigo); }
+    .choice .choice-title { display: block; font-weight: 700; font-size: 15px; }
+    .choice .choice-desc { display: block; font-size: 12px; color: var(--slate); margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -475,7 +509,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg>
           Gitee
         </a>
-        <a class="btn btn-primary" href="https://github.com/edrin09/boki/releases/latest" target="_blank" rel="noopener">下载 BOKI</a>
+        <button class="btn btn-primary" id="downloadBtn" type="button">下载 BOKI</button>
         <button class="nav-toggle" id="navToggle" aria-label="打开菜单" aria-expanded="false" aria-controls="mobileMenu">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
         </button>
@@ -1014,8 +1048,54 @@
         sections.forEach(function (s) { io.observe(s); });
       }
 
+      // 下载源选择弹窗
+      var dlBtn = document.getElementById('downloadBtn');
+      var dlModal = document.getElementById('downloadModal');
+      var dlClose = document.getElementById('downloadModalClose');
+      function openModal() {
+        dlModal.classList.add('open');
+        dlModal.setAttribute('aria-hidden', 'false');
+      }
+      function closeModal() {
+        dlModal.classList.remove('open');
+        dlModal.setAttribute('aria-hidden', 'true');
+      }
+      if (dlBtn) dlBtn.addEventListener('click', openModal);
+      if (dlClose) dlClose.addEventListener('click', closeModal);
+      dlModal.addEventListener('click', function (e) {
+        if (e.target === dlModal) closeModal();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && dlModal.classList.contains('open')) closeModal();
+      });
+
       document.getElementById('year').textContent = new Date().getFullYear();
     })();
   </script>
+
+  <!-- 下载源选择弹窗 -->
+  <div class="modal-overlay" id="downloadModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="downloadModalTitle">
+      <button class="modal-close" id="downloadModalClose" type="button" aria-label="关闭">&times;</button>
+      <h3 id="downloadModalTitle">选择下载源</h3>
+      <p class="modal-sub">安装包已发布到以下平台，选你方便的来源：</p>
+      <div class="modal-choices">
+        <a class="choice" href="https://github.com/edrin09/boki/releases/latest" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+          <span>
+            <span class="choice-title">GitHub Releases</span>
+            <span class="choice-desc">全球主源 · 稳定可达</span>
+          </span>
+        </a>
+        <a class="choice" href="https://gitee.com/edrin/boki/releases" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg>
+          <span>
+            <span class="choice-title">Gitee 发行版</span>
+            <span class="choice-desc">国内加速 · 推荐</span>
+          </span>
+        </a>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
