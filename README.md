@@ -182,6 +182,22 @@ npm run dev
 
 ---
 
+## 📥 下载
+
+不想自己编译？已构建好的 Windows 安装包发布在仓库 Releases：
+
+| 平台 | 安装包 | 下载 |
+|:--|:--|:--|
+| Windows x64 | `BOKI-Setup-<版本>.exe` | [GitHub Releases (latest)](https://github.com/edrin09/boki/releases/latest) · [Gitee 发行版](https://gitee.com/edrin/boki/releases) |
+
+- 安装包为离线一体式（自带 Node 运行时，无需联网、无需预装环境），装完即用。
+- 由 **西安市未央区鹏云智码软件开发部（个体工商户）** 签名发布。
+- 若浏览器提示 SmartScreen 拦截：属未广布代码签名证书的常态，点击「仍要运行」即可；证书下载量累积到一定阈值后告警会自动消除。
+
+> 自行编译见上方「方式一：免环境安装包」。
+
+---
+
 ## 🧩 插件化架构
 
 内核 = 复式记账引擎 + 插件运行时 + 插件市场。其余功能都是插件：
