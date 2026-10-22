@@ -7,7 +7,7 @@
  * 这样切分的原因：拔掉插件后，内核仍必须能完成
  * 「查询状态 → 解锁 → 锁定」这条最基本链路。
  */
-import { Body, Controller, Get, Post, Req } from '@nestjs/common'
+import { Body, Controller, Get, Header, Post, Req } from '@nestjs/common'
 import { Request } from 'express'
 import { Public } from '../common/decorators/public.decorator'
 import { VaultService } from './vault.service'
@@ -30,6 +30,7 @@ export class VaultController {
    * @Public 前端在挂载路由前就要知道是否需要显示解锁页
    */
   @Public()
+  @Header('Cache-Control', 'no-store')
   @Get('status')
   status() {
     return this.vaultService.status()
