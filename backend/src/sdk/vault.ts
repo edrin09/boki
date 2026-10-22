@@ -77,11 +77,15 @@ export function listVaultProviderIds(): string[] {
 /**
  * 解析 meta 对应的 provider。
  *
- * 严格按 `meta.provider` 匹配，**不做**「随便挑一个」的兜底 ——
+ * 已加密时严格按 `meta.provider` 匹配，**不做**「随便挑一个」的兜底 ——
  * 用错 provider 的 KDF 会派生出错误密钥，表现与「密码错」一样，极难排查。
+ *
+ * meta 为 null（尚未开启加密）时返回内核兜底 provider：
+ * 此时还没有任何已固化的 provider 绑定，开启加密会以它派生密钥
+ * 并把 `provider.id` 写进新 meta（插件 provider 与它同名同派生，一致）。
  */
 export function resolveVaultProvider(meta: VaultMeta | null): VaultProvider | null {
-  if (!meta) return null
+  if (!meta) return registry.get(CORE_VAULT_PROVIDER_ID) ?? null
   return registry.get(meta.provider) ?? null
 }
 
@@ -109,7 +113,7 @@ export function readVaultMeta(): VaultMeta | null {
 export function readVaultMetaFrom(file: string): VaultMeta | null {
   if (!fs.existsSync(file)) return null
   try {
-    const meta = JSON.parse(fs.readFileSync(file, 'utf8')) as VaultMeta
+    const meta = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')) as VaultMeta
     if (!meta || meta.version !== 1) return null
     if (typeof meta.enabled === 'boolean' || meta.enabled === 'migrating') return meta
     return null

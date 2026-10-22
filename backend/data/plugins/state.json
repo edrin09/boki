@@ -70,6 +70,11 @@
       "enabled": true,
       "version": "1.0.0",
       "installedAt": "2026-10-21T05:59:48.545Z"
+    },
+    "vault": {
+      "enabled": true,
+      "version": "1.0.0",
+      "installedAt": "2026-10-22T04:11:58.535Z"
     }
   }
 }
