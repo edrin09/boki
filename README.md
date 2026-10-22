@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="brand/boki-lockup.svg" width="380" alt="BOKI — 开源财务软件" />
+  <img src="assets/boki-lockup.svg" width="380" alt="BOKI — 开源财务软件" />
 </p>
 
 <h1 align="center">BOKI — 离线优先的开源财务软件</h1>
@@ -327,18 +327,6 @@ boki/
 │       ├── styles/
 │       ├── utils/              # 金额/日期格式化、Excel 导出
 │       └── views/              # 内核页面
-├── desktop/                    # Electron 桌面壳（免环境安装包）
-│   ├── src/                    # 主进程：sidecar 拉起 / 窗口 / 托盘
-│   ├── scripts/build-package.mjs   # 一键打包编排
-│   ├── electron-builder.yml    # NSIS 安装包配置
-│   └── release/                # 安装包产物（不入版本库）
-├── marketplace/                # 官方插件市场（14 个插件源码 + catalog）
-│   ├── index.json              # 插件目录
-│   └── plugins/<id>/           # 每个插件：manifest.json + server/ + client/
-├── brand/                      # 品牌资产（logo / 色板 / 商标材料）
-├── docs/                       # 插件化改造方案、插件开发指南、开发进度
-├── website/                    # 官网（PC / 移动自适应静态站）
-├── starts/                     # Windows 一键脚本（启动 / 打包 / 清数据）
 └── README.md
 ```
 
