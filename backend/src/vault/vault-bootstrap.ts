@@ -17,15 +17,14 @@ import * as http from 'node:http'
 import * as path from 'node:path'
 import { checkVerifier, type VaultMeta, type VaultProvider } from '../sdk/vault'
 import { normalizeRecoveryCode } from '../sdk/vault-kdf'
+import {
+  UNLOCK_LOCK_AFTER_FAILURES,
+  findUnlockThrottle,
+  pruneUnlockAttempts,
+  recordUnlockFailure,
+  resetUnlockFailures,
+} from './vault-throttle'
 
-/** 同一 IP 在窗口内允许的失败次数 */
-const MAX_FAILURES_PER_WINDOW = 5
-/** 失败计数窗口（毫秒） */
-const WINDOW_MS = 60_000
-/** 连续失败达到该次数后锁定 */
-const LOCK_AFTER_FAILURES = 20
-/** 锁定时长（毫秒） */
-const LOCK_MS = 5 * 60_000
 /** 请求体大小上限 */
 const MAX_BODY_BYTES = 16 * 1024
 
@@ -44,32 +43,12 @@ export interface VaultBootstrapOptions {
   log?: (message: string) => void
 }
 
-interface AttemptState {
-  /** 窗口内累计失败次数 */
-  failures: number
-  /** 窗口开始时间 */
-  windowStart: number
-  /** 锁定截止时间 */
-  lockedUntil: number
-}
-
-const attempts = new Map<string, AttemptState>()
-
 /** 取客户端 IP（只认最外层的 X-Forwarded-For 首段） */
 function clientIp(req: http.IncomingMessage): string {
   const forwarded = req.headers['x-forwarded-for']
   const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded
   if (raw) return raw.split(',')[0].trim()
   return req.socket.remoteAddress || 'unknown'
-}
-
-/** 清理过期的尝试记录，避免内存无限增长 */
-function pruneAttempts(now: number): void {
-  for (const [ip, state] of attempts) {
-    if (state.lockedUntil <= now && now - state.windowStart > WINDOW_MS) {
-      attempts.delete(ip)
-    }
-  }
 }
 
 /** 读取并解析 JSON 请求体 */
@@ -174,25 +153,15 @@ export async function startVaultBootstrapShell(
 
     if (pathname === `${apiRoot}/vault/unlock` && req.method === 'POST') {
       const now = Date.now()
-      pruneAttempts(now)
+      pruneUnlockAttempts(now)
       const ip = clientIp(req)
-      const state = attempts.get(ip) ?? { failures: 0, windowStart: now, lockedUntil: 0 }
 
-      if (state.lockedUntil > now) {
-        const retryAfter = Math.ceil((state.lockedUntil - now) / 1000)
+      const throttled = findUnlockThrottle(ip, now)
+      if (throttled) {
         sendJson(res, 429, {
           code: 42910,
-          message: `尝试过于频繁，请 ${retryAfter} 秒后再试`,
-          data: { retryAfter },
-        })
-        return
-      }
-      if (state.failures >= MAX_FAILURES_PER_WINDOW) {
-        const retryAfter = Math.ceil((WINDOW_MS - (now - state.windowStart)) / 1000)
-        sendJson(res, 429, {
-          code: 42910,
-          message: `尝试过于频繁，请 ${retryAfter} 秒后再试`,
-          data: { retryAfter },
+          message: `尝试过于频繁，请 ${throttled.retryAfter} 秒后再试`,
+          data: { retryAfter: throttled.retryAfter },
         })
         return
       }
@@ -216,30 +185,25 @@ export async function startVaultBootstrapShell(
           throw new Error('密钥与数据文件不匹配，数据可能已损坏')
         }
       } catch (err) {
-        state.failures += 1
-        state.windowStart = now
-        attempts.set(ip, state)
-        if (state.failures >= LOCK_AFTER_FAILURES) {
-          state.lockedUntil = now + LOCK_MS
-          attempts.set(ip, state)
-          log(`解锁连续失败 ${state.failures} 次，${ip} 已锁定 5 分钟`)
+        const failure = recordUnlockFailure(ip, now)
+        if (failure.locked) {
+          log(`解锁连续失败 ${UNLOCK_LOCK_AFTER_FAILURES} 次，${ip} 已锁定 5 分钟`)
           sendJson(res, 429, {
             code: 42910,
             message: '尝试次数过多，账户已临时锁定 5 分钟',
-            data: { retryAfter: Math.ceil(LOCK_MS / 1000) },
+            data: { retryAfter: failure.retryAfter },
           })
           return
         }
-        const remaining = Math.max(0, MAX_FAILURES_PER_WINDOW - state.failures)
         sendJson(res, 401, {
           code: 40110,
           message: (err as Error).message || '主密码错误',
-          data: { remaining },
+          data: { remaining: failure.remaining },
         })
         return
       }
 
-      attempts.delete(ip)
+      resetUnlockFailures(ip)
       sendJson(res, 200, { message: '解锁成功', data: { unlocked: true } })
       // 必须等响应发完再交接，否则前端拿不到 {code:0}
       res.on('finish', () => resolveUnlock(mk as Buffer))

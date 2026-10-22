@@ -7,10 +7,18 @@
  * 这样切分的原因：拔掉插件后，内核仍必须能完成
  * 「查询状态 → 解锁 → 锁定」这条最基本链路。
  */
-import { Body, Controller, Get, Post } from '@nestjs/common'
+import { Body, Controller, Get, Post, Req } from '@nestjs/common'
+import { Request } from 'express'
 import { Public } from '../common/decorators/public.decorator'
 import { VaultService } from './vault.service'
 import { VaultUnlockDto } from './dto/vault.dto'
+/** 提取调用方来源标识：X-Forwarded-For 首段优先，退回直连 IP */
+function clientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for']
+  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded
+  if (raw) return raw.split(',')[0].trim()
+  return req.ip || 'unknown'
+}
 
 @Controller('vault')
 export class VaultController {
@@ -34,8 +42,12 @@ export class VaultController {
    */
   @Public()
   @Post('unlock')
-  unlock(@Body() dto: VaultUnlockDto) {
-    return this.vaultService.unlock({ password: dto.password, recoveryCode: dto.recoveryCode })
+  unlock(@Body() dto: VaultUnlockDto, @Req() req: Request) {
+    return this.vaultService.unlock({
+      password: dto.password,
+      recoveryCode: dto.recoveryCode,
+      clientIp: clientIp(req),
+    })
   }
 
   /** 立即锁定（丢弃内存密钥并关闭数据库连接） */
@@ -44,3 +56,5 @@ export class VaultController {
     return this.vaultService.lock()
   }
 }
+
+

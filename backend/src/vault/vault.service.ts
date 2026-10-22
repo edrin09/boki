@@ -10,6 +10,7 @@
  */
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -19,6 +20,12 @@ import { DataSource, Repository } from 'typeorm'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { randomBytes } from 'node:crypto'
+import {
+  findUnlockThrottle,
+  pruneUnlockAttempts,
+  recordUnlockFailure,
+  resetUnlockFailures,
+} from './vault-throttle'
 import {
   DEFAULT_CIPHER_PARAMS,
   readVaultMeta,
@@ -180,13 +187,31 @@ export class VaultService {
    *
    * @param payload `{ password }` 或 `{ recoveryCode }`
    */
-  async unlock(payload: { password?: string; recoveryCode?: string }): Promise<{ unlocked: true }> {
+  async unlock(
+    payload: { password?: string; recoveryCode?: string; clientIp?: string },
+  ): Promise<{ unlocked: true }> {
     const meta = this.meta()
     if (!meta || meta.enabled === false) {
       throw new BadRequestException('当前数据库未启用加密')
     }
     if (meta.enabled === 'migrating') {
       throw new BadRequestException('数据库正在迁移中，请先完成恢复：npm run vault:recover')
+    }
+
+    // ---------- T3 解锁限流（进程内手动锁定态同样生效） ----------
+    const ip = payload.clientIp || 'unknown'
+    const now = Date.now()
+    pruneUnlockAttempts(now)
+    const throttled = findUnlockThrottle(ip, now)
+    if (throttled) {
+      throw new HttpException(
+        {
+          code: 42910,
+          message: `尝试过于频繁，请 ${throttled.retryAfter} 秒后再试`,
+          data: { retryAfter: throttled.retryAfter },
+        },
+        429,
+      )
     }
 
     const provider = this.requireProvider(meta)
@@ -200,19 +225,45 @@ export class VaultService {
         mk = provider.deriveKey(payload.password, meta)
       }
     } catch (err) {
+      const failure = recordUnlockFailure(ip, now)
+      if (failure.locked) {
+        this.logger.warn(`解锁连续失败，${ip} 已锁定 5 分钟`)
+        throw new HttpException(
+          {
+            code: 42910,
+            message: '尝试次数过多，账户已临时锁定 5 分钟',
+            data: { retryAfter: failure.retryAfter },
+          },
+          429,
+        )
+      }
       throw new UnauthorizedException({
         code: 40110,
         message: (err as Error).message || '主密码错误',
+        data: { remaining: failure.remaining },
       })
     }
 
     if (!checkVerifier(mk, meta.verifier)) {
+      const failure = recordUnlockFailure(ip, now)
+      if (failure.locked) {
+        throw new HttpException(
+          {
+            code: 42910,
+            message: '尝试次数过多，账户已临时锁定 5 分钟',
+            data: { retryAfter: failure.retryAfter },
+          },
+          429,
+        )
+      }
       throw new UnauthorizedException({
         code: 40110,
         message: '密钥与数据文件不匹配，数据可能已损坏',
+        data: { remaining: failure.remaining },
       })
     }
 
+    resetUnlockFailures(ip)
     const wasLocked = !getBootKeyHex()
     setMasterKey(mk)
     setVaultEnabled(true)
