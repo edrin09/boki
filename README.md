@@ -372,7 +372,7 @@ boki/
 
 BOKI 靠社区支持持续维护。赞助不影响技术决策、不换取代码投票权。
 
-- [GitHub Sponsors](https://github.com/sponsors/boki-app)（个人 / 企业月度）
+- [GitHub Sponsors](https://github.com/sponsors/fiyhight)（个人 / 企业月度）
 - Open Collective（企业赞助，可开票，账本透明）
 - 爱发电 / 微信 / 支付宝（国内个人小额捐赠）
 
