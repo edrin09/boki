@@ -1,9 +1,11 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   Header,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -11,6 +13,7 @@ import {
   Put,
   Query,
   Res,
+  UnauthorizedException,
 } from '@nestjs/common'
 import type { Response } from 'express'
 import { SystemService } from './system.service'
@@ -104,10 +107,27 @@ export class SystemController {
   @SkipWrap()
   @RequirePermissions('system:backup:download')
   @Operation('下载数据库备份')
-  downloadBackup(@Query('filename') filename: string, @Res() res: Response) {
-    const { stream, filename: name } = this.systemService.openBackupStream(filename)
+  downloadBackup(
+    @Query('filename') filename: string,
+    @Query('format') format: string,
+    @Headers('x-vault-reauth') reauth: string,
+    @Res() res: Response,
+  ) {
+    if (!filename) throw new BadRequestException('filename 必填')
+    const fmt = format === 'plain' ? 'plain' : 'cipher'
+    const { stream, filename: name } = this.systemService.openBackupStream(
+      filename,
+      fmt,
+      reauth,
+    )
     res.setHeader('Content-Type', 'application/octet-stream')
     res.setHeader('Content-Disposition', `attachment; filename="${name}"`)
+    stream.on('error', (err: Error) => {
+      if (res.headersSent) return
+      const status = err instanceof UnauthorizedException ? 401 : 500
+      const body = JSON.stringify({ code: status === 401 ? 40110 : 500, message: err.message, data: null, timestamp: Date.now() })
+      res.status(status).setHeader('Content-Type', 'application/json').end(body)
+    })
     stream.pipe(res)
   }
 

@@ -77,6 +77,12 @@ service.interceptors.response.use(
     const status = error?.response?.status
     const body = error?.response?.data
 
+    // 数据锁定（闲置锁定/手动锁定）：派发全局事件，App.vue 以全屏遮罩响应
+    if (status === 423) {
+      window.dispatchEvent(new Event('vault:locked'))
+      return Promise.reject(new ApiError(body?.message || '数据已锁定，请先解锁', 423, body?.code))
+    }
+
     if (status === 401) {
       clearToken()
       unauthorizedHandler?.()

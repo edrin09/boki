@@ -3,6 +3,7 @@ import * as path from 'node:path'
 import { TypeOrmModuleOptions } from '@nestjs/typeorm'
 import { entities as coreEntities } from '../entities'
 import { syncRequiredMarker } from '../plugins/plugin.paths'
+import { getBootKeyHex } from '../vault/keystore'
 
 /**
  * 解析数据库文件路径（相对 backend 目录）
@@ -41,6 +42,10 @@ export function shouldSynchronize(database: string): boolean {
 /**
  * TypeORM 数据库配置（SQLite / better-sqlite3）
  *
+ * 驱动：`better-sqlite3` 这个包名下装的是 `better-sqlite3-multiple-ciphers`
+ * （npm alias，见 package.json）。不设 cipher 时行为与原生 better-sqlite3 完全一致，
+ * 因此未启用加密的部署零感知。
+ *
  * @param pluginEntities 已安装插件实体（含停用插件，保留其表结构）
  */
 export function buildDatabaseOptions(pluginEntities: any[] = []): TypeOrmModuleOptions {
@@ -55,9 +60,33 @@ export function buildDatabaseOptions(pluginEntities: any[] = []): TypeOrmModuleO
     logging: process.env.DB_LOGGING === 'true',
     // WAL 模式提升读写并发能力
     prepareDatabase: (db: any) => {
+      applyCipher(db)
       db.pragma('journal_mode = WAL')
       db.pragma('foreign_keys = ON')
       db.pragma('busy_timeout = 5000')
     },
   } as TypeOrmModuleOptions
+}
+
+/**
+ * 应用 SQLCipher 加密参数。
+ *
+ * ⚠️ PRAGMA 顺序不可颠倒：`cipher` → `legacy` → `key` → 之后才能 WAL / foreign_keys。
+ * 顺序错了 SQLite 会把密文库当成损坏文件。
+ *
+ * `DB_CIPHER=plain` 可强制走明文（**仅供回归对比**，生产禁用）。
+ */
+function applyCipher(db: any): void {
+  if ((process.env.DB_CIPHER || '').toLowerCase() === 'plain') {
+    return
+  }
+  const key = getBootKeyHex()
+  if (!key) {
+    // 未加密库：显式声明 plain，避免误用上一次连接的 cipher 设置
+    return
+  }
+  db.pragma("cipher = 'sqlcipher'")
+  db.pragma('legacy = 4')
+  db.pragma(`key = "x'${key}'"`)
+  db.pragma('cipher_memory_security = ON')
 }

@@ -24,6 +24,7 @@ pnpm-debug.log*
 # database (runtime)
 backend/data/*.db
 backend/data/*.db-*
+backend/data/*.bak*
 backend/data/backup/
 backend/data/uploads/
 

@@ -24,10 +24,14 @@ import { SetupModule } from './setup/setup.module'
 import { CompanyReposModule } from '../common/company/company-repos.module'
 import { CompanyScopeInterceptor } from '../common/company/company-scope.interceptor'
 import { PluginsModule } from '../plugins/plugins.module'
+import { VaultModule } from '../vault/vault.module'
 
 /** 内核模块（迁移完成后只保留记账底座与系统管理） */
 const CORE_MODULES = [
   SetupModule,
+  // Vault 必须排在 AuthModule 之前：它提供内核级的「解锁 / 锁定 / 状态」能力，
+  // 拔掉 vault 插件后这套能力依然可用（方案 D1 的判定标准）。
+  VaultModule,
   AuthModule,
   AccountsModule,
   PartnersModule,

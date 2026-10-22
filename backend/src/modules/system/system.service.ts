@@ -3,12 +3,15 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { LessThan, Repository } from 'typeorm'
 import { createReadStream, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
 import * as path from 'node:path'
+import * as os from 'node:os'
 import * as fs from 'node:fs/promises'
+import { randomBytes } from 'node:crypto'
 import { SysLog } from '../../entities/sys-log.entity'
 import { User } from '../../entities/user.entity'
 import { Company } from '../../entities/company.entity'
@@ -17,6 +20,13 @@ import { Partner } from '../../entities/partner.entity'
 import { Voucher } from '../../entities/voucher.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
 import { resolveDatabasePath } from '../../config/database.config'
+import {
+  checkBackupCompatibility,
+  createBackupSnapshot,
+  exportPlainDatabase,
+  isPlaintextDatabase,
+  verifyMasterPassword,
+} from '../../vault/vault-backup'
 import { requireCompanyId } from '../../common/company/company-context'
 import { DEFAULT_AUTO_POST_THRESHOLD } from '../../common/company/company.constants'
 import { invalidateCompanyCache } from '../../common/company/company-scope.interceptor'
@@ -229,6 +239,10 @@ export class SystemService {
 
   /**
    * 生成备份文件，返回备份文件名
+   *
+   * ⚠️ 加密库下 `db.backup()` 不可用（实测报 "backup is not supported with
+   * incompatible source and target databases"），统一走 `VACUUM INTO`；
+   * 产物与源库同密钥，密文库备份出来也就是密文（G6）。
    */
   async createBackup(): Promise<{ filename: string; size: number }> {
     const dbPath = resolveDatabasePath()
@@ -238,35 +252,94 @@ export class SystemService {
     const filename = `financial-${stamp}.db`
     const target = path.join(this.backupDir, filename)
 
-    // SQLite 在线备份 API，保证一致性
-    const Database = require('better-sqlite3')
-    const db = new Database(dbPath, { readonly: true })
-    try {
-      await db.backup(target)
-    } finally {
-      db.close()
+    // VACUUM INTO 要求目标文件不存在
+    for (const p of [target, `${target}-wal`, `${target}-shm`]) {
+      if (existsSync(p)) await fs.rm(p, { force: true })
     }
+
+    await createBackupSnapshot(dbPath, target)
 
     const size = statSync(target).size
     return { filename, size }
   }
 
-  /** 备份文件下载流 */
-  openBackupStream(filename: string) {
+  /**
+   * 备份文件下载流
+   *
+   * @param filename    备份文件名
+   * @param format      `cipher`（默认，密文）/ `plain`（明文，需二次鉴权）
+   * @param reauthPassword 明文导出时重新输入的主密码
+   */
+  openBackupStream(filename: string, format: 'cipher' | 'plain' = 'cipher', reauthPassword?: string) {
     const safe = path.basename(filename)
     const full = path.join(this.backupDir, safe)
     if (!existsSync(full)) throw new NotFoundException('备份文件不存在')
     if (!safe.endsWith('.db')) throw new BadRequestException('非法的备份文件')
-    return { stream: createReadStream(full), filename: safe }
+
+    if (format !== 'plain') {
+      return { stream: createReadStream(full), filename: safe }
+    }
+
+    // ---- 明文导出：必须重新验证主密码 ----
+    const check = verifyMasterPassword(reauthPassword ?? '')
+    if (!check.ok) {
+      throw new UnauthorizedException({ code: 40110, message: check.message })
+    }
+
+    // 已经是明文备份，直接给
+    if (isPlaintextDatabase(full)) {
+      return { stream: createReadStream(full), filename: safe.replace(/\.db$/, '-plain.db') }
+    }
+
+    // 密文备份 → 临时转成明文再给（流结束后删除临时文件）
+    const tmpDir = path.join(os.tmpdir(), 'boki-vault-export')
+    const tmp = path.join(tmpDir, `${randomBytes(8).toString('hex')}.db`)
+    return {
+      stream: this.plainExportStream(full, tmp),
+      filename: safe.replace(/\.db$/, '-plain.db'),
+    }
+  }
+
+  /**
+   * 生成明文导出流（临时文件在流关闭后自动删除）。
+   */
+  private plainExportStream(source: string, tmp: string) {
+    const { PassThrough } = require('node:stream')
+    const out = new PassThrough()
+
+    void (async () => {
+      try {
+        await exportPlainDatabase(source, tmp)
+        const rs = createReadStream(tmp)
+        rs.on('error', (err: Error) => out.destroy(err))
+        rs.on('close', () => {
+          void fs.rm(tmp, { force: true }).catch(() => undefined)
+        })
+        rs.pipe(out)
+      } catch (err) {
+        void fs.rm(tmp, { force: true }).catch(() => undefined)
+        out.destroy(err as Error)
+      }
+    })()
+
+    return out
   }
 
   /**
    * 从备份恢复（会覆盖当前数据库，需重启服务生效）
+   *
+   * ⚠️ 加密库必须先校验「备份与当前密钥是否一致」——
+   * 把明文备份恢复到密文库（或反过来）都会导致恢复后永久打不开。
    */
   async restoreBackup(filename: string): Promise<{ message: string; filename: string }> {
     const safe = path.basename(filename)
     const source = path.join(this.backupDir, safe)
     if (!existsSync(source)) throw new NotFoundException('备份文件不存在')
+
+    const compatible = checkBackupCompatibility(source)
+    if (!compatible.ok) {
+      throw new BadRequestException({ code: 50011, message: compatible.message })
+    }
 
     const dbPath = resolveDatabasePath()
     // 恢复前先给当前库做一份安全备份
@@ -287,6 +360,9 @@ export class SystemService {
    * 复制 SQLite 数据库文件。
    * 说明：运行中无法删除 -wal/-shm（文件被占用），
    * 这里采用「先写主库、附属日志由 SQLite 自行重放」的方式，避免 EBUSY。
+   *
+   * ⚠️ 密文库下 `db.backup()` 不可用，兜底走 `VACUUM INTO`；
+   * 且 `VACUUM INTO` 要求目标文件不存在。
    */
   private async copyDbFile(from: string, to: string): Promise<void> {
     try {
@@ -297,13 +373,12 @@ export class SystemService {
     }
 
     // EBUSY 兜底：使用 SQLite VACUUM INTO 生成一致快照
-    const Database = require('better-sqlite3')
-    const db = new Database(from, { readonly: true })
-    try {
-      await db.exec(`VACUUM INTO '${to.replace(/'/g, "''")}'`)
-    } finally {
-      db.close()
+    const { copyDatabaseSnapshot } = await import('../../vault/db-open')
+    const { getBootKeyHex } = await import('../../vault/keystore')
+    for (const p of [to, `${to}-wal`, `${to}-shm`]) {
+      if (existsSync(p)) await fs.rm(p, { force: true })
     }
+    await copyDatabaseSnapshot(from, to, { keyHex: getBootKeyHex() })
   }
 
   /** 删除备份文件 */

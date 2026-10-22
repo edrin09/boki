@@ -25,6 +25,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let code: number = status
     let message: string | string[] = '服务器内部错误'
     let errorMsg: string | null = null
+    let extraData: unknown = null
 
     if (exception instanceof HttpException) {
       status = exception.getStatus()
@@ -35,6 +36,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       } else if (res && typeof res === 'object') {
         message = res.message ?? exception.message
         errorMsg = typeof res.error === 'string' ? res.error : null
+        // 业务错误码：内核/插件可以抛 { code: 42300, message, data }，
+        // 此时 `code` 用业务码，HTTP 状态码保持不变（前端按 code 分支处理）。
+        if (typeof res.code === 'number' && Number.isFinite(res.code)) {
+          code = res.code
+        }
+        if (res.data !== undefined && res.data !== null) {
+          extraData = res.data
+        }
       } else {
         message = exception.message
       }
@@ -65,7 +74,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json({
       code,
       message: normalizedMessage,
-      data: null,
+      data: extraData,
       errors: Array.isArray(message) ? message : undefined,
       error: errorMsg ?? undefined,
       path: request.url,

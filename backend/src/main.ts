@@ -15,11 +15,15 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { LogInterceptor } from './common/interceptors/log.interceptor'
 import { TransformInterceptor } from './common/interceptors/transform.interceptor'
 import { SystemService } from './modules/system/system.service'
+import { checkVerifier, readVaultMeta, resolveVaultProvider, type VaultMeta } from './sdk/vault'
+import { setBootKey, setVaultEnabled } from './vault/keystore'
+import { startVaultBootstrapShell } from './vault/vault-bootstrap'
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap')
 
   // 插件运行时：先加载已启用插件，再把模块与实体交给 Nest / TypeORM
+  // ⚠️ 必须早于 vault 解锁：插件在 server/index.js 顶层注册 vault provider
   const runtime = loadPluginRuntime()
   for (const error of runtime.errors) {
     logger.warn(`插件 ${error.id} 未加载：${error.message}`)
@@ -29,12 +33,18 @@ async function bootstrap(): Promise<void> {
   }
   const pendingSync = fs.existsSync(syncRequiredMarker())
 
+  const prefix = process.env.APP_PREFIX || 'api'
+  const port = Number(process.env.APP_PORT || 3000)
+
+  // ============ Vault 三态判定（§5.1） ============
+  const vaultMeta = readVaultMeta()
+  await prepareVault(vaultMeta, port, prefix, logger)
+
   const app = await NestFactory.create<NestExpressApplication>(
     AppModule.register(runtime.modules, runtime.entities),
     { bufferLogs: false },
   )
 
-  const prefix = process.env.APP_PREFIX || 'api'
   app.setGlobalPrefix(prefix)
 
   // 全局校验管道
@@ -65,14 +75,111 @@ async function bootstrap(): Promise<void> {
   // 静态托管前端构建产物：打包版与 API 同源，免 Nginx、免跨域
   serveWebDist(app, prefix)
 
-  const port = Number(process.env.APP_PORT || 3000)
-  await app.listen(port, '0.0.0.0')
+  await listenWithRetry(app, port, logger)
 
   // schema 同步已完成，清理一次性标记
   if (pendingSync) clearSyncRequired()
 
   logger.log(`应用已启动: http://localhost:${port}/${prefix}`)
   logger.log(`接口文档: http://localhost:${port}/${prefix}`)
+}
+
+/**
+ * Vault 启动分支（§5.1）。
+ *
+ * | vault.json | bootKey | 分支 | 行为 |
+ * |:--|:--|:--|:--|
+ * | 不存在 | — | A | 现状，直接启动完整 app |
+ * | `migrating` | — | R | 拒绝启动，打印恢复指引 |
+ * | `true` | 有（BOKI_VAULT_KEY） | B | 直接启动（无人值守，放弃零知识） |
+ * | `true` | 无 | C | 先起 bootstrap shell，解锁后再起完整 app |
+ */
+async function prepareVault(
+  meta: VaultMeta | null,
+  port: number,
+  prefix: string,
+  logger: Logger,
+): Promise<void> {
+  if (!meta || meta.enabled === false) {
+    setVaultEnabled(false)
+    return
+  }
+
+  // 分支 R：迁移中间态 —— 拒绝服务，打印恢复指引
+  if (meta.enabled === 'migrating') {
+    logger.error('检测到未完成的加密迁移，已拒绝启动以保护数据。')
+    logger.error('请执行 `npm run vault:recover` 按提示恢复。')
+    process.exit(1)
+  }
+
+  const provider = resolveVaultProvider(meta)
+  if (!provider) {
+    // 最高危场景（M5）：库是密文，但拿不到 provider。
+    // 此时**绝不能**让 TypeORM 用「无 key」的方式去开库 ——
+    // SQLite 会把加密文件当成损坏文件，而 synchronize 可能尝试重建表，数据就没了。
+    logger.error(`缺少 vault provider（${meta.provider}），无法打开加密数据库。`)
+    logger.error('请恢复 data/plugins 下的 vault 插件目录，或从备份恢复数据。')
+    process.exit(1)
+  }
+
+  // 分支 B：无人值守（服务器场景）
+  const envKey = process.env.BOKI_VAULT_KEY
+  if (envKey) {
+    logger.warn('BOKI_VAULT_KEY 已启用：本机不具备零知识保护，主密码不再起到保护作用。')
+    const mk = provider.deriveKey(envKey, meta)
+    if (!checkVerifier(mk, meta.verifier)) {
+      logger.error('BOKI_VAULT_KEY 与数据库不匹配，无法打开。')
+      process.exit(1)
+    }
+    setBootKey(mk)
+    setVaultEnabled(true)
+    return
+  }
+
+  // 分支 C：先起引导壳，拿到 MK 后让出端口给 Nest
+  logger.log('数据库已加密，等待主密码解锁…')
+  const shell = await startVaultBootstrapShell({
+    port,
+    prefix,
+    meta,
+    provider,
+    webDistDir: process.env.WEB_DIST_DIR,
+    log: (message) => logger.log(message),
+  })
+  await shell.close()
+
+  if (!checkVerifier(shell.mk, meta.verifier)) {
+    logger.error('解锁校验失败：密钥与数据文件不匹配。')
+    process.exit(1)
+  }
+  setBootKey(shell.mk)
+  setVaultEnabled(true)
+  logger.log('已解锁，正在启动应用…')
+}
+
+/**
+ * 监听端口（带 EADDRINUSE 重试）。
+ *
+ * 端口交接存在 50~300ms 空窗，Windows 上偶发端口未及时释放，
+ * 这里做有限次退避重试，避免用户看到「服务启动失败」。
+ */
+async function listenWithRetry(
+  app: NestExpressApplication,
+  port: number,
+  logger: Logger,
+): Promise<void> {
+  const maxAttempts = 20
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await app.listen(port, '0.0.0.0')
+      return
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code
+      if (code !== 'EADDRINUSE' || attempt === maxAttempts) throw err
+      logger.warn(`端口 ${port} 仍被占用，第 ${attempt} 次重试…`)
+      await new Promise((r) => setTimeout(r, 50 * attempt))
+    }
+  }
 }
 
 /**
