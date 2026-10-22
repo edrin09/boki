@@ -1,10 +1,10 @@
 {
-  "name": "financial-bs-backend",
+  "name": "boki-backend",
   "version": "1.0.0",
-  "description": "简易财务软件 B/S 版 - 后端 API (NestJS + TypeORM + SQLite)",
-  "author": "financial-bs",
+  "description": "BOKI - 开源财务软件 · 后端 API (NestJS + TypeORM + SQLite)",
+  "author": "BOKI",
   "private": true,
-  "license": "MIT",
+  "license": "AGPL-3.0",
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\"",

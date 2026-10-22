@@ -3,8 +3,8 @@
     <!-- 侧边栏 -->
     <aside class="app-sider" :class="{ 'is-collapsed': collapsed }">
       <div class="app-logo">
-        <span v-if="!collapsed">简易财务软件</span>
-        <span v-else>财务</span>
+        <img class="app-logo__mark" src="/boki-mark.svg" alt="BOKI" />
+        <span v-if="!collapsed">BOKI</span>
       </div>
       <el-scrollbar class="app-menu-wrap">
         <el-menu
@@ -150,13 +150,20 @@ function onCommand(command: string) {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   color: #fff;
-  font-weight: 600;
-  font-size: 15px;
-  letter-spacing: 1px;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 1.5px;
   background: var(--app-primary);
   flex-shrink: 0;
   white-space: nowrap;
+
+  &__mark {
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+  }
 }
 
 .app-menu-wrap {

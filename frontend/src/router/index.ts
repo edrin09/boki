@@ -78,7 +78,7 @@ export function firstAccessiblePath(permissions: string[]): string {
 
 router.beforeEach(async (to, _from, next) => {
   const title = (to.meta?.title as string) || ''
-  document.title = title ? `${title} - 简易财务软件` : '简易财务软件'
+  document.title = title ? `${title} - BOKI` : 'BOKI'
 
   const token = getToken()
 

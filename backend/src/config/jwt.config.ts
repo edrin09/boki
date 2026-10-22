@@ -5,7 +5,7 @@ import { Logger } from '@nestjs/common'
  * 注意：必须通过函数在运行时读取，避免 .env 尚未加载导致密钥与签发时不一致。
  */
 
-const DEV_FALLBACK_SECRET = 'financial-bs-dev-secret'
+const DEV_FALLBACK_SECRET = 'boki-dev-secret'
 let warned = false
 
 export function getJwtSecret(): string {

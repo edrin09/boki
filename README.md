@@ -1,20 +1,79 @@
-# 简易财务软件（B/S 版）
+<p align="center">
+  <img src="brand/boki-lockup.svg" width="380" alt="BOKI — 开源财务软件" />
+</p>
 
-一套面向小微企业的轻量财务系统，采用 **Vue 3 + NestJS + SQLite**，单命令启动，开箱即用。
+<h1 align="center">BOKI — 开源财务软件，像搭积木一样记账</h1>
+
+<p align="center">
+  <strong>复式记账内核 · 插件化 · 离线私有化 · AI 会计员</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/boki-app/boki/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-AGPL%20v3-4F46E5.svg" alt="License: AGPL v3" /></a>
+  <img src="https://img.shields.io/badge/官方插件-14-0EA5E9.svg" alt="plugins 14" />
+  <img src="https://img.shields.io/badge/Vue-3.5-42b883.svg" alt="Vue 3.5" />
+  <img src="https://img.shields.io/badge/NestJS-11-e0234e.svg" alt="NestJS 11" />
+  <img src="https://img.shields.io/badge/SQLite-003B57.svg?logo=sqlite&logoColor=white" alt="SQLite" />
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-64748B.svg" alt="platform" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/boki-app/boki">GitHub</a> ·
+  <a href="https://gitee.com/boki-app/boki">码云镜像</a> ·
+  <a href="#-快速开始">快速开始</a> ·
+  <a href="#-插件化架构">插件</a> ·
+  <a href="#️-赞助">赞助</a>
+</p>
+
+---
+
+## BOKI 是什么
+
+BOKI 是一套面向小微企业的**开源财务软件**：前端 Vue 3 + 后端 NestJS + SQLite 单文件数据库，单命令启动，开箱即用。
+
+内核只保留记账必需的**复式记账引擎**（科目、凭证、期初、公司上下文），其余能力全部**插件化**——想要什么功能装什么插件，不装的插件在界面里不留一丝痕迹。数据全部留在本机，配合本地 OCR，**断网也能用，数据不出机器**。
 
 - 记账方式：**复式记账**（借贷必相等，后端强校验）
-- 报表：资产负债表、利润表（本期 + 本年累计）
+- 报表：资产负债表、利润表（本期 + 本年累计）、票据台账、现金流量简表、费用结构分析
 - 权限：JWT 登录 + RBAC（菜单级 + 操作级）
 - 多公司：一个账号可管理多家记账公司，数据完全隔离，顶部一键切换
 - 数据库：SQLite 单文件，零配置，支持一键备份/恢复
 
 ---
 
-## 一、快速开始
+## ✨ 核心特性
+
+| | 特性 | 说明 |
+|:--|:--|:--|
+| 📒 | **复式记账强校验** | 每张凭证至少 2 条分录，借方合计 = 贷方合计，前后端双重校验，不平衡无法保存；明细科目限制、辅助核算必填 |
+| 🧩 | **插件化架构** | 后端业务模块 29 → 8，前端页面 45 → 18；14 个官方插件覆盖档案/资金/薪酬/票据/报表/AI/语音/IAM/多公司，系统内一键安装、停用、卸载 |
+| 🔒 | **离线私有化** | SQLite 单文件 + 本地 OCR（PP-OCRv4）+ 本地语音模型，内网/断网环境完整可用，财务数据不出机器 |
+| 🏢 | **多公司隔离** | 所有业务表带 `company_id`，仓储层自动追加过滤；令牌内 `companyId` 由服务端签名保证不可伪造 |
+| 🧾 | **票据智能记账** | 上传电子发票 PDF / 扫描件，自动解析类型、金额、税额、购销方；sha256 去重、归类规则、待确认工作台，确认后自动生成凭证 |
+| 🤖 | **AI 会计员** | AI 插件提供模型配置（本地/云端），语音插件支持自然语言操作，悬浮入口即问即答 |
+| 💻 | **一键安装包** | Electron 桌面壳 + NestJS sidecar，产出单个 `BOKI-Setup.exe`；未装 Node、未装数据库、不能联网的 Windows 机器装完即用，同机即局域网服务器 |
+| 📊 | **报表与导出** | 资产负债表 / 利润表 / 科目余额表 / 试算平衡表 / 票据台账 / 月度报表包，支持导出 Excel |
+
+---
+
+## 🚀 快速开始
+
+### 方式一：免环境安装包（推荐，内部办公场景）
+
+产出一个 `BOKI-Setup-1.0.0.exe`，在**未装 Node、未装数据库、不能联网**的 Windows 机器上装完即用；那台机器同时充当局域网服务器，同事用浏览器访问即可。
+
+```bash
+cd desktop
+npm run pack          # 产物：desktop/release/BOKI-Setup-1.0.0.exe
+```
+
+架构：Electron 壳负责窗口与托盘，后端以 `node.exe` 子进程方式拉起（sidecar），后端同时托管前端静态文件，**前后端同源、单端口 9300**，不需要 Nginx、不需要处理跨域。数据落在 `C:\ProgramData\BOKI\`（安装目录对普通用户只读，SQLite 必须写可写目录）。
+
+### 方式二：源码运行（开发 / 自备服务器）
 
 需要两个终端。
 
-### 终端 1 — 后端（端口 3000）
+**终端 1 — 后端（端口 3000）**
 
 ```bash
 cd backend
@@ -23,11 +82,7 @@ copy .env.example .env      # Windows；macOS/Linux 用 cp
 npm run start:dev
 ```
 
-首次启动会自动创建 `backend/data/financial.db`，并写入种子数据：
-1 家默认记账公司、80+ 条权限、4 个角色、75 个中文会计科目、4 个默认用户。
-
-> 由旧版本（单公司）升级时，历史数据会自动归入新建的「默认记账公司」，
-> 无需手动迁移；多建公司请在「系统管理 → 记账公司」操作。
+首次启动会自动创建 `backend/data/financial.db`，并写入种子数据：1 家默认记账公司、80+ 条权限、4 个角色、75 个中文会计科目、4 个默认用户。
 
 离线 OCR 模型首次使用前需下载（约 25MB，放 `backend/models/ocr/`）：
 
@@ -37,9 +92,7 @@ npm run models:fetch
 
 > 模型缺失时服务仍可正常启动（自动降级），仅「识别 / 票据上传 / 证件建档」相关功能会提示模型未就绪；`GET /api/ocr/status` 可查看就绪状态。
 
-API 地址：<http://localhost:3000/api>
-
-### 终端 2 — 前端（端口 5173）
+**终端 2 — 前端（端口 5173）**
 
 ```bash
 cd frontend
@@ -62,12 +115,42 @@ npm run dev
 
 ---
 
-## 二、功能清单
+## 🧩 插件化架构
+
+内核 = 复式记账引擎 + 插件运行时 + 插件市场。其余功能都是插件：
+
+| 插件 | 能力 |
+|:--|:--|
+| `banks` | 资金账户（库存现金 / 银行存款） |
+| `departments` | 部门档案 |
+| `projects` | 项目档案与辅助核算 |
+| `cash-bank` | 收款 / 付款 / 转账，自动生成凭证 |
+| `bank-stmt` | 银行流水导入与核对 |
+| `ar-ap` | 应收 / 应付余额查询与往来核销 |
+| `income-expense` | 其他收入 / 其他支出单据 |
+| `fixed-expense` | 固定费用（房租、折旧计划等） |
+| `hr` | 员工档案、报销单、借款单、工资表 |
+| `receipts` | 票据智能记账（上传 / 解析 / 去重 / 归类 / 待确认工作台） |
+| `ocr` | 离线 OCR 引擎（PP-OCRv4）与票据解析器 |
+| `report-pack` | 资产负债表、利润表、票据台账、现金流量、费用分析、一键月结、经营看板 |
+| `ai` | AI 模型配置（本地 / 云端） |
+| `voice` | 语音助手（自然语言记账查询） |
+| `iam` | 用户 / 角色 / 权限管理面 |
+| `multi-company` | 记账公司管理与成员授权 |
+
+- 安装 / 停用 / 卸载：系统内「系统管理 → 插件」页面，或调用插件市场 API
+- 插件源码：`marketplace/plugins/<id>/`，manifest 声明路由 / 菜单 / 插槽 / 权限
+- 零插件状态下内核仍可完成「登录 → 建账套 → 记账」完整闭环
+- 开发自己的插件：见 [`docs/插件开发与迁移指南.md`](./docs/插件开发与迁移指南.md)
+
+---
+
+## 📦 功能清单
 
 | 模块 | 功能 |
 |:--|:--|
 | 记账公司 | 多公司建账、公司成员授权、顶部一键切换、各公司数据完全隔离 |
-| 系统管理 | 用户管理、角色管理、权限管理（RBAC）、操作日志、数据备份/恢复、个人中心 |
+| 系统管理 | 用户管理、角色管理、权限管理（RBAC）、操作日志、数据备份/恢复、个人中心、插件管理 |
 | 基础资料 | 会计科目（多级树 + 辅助核算）、往来单位、资金账户、部门、项目、公司信息 |
 | 期初设置 | 按年度 + 科目 + 辅助核算录入期初余额，一键试算平衡 |
 | 凭证管理 | 复式记账凭证录入（借贷强校验）、草稿/审核/反审核/作废、凭证号按月连续 |
@@ -82,9 +165,7 @@ npm run dev
 | 离线 OCR | PP-OCRv4（det/cls/rec）本地推理，断网可用，`/ocr/status` 探活 |
 | 数据维护 | SQLite 备份、下载、恢复；操作日志清理 |
 
----
-
-## 三、核心会计规则
+### 核心会计规则
 
 | 规则 | 实现说明 |
 |:--|:--|
@@ -100,224 +181,29 @@ npm run dev
 
 ---
 
-## 四、目录结构
+## 🧪 测试
 
-```
-financial-bs/
-├── backend/                    # NestJS API
-│   ├── data/                   # SQLite 数据库（运行时自动生成，不入版本库）
-│   ├── scripts/reset-db.ts     # 数据库重置脚本
-│   ├── test/smoke.mjs          # 冒烟测试 1：认证/凭证/账簿/RBAC
-│   ├── test/smoke2.mjs         # 冒烟测试 2：期初/报表/资金往来/系统
-│   ├── test/multi-company.mjs  # 多公司隔离验证：切换/隔离/越权/授权
-│   └── src/
-│       ├── common/             # 装饰器、守卫、拦截器、过滤器、工具
-│       │   └── company/        # 多公司：请求上下文、隔离仓储、作用域拦截器
-│       ├── config/             # 数据库与 JWT 配置
-│       ├── db/                 # 种子数据
-│       ├── entities/           # TypeORM 实体
-│       └── modules/            # 业务模块（auth/companies/users/roles/... /books /reports）
-├── frontend/                   # Vue 3 前端
-│   └── src/
-│       ├── api/                # Axios 封装与接口定义
-│       ├── components/         # 布局与通用组件
-│       ├── composables/        # 分页列表等组合逻辑
-│       ├── directives/         # v-permission / v-role
-│       ├── router/              # 路由与菜单
-│       ├── stores/             # Pinia
-│       ├── styles/
-│       ├── utils/              # 金额/日期格式化、Excel 导出
-│       └── views/              # 38 个业务页面
-├── desktop/                    # Electron 桌面壳（免环境安装包）
-│   ├── src/                    # 主进程：sidecar 拉起 / 窗口 / 托盘
-│   ├── scripts/build-package.mjs   # 一键打包编排
-│   ├── electron-builder.yml    # NSIS 安装包配置
-│   └── release/                # 安装包产物（不入版本库）
-├── 产品介绍.md                  # 交付对象看的成品说明
-├── 打包与更新指南.md             # 维护者看的打包与升级流程
-└── README.md                   # 开发与部署技术说明
-```
-
----
-
-## 五、常用命令
-
-### 后端（`backend/`）
-
-| 命令 | 说明 |
-|:--|:--|
-| `npm run start:dev` | 开发模式（热重载） |
-| `npm run build` | 生产构建 → `dist/` |
-| `npm run start:prod` | 运行构建产物 |
-| `npm run typecheck` | 类型检查 |
-| `npm run db:reset -- --yes` | **清空并重置数据库** |
-| `npm run test:smoke` | 冒烟测试 1（需先启动服务） |
-| `npm run test:smoke2` | 冒烟测试 2（需全新数据库） |
-| `npm run test:smoke3` | 冒烟测试 3（员工 / 报销 / 工资表 / 红冲，需全新数据库） |
-| `npm run test:companies` | 多公司隔离验证（需先启动服务；脚本自动回收自身数据） |
-| `npm run test:ocr` | OCR 识别验证（需模型已下载） |
-| `npm run test:parsers` | 票据解析器验证（PDF 文本层 / OCR 双路径） |
-| `npm run test:receipts` | 票据上传 / 去重 / 字段抽取验证（需 3000 端口） |
-| `npm run test:extract` | 证件一键录入端到端验证（需 3000 端口） |
-| `npm run test:reports` | P18 报表接口验证（需 3000 端口） |
-| `npm run models:fetch` | 下载 OCR 模型到 `models/ocr/` |
-
-### 前端（`frontend/`）
-
-| 命令 | 说明 |
-|:--|:--|
-| `npm run dev` | 开发模式 |
-| `npm run build` | 类型检查 + 生产构建 |
-| `npm run preview` | 本地预览构建产物 |
-
----
-
-## 六、生产部署
-
-### 方式一：免环境安装包（推荐，内部办公场景）
-
-产出一个 `Setup.exe`，在**未装 Node、未装数据库、不能联网**的 Windows 机器上装完即用；那台机器同时充当局域网服务器，同事用浏览器访问即可。
-
-```bash
-cd desktop
-npm run pack          # 产物：desktop/release/FinancialApp-Setup-1.0.0.exe
-```
-
-架构：Electron 壳负责窗口与托盘，后端以 `node.exe` 子进程方式拉起（sidecar），后端同时托管前端静态文件，因此**前后端同源、单端口 9300**，不需要 Nginx、不需要处理跨域。
-
-数据落在 `C:\ProgramData\FinancialApp\`（安装目录对普通用户只读，SQLite 必须写可写目录）。完整流程、升级方式与排障见 [`打包与更新指南.md`](./打包与更新指南.md)。
-
-### 方式二：传统服务器部署（自备 Linux/云主机）
-
-```bash
-# 1. 构建
-cd backend  && npm install && npm run build
-cd ../frontend && npm install && npm run build
-
-# 2. 运行后端（推荐 PM2 常驻）
-cd ../backend
-npm i -g pm2
-pm2 start dist/main.js --name financial-bs-api
-pm2 save && pm2 startup
-
-# 3. 托管前端静态文件
-#    将 frontend/dist 交由 Nginx / Caddy 等静态服务器
-#    并把 /api 反向代理到 http://127.0.0.1:3000
-```
-
-也可以让后端直接托管前端（与安装包同源模型一致），只需设 `WEB_DIST_DIR`：
-
-```bash
-WEB_DIST_DIR=../frontend/dist APP_PORT=3000 node dist/main.js
-```
-
-Nginx 参考配置：
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    root /var/www/financial/dist;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;   # SPA 路由回退
-    }
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:3000/api/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}
-```
-
-### 生产环境注意事项
-
-| 项 | 建议 |
-|:--|:--|
-| `JWT_SECRET` | **必须**改为随机强密钥。安装包由 Electron 首次启动自动生成并持久化，无需手工设置；方式二请自行配置 |
-| `DB_SYNCHRONIZE` | 安装包固定为 `true`（升级后自动同步新增表/字段）；方式二建议设 `false` 并改用迁移 |
-| `CORS_ORIGIN` | 同源部署（安装包）用 `*` 即可；方式二请设为具体域名 |
-| `APP_PORT` | 安装包默认 `9300`（避开开发常用 3000），可在 `config.json` 中修改 |
-| 数据备份 | 使用「系统管理 → 数据备份」页面，或直接复制数据库文件 |
-| 恢复数据 | SQLite 运行中无法删除 WAL 文件，恢复后请**重启服务**使数据完全生效 |
-
----
-
-## 七、验证清单（首次部署建议按此顺序检查）
-
-1. 打开 <http://localhost:5173>，用 `admin / 123456` 登录
-2. 「基础资料 → 会计科目」能看到 75 个预置科目，层级与辅助核算正确
-3. 「基础资料 → 往来单位」新增一个客户
-4. 「基础资料 → 期初余额」录入期初（如 库存现金 借 100000、实收资本 贷 100000）
-5. 「账簿查询 → 试算平衡表」确认借贷平衡（绿色「借贷平衡」标签）
-6. 「凭证管理 → 凭证录入」新增一张凭证，故意让借贷不等 → 应被拦截
-7. 改成借贷相等并「保存并审核」
-8. 「凭证管理 → 凭证列表」可审核/反审核/作废
-9. 「账簿查询 → 总账 / 科目余额表」能看到刚才的记账
-10. 「财务报表 → 资产负债表 / 利润表」正常生成
-11. 「资金往来 → 现金银行」新增收款单 → 自动生成已审核凭证
-12. 「资金往来 → 应收应付」查看余额并执行核销
-13. 「系统管理 → 数据备份」创建备份并下载
-
-### 多公司记账验证
-
-14. 顶部右上角显示当前记账公司；点开后可见全部可管理公司
-15. 「系统管理 → 记账公司 → 新建公司」创建第二家公司（会计科目自动初始化）
-16. 顶部切换到新公司 → 往来单位、凭证列表均为空（与原公司隔离）
-17. 在新公司新增一条往来单位 → 切回原公司后应看不到该记录
-18. 「记账公司 → 成员」把另一个账号（如 `accountant`）授权到新公司 → 该账号登录后可切换进入
-19. 「基础资料 → 公司信息」保存的名称/税号仅作用于当前公司
-
-### 扩展功能验证（P14–P19）
-
-20. 「基础资料 → 公司信息」维护本公司纳税人识别号（方向判定依据）
-21. 访问 `GET /api/ocr/status` → `ready: true`（断网环境下同样可用）
-22. 「档案一键录入 → 往来单位」上传营业执照图片 → 四项建议值自动填充，批量建档成功
-23. 「档案一键录入 → 员工」上传身份证图片 → 姓名/证件号自动填充
-24. 「票据智能记账 → 票据列表」上传电子发票 PDF → 解析出类型/金额/税额/购销方
-25. 同一文件再次上传 → 提示重复（sha256 去重）
-26. 「票据智能记账 → 待确认工作台」确认票据 → 生成借贷平衡的凭证草稿，先进入「已确认」再可查账簿
-27. 「票据智能记账 → 归类规则」新增规则并调整优先级
-28. 「薪酬报销 → 工资表」导入 Excel 工资表 → 生成工资单草稿
-29. 「财务报表 → 票据台账 / 现金流量简表 / 费用结构分析」按期间查询与导出
-30. 「财务报表 → 一键月结」查看未结账事项提示；全部办结后生成月度报表包
-31. 「工作台」首页经营看板展示本月收入/支出/现金余额/待确认票据提醒
-
-### 回归验证（版本交付前建议全量执行）
-
-后端须以 **Node 24.4.1** 启动于 3000 端口。`smoke / smoke2 / smoke3` 均依赖**凭证号从 0001 起算**，必须各自在全新数据库上执行，因此按两阶段进行：
+自研端到端验证脚本（250+ 项断言），全部通过：
 
 ```bash
 cd backend
-
-# 阶段一：全新数据库（每次 reset 后重启后端）
-npm run test:smoke3      # 员工 / 报销 / 工资表 / 红冲 / 复制
-npm run db:reset -- --yes   # ← 换新库
-npm run test:smoke       # 认证 / 凭证 / 账簿 / RBAC
-npm run db:reset -- --yes   # ← 换新库
-npm run test:smoke2      # 期初 / 报表 / 资金往来 / 系统
-
-# 阶段二：任一数据库上执行（receipts 会自行清理历史票据，可重复运行）
-npm run test:ocr         # 离线 OCR 识别
+npm run test:smoke       # 认证 / 凭证 / 账簿 / RBAC（需全新数据库）
+npm run test:smoke2      # 期初 / 报表 / 资金往来 / 系统（需全新数据库）
+npm run test:smoke3      # 员工 / 报销 / 工资表 / 红冲（需全新数据库）
+npm run test:companies   # 多公司隔离：切换 / 隔离 / 越权 / 授权
+npm run test:plugins     # 插件生命周期 109 项断言：安装 / 停用 / 卸载 / 依赖保护
+npm run test:ocr         # 离线 OCR 识别（需模型已下载）
 npm run test:parsers     # 票据解析（PDF 文本层 / OCR 双路径）
-npm run test:receipts    # 上传 / 去重 / 字段抽取
-npm run test:extract     # 证件一键录入 + 批量建档
-npm run test:reports     # P18 报表（台账 / 现金流 / 费用分析 / 月结 / 看板）
-
-# 阶段三：多公司隔离（任一数据库均可，会自动回收自身数据）
-npm run test:companies   # 切换公司 / 数据隔离 / 越权拦截 / 成员授权 / 删除校验
+npm run test:receipts    # 票据上传 / 去重 / 字段抽取
+npm run test:extract     # 证件一键录入端到端
+npm run test:reports     # 报表接口（台账 / 现金流 / 费用分析 / 月结 / 看板）
 ```
 
-> 阶段一每个测试之间必须 `db:reset` 并重启后端（`reset-db.ts` 会删除数据库文件，重启时自动重建并写入种子数据）。
->
-> Node 版本注意：better-sqlite3 预编译包对应 ABI 137（Node 24.4.1）。若 shell 中的 `node` 是其他版本（如 22），启动与测试会报 `NODE_MODULE_VERSION` 不匹配，请改用 `C:\Program Files\nodejs\node.exe` 全路径或调整 PATH。
+> `smoke / smoke2 / smoke3` 依赖凭证号从 0001 起算，必须各自在全新数据库上执行（之间跑 `npm run db:reset -- --yes` 并重启后端）。
 
 ---
 
-## 八、技术栈
+## 🛠 技术栈
 
 | 层 | 技术 |
 |:--|:--|
@@ -325,20 +211,97 @@ npm run test:companies   # 切换公司 / 数据隔离 / 越权拦截 / 成员�
 | 后端 | NestJS 11 + TypeScript + TypeORM 0.3 + better-sqlite3 + JWT + Passport + class-validator |
 | 数据库 | SQLite（better-sqlite3 驱动，开启 WAL） |
 | 离线识别 | onnxruntime-node + PP-OCRv4（det/cls/rec）、pdfjs-dist（PDF 文本层）、sharp / @napi-rs/canvas（图像处理） |
-| 测试 | 自研端到端验证脚本（冒烟 + OCR + 解析 + 上传 + 建档 + 报表 + 多公司隔离，250+ 项断言） |
+| 桌面壳 | Electron + electron-builder（NSIS 安装包） |
+| 插件系统 | manifest 驱动的运行时（后端动态 AppModule + 前端路由/菜单/插槽），`.finplugin` 分发格式 |
+| 测试 | 自研端到端验证脚本（冒烟 + OCR + 解析 + 上传 + 建档 + 报表 + 多公司隔离 + 插件生命周期） |
 
 ---
 
-## 九、已知边界
+## 📁 目录结构
 
-本版本定位为「小微企业日常记账」，以下功能**未包含**，可按需扩展：
+```text
+boki/
+├── backend/                    # NestJS API（内核：记账引擎 + 插件运行时 + 插件市场）
+│   ├── data/                   # SQLite 数据库（运行时自动生成，不入版本库）
+│   ├── models/ocr/             # 离线 OCR 模型（npm run models:fetch 获取）
+│   ├── scripts/reset-db.ts     # 数据库重置脚本
+│   ├── test/                   # 端到端验证脚本（10 个）
+│   └── src/
+│       ├── common/             # 装饰器、守卫、拦截器、过滤器、工具
+│       │   └── company/        # 多公司：请求上下文、隔离仓储、作用域拦截器
+│       ├── config/             # 数据库与 JWT 配置
+│       ├── db/                 # 种子数据
+│       ├── entities/           # TypeORM 实体
+│       ├── modules/            # 内核业务模块（auth/setup/plugins/...）
+│       └── plugins/            # 后端插件运行时（manifest 校验 / loader / 动态 AppModule）
+├── frontend/                   # Vue 3 前端
+│   └── src/
+│       ├── api/                # Axios 封装与接口定义
+│       ├── components/         # 布局与通用组件
+│       ├── composables/        # 分页列表等组合逻辑
+│       ├── directives/         # v-permission / v-role
+│       ├── plugins/            # 前端插件运行时（路由 / 菜单 / 插槽 / 静态资产注入）
+│       ├── router/             # 路由与菜单
+│       ├── stores/             # Pinia
+│       ├── styles/
+│       ├── utils/              # 金额/日期格式化、Excel 导出
+│       └── views/              # 内核页面
+├── desktop/                    # Electron 桌面壳（免环境安装包）
+│   ├── src/                    # 主进程：sidecar 拉起 / 窗口 / 托盘
+│   ├── scripts/build-package.mjs   # 一键打包编排
+│   ├── electron-builder.yml    # NSIS 安装包配置
+│   └── release/                # 安装包产物（不入版本库）
+├── marketplace/                # 官方插件市场（14 个插件源码 + catalog）
+│   ├── index.json              # 插件目录
+│   └── plugins/<id>/           # 每个插件：manifest.json + server/ + client/
+├── brand/                      # 品牌资产（logo / 色板 / 商标材料）
+├── docs/                       # 插件化改造方案、插件开发指南、开发进度
+├── website/                    # 官网（PC / 移动自适应静态站）
+├── starts/                     # Windows 一键脚本（启动 / 打包 / 清数据）
+└── README.md
+```
 
-- 期末结账与损益自动结转（当前报表差额 = 未结转损益，属预期行为；现金流量为简表口径，未按完整准则分项列示）
+---
+
+## 🗺 路线图
+
+本版本定位「小微企业日常记账」，已知边界与下一步：
+
+- 期末结账与损益自动结转（当前报表差额 = 未结转损益，属预期行为）
 - 完整准则版现金流量表（已提供经营/投资/筹资三分法简表）
-- 多账套 / 多币种（**多公司已支持**，各公司数据隔离；但公司内不再分账套，且不支持同公司多币种）
-- 公司级角色细分（角色为全局 RBAC，某账号被授权某公司后，其角色在该公司的所有公司中一致生效）
-- 固定资产折旧、工资核算（当前为工资单草稿，不含个税/社保精算）、发票管理（票据为智能记账入口，非税控开票）
+- 固定资产折旧、工资核算个税/社保精算
 - 单据多级审批流
-- OCR 仅覆盖增值税发票、收据、营业执照、身份证四类版式，其余票据类型走人工录入
+- 插件 SDK 独立发布（`@boki/plugin-sdk`）与社区插件模板
+- 官网与文档中英双语
 
-建议的下一步迭代顺序：期末结转损益 → 完整现金流量表 → 固定资产 → 审批流。
+建议的迭代顺序：期末结转损益 → 完整现金流量表 → 固定资产 → 审批流 → 插件 SDK 开放。
+
+---
+
+## ❤️ 赞助
+
+BOKI 靠社区支持持续维护。赞助不影响技术决策、不换取代码投票权。
+
+- [GitHub Sponsors](https://github.com/sponsors/boki-app)（个人 / 企业月度）
+- Open Collective（企业赞助，可开票，账本透明）
+- 爱发电 / 微信 / 支付宝（国内个人小额捐赠）
+
+> 档位与权益、开票说明见 `SPONSORS.md`（随赞助通道开通后发布）。企业赞助通常需要可开票主体，欢迎通过 hello@boki.app 联系。
+
+---
+
+## 💬 社区
+
+- GitHub Issues / Discussions：问题、建议、投票
+- 码云镜像：国内快速克隆（GitHub 访问慢时可用）
+- 贡献方式：欢迎通过 Issue 提交建议；写插件是成本最低的贡献（开发指南见 [`docs/插件开发与迁移指南.md`](./docs/插件开发与迁移指南.md)）
+
+---
+
+## 📄 License
+
+- **内核**（`backend/` `frontend/` `desktop/`）：[AGPL-3.0](./LICENSE) —— 防止云厂商白嫖，财务数据场景强 copyleft
+- **官方插件**（`marketplace/plugins/`）：Apache-2.0 —— 促生态，社区可自由复用
+- 社区插件可自选许可（MIT / Apache 等），但调用内核 API 需遵守内核许可
+
+品牌资产（logo / 商标）见 [`brand/知识产权与商标方案.md`](./brand/知识产权与商标方案.md)，**不属于**开源许可范围。

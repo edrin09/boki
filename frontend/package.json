@@ -1,10 +1,10 @@
 {
-  "name": "financial-bs-frontend",
+  "name": "boki-frontend",
   "version": "1.0.0",
-  "description": "简易财务软件 B/S 版 - 前端 (Vue3 + Vite + Element Plus)",
-  "author": "financial-bs",
+  "description": "BOKI - 开源财务软件 · 前端 (Vue3 + Vite + Element Plus)",
+  "author": "BOKI",
   "private": true,
-  "license": "MIT",
+  "license": "AGPL-3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -2,9 +2,9 @@
   <div class="login">
     <div class="login__card">
       <div class="login__brand">
-        <div class="login__logo">财务</div>
-        <h1 class="login__title">简易财务软件</h1>
-        <p class="login__subtitle">复式记账 · 凭证管理 · 账簿报表</p>
+        <img class="login__logo" src="/boki-mark.svg" alt="BOKI" />
+        <h1 class="login__title">BOKI</h1>
+        <p class="login__subtitle">开源财务软件 · 复式记账 · 凭证管理 · 账簿报表</p>
       </div>
 
       <el-form
@@ -99,7 +99,7 @@ async function onSubmit() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #60a5fa 100%);
+  background: linear-gradient(135deg, #312e81 0%, #4f46e5 55%, #0ea5e9 100%);
 }
 
 .login__card {
@@ -116,18 +116,10 @@ async function onSubmit() {
 }
 
 .login__logo {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   margin: 0 auto 12px;
-  border-radius: 10px;
-  background: var(--app-primary);
-  color: #fff;
-  font-weight: 700;
-  font-size: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  letter-spacing: 1px;
+  display: block;
 }
 
 .login__title {
