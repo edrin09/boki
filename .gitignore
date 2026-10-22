@@ -40,9 +40,10 @@ coverage/
 *.pem
 npm-shrinkwrap.json
 
-# OCR 模型与字典（体积较大，用 npm run models:fetch 获取）
+# 模型与字典（体积较大，用 npm run models:fetch / models:fetch-asr 获取）
 backend/models/ocr/*.onnx
 backend/models/ocr/*.txt
+backend/models/asr/
 
 # 桌面壳（Electron）中间产物 —— 逐项性质与删除代价见「打包与更新指南.md · 八、中间产物与目录说明」
 # 注意：安装包 BOKI-Setup-<version>.exe 也落在 desktop/release/ 下，
