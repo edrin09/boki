@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/fiyhight/boki/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-AGPL%20v3-4F46E5.svg" alt="License: AGPL v3" /></a>
+  <a href="https://github.com/edrin09/boki/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-AGPL%20v3-4F46E5.svg" alt="License: AGPL v3" /></a>
   <img src="https://img.shields.io/badge/Offline%20First-100%25-16A34A.svg" alt="Offline First" />
   <img src="https://img.shields.io/badge/%E4%BA%91%E7%AB%AF%E4%BE%9D%E8%B5%96-0-16A34A.svg" alt="no cloud" />
   <img src="https://img.shields.io/badge/官方插件-14-0EA5E9.svg" alt="plugins 14" />
@@ -20,8 +20,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/fiyhight/boki">GitHub</a> ·
-  <a href="https://gitee.com/fiyhight/boki">码云镜像</a> ·
+  <a href="https://github.com/edrin09/boki">GitHub</a> ·
+  <a href="https://gitee.com/edrin/boki">码云镜像</a> ·
   <a href="#-快速开始">快速开始</a> ·
   <a href="#-全离线能力">离线能力</a> ·
   <a href="#-安全边界">安全边界</a> ·
@@ -372,7 +372,7 @@ boki/
 
 BOKI 靠社区支持持续维护。赞助不影响技术决策、不换取代码投票权。
 
-- [GitHub Sponsors](https://github.com/sponsors/fiyhight)（个人 / 企业月度）
+- [GitHub Sponsors](https://github.com/sponsors/edrin09)（个人 / 企业月度）
 - Open Collective（企业赞助，可开票，账本透明）
 - 爱发电 / 微信 / 支付宝（国内个人小额捐赠）
 
