@@ -264,7 +264,9 @@ export async function startVaultBootstrapShell(
 
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
-    server.listen(port, '0.0.0.0', () => {
+    // 不指定 host，让它绑定 ::（dual-stack）：Windows 上 localhost 会先解析 ::1，
+    // 显式绑 0.0.0.0 会导致 .NET/PowerShell 客户端连 ::1 被拒（T7 踩坑实测）。
+    server.listen(port, () => {
       server.removeListener('error', reject)
       resolve()
     })
