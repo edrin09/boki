@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>开源化改造方案 · BOKI</title>
+<style>
+:root{--indigo:#4f46e5;--indigo-deep:#3730a3;--slate:#64748b;--border:#e5e7eb;--bg-soft:#f8fafc;--text:#0f172a;}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);line-height:1.75;background:#fff}
+header.bar{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:14px;z-index:10}
+header.bar a{color:var(--indigo);text-decoration:none;font-weight:600;font-size:14px}
+header.bar .logo{font-weight:800;color:var(--text)}
+main{max-width:840px;margin:0 auto;padding:40px 22px 80px}
+h1{font-size:28px;margin:0 0 8px}
+.eyebrow{color:var(--indigo);font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
+h2{font-size:20px;margin:34px 0 10px;border-left:3px solid var(--indigo);padding-left:10px}
+p,li{color:#334155}
+code{background:var(--bg-soft);border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:13px}
+.card{background:var(--bg-soft);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:14px 0}
+.card h3{margin:0 0 6px;font-size:16px}
+footer{text-align:center;color:var(--slate);font-size:13px;padding:30px;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a href="index.html">← 返回官网</a>
+  <span class="logo">BOKI</span>
+  <span style="color:var(--slate);font-size:13px">开源化改造方案</span>
+</header>
+<main>
+  <span class="eyebrow">Open Source</span>
+  <h1>插件化与开源化改造方案</h1>
+  <p>BOKI 的改造目标是：<strong>核心能力完全开源、可审计、可自托管</strong>，同时保留健康的生态与商业空间。下面公开的是方案的设计原则与许可策略。</p>
+
+  <h2>双许可策略</h2>
+  <div class="card">
+    <h3>内核 · AGPL-3.0</h3>
+    <p>复式记账引擎与插件运行时以 AGPL-3.0 发布。任何人可自由使用、修改、自托管；若将其作为网络服务向公众提供，需同样开源对应修改，保障用户始终拥有可审查的代码。</p>
+  </div>
+  <div class="card">
+    <h3>官方插件 · Apache-2.0</h3>
+    <p>官方插件采用 Apache-2.0，鼓励社区自由复用与二次分发（可免费也可收费），降低生态参与门槛，不与内核的强 copyleft 绑定。</p>
+  </div>
+
+  <h2>为什么插件化</h2>
+  <ul>
+    <li><strong>内核收口</strong>：仅保留 8 个后端模块 / 18 个前端页面，易于审计与安全评估。</li>
+    <li><strong>功能解耦</strong>：14 个官方插件独立演进，零插件也能完成核心记账闭环。</li>
+    <li><strong>贡献友好</strong>：写插件是成本最低的贡献方式，不触碰内核即可扩展能力。</li>
+  </ul>
+
+  <h2>商业与开源的边界</h2>
+  <p>需要把 BOKI 集成进闭源商业产品时，可通过<strong>商业授权许可</strong>豁免 AGPL-3.0 的传染性，不必公开自有代码。企业私有化部署、高级权限与审计、专属技术支持作为商业支持提供。开源版已包含完整记账能力与透明的安全边界。</p>
+
+  <h2>贡献方式</h2>
+  <ul>
+    <li>写插件（成本最低的贡献）</li>
+    <li>提交 Issue 与改进建议</li>
+    <li>赞助维护（GitHub Sponsors / 爱发电等）</li>
+  </ul>
+  <p>详见 <a href="docs-plugin.html">插件开发指南</a> 与 <a href="roadmap.html">开发进度</a>。</p>
+</main>
+<footer>© BOKI · 开源财务软件 · 内核 AGPL-3.0 · 官方插件 Apache-2.0</footer>
+</body>
+</html>

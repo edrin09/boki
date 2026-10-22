@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>插件开发指南 · BOKI</title>
+<style>
+:root{--indigo:#4f46e5;--indigo-deep:#3730a3;--slate:#64748b;--border:#e5e7eb;--bg-soft:#f8fafc;--text:#0f172a;}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);line-height:1.75;background:#fff}
+header.bar{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:14px;z-index:10}
+header.bar a{color:var(--indigo);text-decoration:none;font-weight:600;font-size:14px}
+header.bar .logo{font-weight:800;color:var(--text)}
+main{max-width:840px;margin:0 auto;padding:40px 22px 80px}
+h1{font-size:28px;margin:0 0 8px}
+.eyebrow{color:var(--indigo);font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
+h2{font-size:20px;margin:34px 0 10px;border-left:3px solid var(--indigo);padding-left:10px}
+p,li{color:#334155}
+code{background:var(--bg-soft);border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:13px}
+pre{background:#0f172a;color:#e2e8f0;padding:14px 16px;border-radius:10px;overflow:auto;font-size:13px}
+a.inline{color:var(--indigo)}
+footer{text-align:center;color:var(--slate);font-size:13px;padding:30px;border-top:1px solid var(--border)}
+.tag{display:inline-block;background:var(--bg-soft);border:1px solid var(--border);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--slate);margin-right:6px}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a href="index.html">← 返回官网</a>
+  <span class="logo">BOKI</span>
+  <span style="color:var(--slate);font-size:13px">插件开发指南</span>
+</header>
+<main>
+  <span class="eyebrow">Plugins</span>
+  <h1>插件开发指南</h1>
+  <p>BOKI 采用「复式记账内核 + 插件运行时」架构。内核只负责账套、凭证、科目等核心能力，其余功能（票据、报表、AI、语音、权限……）全部以插件形式存在。<strong>零插件状态下内核仍可完成「登录 → 建账套 → 记账」闭环</strong>，因此写插件是成本最低、风险最小的贡献方式。</p>
+
+  <h2>插件结构</h2>
+  <p>每个插件是一个独立目录，至少包含：</p>
+  <pre>my-plugin/
+├── manifest.json      # 声明路由 / 菜单 / 插槽 / 权限
+├── index.html         # 前端页面（或嵌入现有页面插槽）
+└── server/            # 后端模块（可选）</pre>
+  <p><code>manifest.json</code> 关键字段：</p>
+  <ul>
+    <li><code>id</code> — 全局唯一，如 <code>ocr</code>、<code>report-pack</code></li>
+    <li><code>name</code> / <code>version</code> — 展示名与语义化版本</li>
+    <li><code>routes</code> — 前端路由表</li>
+    <li><code>menus</code> — 注入系统菜单的入口</li>
+    <li><code>slots</code> — 挂载到现有页面的插槽点</li>
+    <li><code>permissions</code> — 声明的权限项</li>
+  </ul>
+
+  <h2>运行时 API</h2>
+  <p>插件通过统一的运行时接口与内核交互，不直连数据库：</p>
+  <ul>
+    <li><strong>账套上下文</strong>：当前公司、会计期间、操作员</li>
+    <li><strong>凭证引擎</strong>：生成 / 冲销凭证，自动过账</li>
+    <li><strong>辅助核算</strong>：部门、项目、客商维度挂接</li>
+    <li><strong>事件总线</strong>：凭证过账、月结等事件订阅</li>
+  </ul>
+
+  <h2>本地开发</h2>
+  <pre># 1) 把插件放进本地插件仓库
+cp -r my-plugin ../marketplace/plugins/
+# 2) 启动内核 + 前端
+npm run dev
+# 3) 系统内「系统管理 → 插件」启用并调试</pre>
+  <p>版本比对由内核内置：安装版本与插件仓库目录中的 <code>version</code> 不一致时，界面显示「更新」按钮，点击即热更新。</p>
+
+  <h2>发布到插件仓库</h2>
+  <p>开发完成后，将插件提交到插件仓库（版本化的分发体系，支持在线获取更新）。新票据版式、新报表、新皮肤、新语言包都受欢迎。</p>
+  <p><span class="tag">AGPL-3.0 内核</span><span class="tag">Apache-2.0 官方插件</span></p>
+  <p>想看完整示例，参考仓库内的官方插件实现；有疑问在 <a class="inline" href="https://github.com/edrin09/boki/issues">GitHub Issues</a> 交流。</p>
+</main>
+<footer>© BOKI · 开源财务软件 · 内核 AGPL-3.0 · 官方插件 Apache-2.0</footer>
+</body>
+</html>

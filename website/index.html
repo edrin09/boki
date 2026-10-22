@@ -290,6 +290,10 @@
       position: absolute; top: 16px; right: 16px; font-size: 11px; font-weight: 700; color: #92400e;
       background: #fef3c7; border: 1px solid #fde68a; border-radius: 999px; padding: 2px 10px;
     }
+    .download-card .dev {
+      position: absolute; top: 16px; right: 16px; font-size: 11px; font-weight: 700; color: #fff;
+      background: var(--slate); border-radius: 999px; padding: 2px 10px;
+    }
     .download-note { text-align: center; margin-top: 26px; font-size: 13px; color: var(--slate); }
     .download-card .dbtns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
     .download-card .dbtn {
@@ -463,9 +467,13 @@
         <li><a href="#sponsors">赞助</a></li>
       </ul>
       <div class="nav-cta">
-        <a class="btn btn-outline" href="https://github.com/edrin09/boki" aria-label="GitHub 仓库">
+        <a class="btn btn-outline" href="https://github.com/edrin09/boki" target="_blank" rel="noopener" aria-label="GitHub 仓库">
           <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
           GitHub
+        </a>
+        <a class="btn btn-outline" href="https://gitee.com/edrin/boki" target="_blank" rel="noopener" aria-label="Gitee 镜像">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg>
+          Gitee
         </a>
         <a class="btn btn-primary" href="https://github.com/edrin09/boki/releases/latest" target="_blank" rel="noopener">下载 BOKI</a>
         <button class="nav-toggle" id="navToggle" aria-label="打开菜单" aria-expanded="false" aria-controls="mobileMenu">
@@ -484,6 +492,7 @@
       <a href="#sponsors">赞助</a>
       <a href="#community">社区</a>
       <a class="btn btn-primary" href="https://github.com/edrin09/boki">GitHub 源码</a>
+      <a class="btn btn-outline" href="https://gitee.com/edrin/boki" target="_blank" rel="noopener">Gitee 镜像</a>
     </nav>
   </header>
 
@@ -711,7 +720,7 @@
           <div class="plugin-card"><span class="pid">iam</span><h4>用户权限</h4><p>用户 / 角色 / 权限管理面</p></div>
           <div class="plugin-card"><span class="pid">multi-company</span><h4>多公司</h4><p>记账公司管理与成员授权</p></div>
         </div>
-        <p class="plugins-note">想写自己的插件？见 <a href="https://github.com/edrin09/boki/blob/main/docs/%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%E4%B8%8E%E8%BF%81%E7%A7%BB%E6%8C%87%E5%8D%97.md">插件开发与迁移指南</a>，manifest 声明路由 / 菜单 / 插槽 / 权限即可。</p>
+        <p class="plugins-note">想写自己的插件？见 <a href="docs-plugin.html">插件开发与迁移指南</a>，manifest 声明路由 / 菜单 / 插槽 / 权限即可。</p>
       </div>
     </section>
 
@@ -800,10 +809,11 @@
             <span class="dcode">npm run models:fetch &amp;&amp; npm run models:fetch-asr</span>
           </div>
           <div class="download-card">
+            <span class="dev">开发中</span>
             <span class="dicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg></span>
-            <h3>Docker / 服务器</h3>
-            <p>后端托管前端静态文件即可同源单端口；Nginx 反代 /api 到 3000 端口，PM2 常驻。</p>
-            <span class="dcode">WEB_DIST_DIR=… node dist/main.js</span>
+            <h3>Docker / 服务器部署</h3>
+            <p>Docker 镜像与独立服务器部署包仍在开发中；当前内网 / 服务器场景请走「源码运行」或 Windows 安装包（那台机器兼当局域网服务器）。</p>
+            <span class="dcode">预计下个版本提供</span>
           </div>
         </div>
         <p class="download-note">当前提供 Windows 安装包，发布于 <a href="https://github.com/edrin09/boki/releases/latest" target="_blank" rel="noopener">GitHub Releases</a> 与 <a href="https://gitee.com/edrin/boki/releases" target="_blank" rel="noopener">Gitee 发行版</a>；macOS / Linux 请走源码运行，桌面壳多平台打包已在路线图中。</p>
@@ -850,7 +860,7 @@
         </div>
         <div class="biz-cta">
           <p><b>获取企业版报价或定制方案</b> · 请说明规模、部署环境与合规要求</p>
-          <a class="btn btn-primary" href="mailto:hello@boki.app?subject=BOKI%20%E4%BC%81%E4%B8%9A%E7%89%88%E5%92%A8%E8%AF%A2">hello@boki.app</a>
+          <a class="btn btn-primary" href="mailto:y_p09@163.com?subject=BOKI%20%E4%BC%81%E4%B8%9A%E7%89%88%E5%92%A8%E8%AF%A2">y_p09@163.com</a>
         </div>
       </div>
     </section>
@@ -882,7 +892,7 @@
           <span><b>GitHub Sponsors</b> · 个人与企业月度</span>
           <span><b>Open Collective</b> · 企业赞助可开票、账本透明</span>
           <span><b>爱发电 / 微信 / 支付宝</b> · 国内个人小额</span>
-          <span>企业赞助请联系 <b>hello@boki.app</b></span>
+          <span>企业赞助请联系 <a href="mailto:y_p09@163.com"><b>y_p09@163.com</b></a></span>
         </div>
       </div>
     </section>
@@ -906,12 +916,12 @@
             <h3>码云镜像</h3>
             <p>国内快速克隆，GitHub 访问慢时可用。</p>
           </a>
-          <a class="community-card" href="https://github.com/edrin09/boki/blob/main/docs/%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%E4%B8%8E%E8%BF%81%E7%A7%BB%E6%8C%87%E5%8D%97.md">
+          <a class="community-card" href="docs-plugin.html">
             <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 12h6M9 16h4"/></svg></span>
             <h3>插件开发指南</h3>
             <p>manifest、运行时 API、迁移方法论，照做即可产出插件。</p>
           </a>
-          <a class="community-card" href="https://github.com/edrin09/boki/blob/main/docs/%E5%BC%80%E5%8F%91%E8%BF%9B%E5%BA%A6.md">
+          <a class="community-card" href="roadmap.html">
             <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></span>
             <h3>开发进度</h3>
             <p>14 个插件交付状态、测试矩阵与已知边界，全部公开。</p>
@@ -943,14 +953,14 @@
           <a href="https://gitee.com/edrin/boki">码云镜像</a>
           <a href="#commercial">商业支持</a>
           <a href="#sponsors">赞助档位</a>
-          <a href="mailto:hello@boki.app">联系我们</a>
+          <a href="mailto:y_p09@163.com">联系我们</a>
         </div>
         <div class="footer-col">
           <h4>资源</h4>
-          <a href="https://github.com/edrin09/boki/blob/main/docs/%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%E4%B8%8E%E8%BF%81%E7%A7%BB%E6%8C%87%E5%8D%97.md">插件开发指南</a>
-          <a href="https://github.com/edrin09/boki/blob/main/docs/%E5%BC%80%E5%8F%91%E8%BF%9B%E5%BA%A6.md">开发进度</a>
-          <a href="https://github.com/edrin09/boki/blob/main/docs/%E6%8F%92%E4%BB%B6%E5%8C%96%E4%B8%8E%E5%BC%80%E6%BA%90%E5%8C%96%E6%94%B9%E9%80%A0%E6%96%B9%E6%A1%88.md">改造方案</a>
-          <a href="https://github.com/edrin09/boki/blob/main/brand/README.md">品牌规范</a>
+          <a href="docs-plugin.html">插件开发指南</a>
+          <a href="roadmap.html">开发进度</a>
+          <a href="oss-plan.html">改造方案</a>
+          <a href="brand.html">品牌规范</a>
         </div>
       </div>
       <div class="footer-bottom">
