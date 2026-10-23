@@ -392,7 +392,7 @@ boki/
 
 BOKI 靠社区支持持续维护。赞助不影响技术决策、不换取代码投票权。
 
-- 爱发电 / 微信 / 支付宝（国内个人小额捐赠，**国内优先**）
+- [爱发电](https://afdian.com/a/edrin) / 微信 / 支付宝（国内个人小额捐赠，**国内优先**）
 - 企业赞助（青铜及以上）：**签服务协议 + 对公转账 + 可开发票**，见 [SPONSORS.md](.github/SPONSORS.md)
 - GitHub Sponsors / Open Collective（国际通道，地区受限，暂缓开通）
 

@@ -14,7 +14,7 @@
 
 # —— 已开通渠道（放在最前，列表页靠上显示）——
 custom:
-  - "https://afdian.com/a/boki"      # TODO: 替换为爱发电主页（开通爱发电后）
+  - "https://afdian.com/a/edrin"     # 爱发电主页（已开通）
   - "https://edrin09.github.io/boki/sponsor.html"       # 赞助方案与权益（GitHub Pages）
   - "https://edrin09.github.io/boki/sponsor.html#donate       # 微信 / 支付宝捐赠环节（GitHub Pages）
 
