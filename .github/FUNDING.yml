@@ -1,24 +1,27 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # Boki 簿记 · 赞助入口
-# 文档：https://boki.app/sponsor
+# 文档：https://github.com/edrin09/boki/blob/main/.github/SPONSORS.md
 # 品牌：brand/README.md
 #
-# 说明：
-#   - github / open_collective 优先，企业赞助走 Open Collective（可开票、账本透明）
-#   - custom 放国内渠道（爱发电 / 微信 / 支付宝说明页）
-#   - 未开通的项留空即可，GitHub 会自动忽略
+# 渠道策略（按《开源运营与赞助落地方案》统一后的推荐，方案文档移至 docs/ 作为本地内部参考）：
+#   - 国内优先：爱发电（个人月度/一次性）+ 企业走签约+对公可开票
+#   - GitHub Sponsors：可开通地区不含中国大陆，维护者暂无法收款，先注释保留
+#   - Open Collective：需国际收款账户（Stripe 等），国内主体暂缓，同注释保留
+#   - 开通后取消注释并替换真实 slug / 链接，再提交
 #
-# 开通后请把占位符替换为真实账号/链接，再提交本文件。
+# 说明：GitHub 会忽略空值与不认识的键；列表页只显示已填项。
 
-github: [edrin09]
-open_collective: boki      # TODO: 替换为 Open Collective slug
-ko_fi:                     # 可选
-patreon:                   # 可选
-tidelift:                  # 可选
-liberapay:                 # 可选
-
+# —— 已开通渠道（放在最前，列表页靠上显示）——
 custom:
-  - "https://afdian.com/a/boki"      # TODO: 替换为爱发电主页
-  - "https://boki.app/sponsor"       # 赞助方案与权益
-  - "https://boki.app/donate"        # 微信 / 支付宝捐赠说明
+  - "https://afdian.com/a/boki"      # TODO: 替换为爱发电主页（开通爱发电后）
+  - "https://edrin09.github.io/boki/sponsor.html"       # 赞助方案与权益（GitHub Pages）
+  - "https://edrin09.github.io/boki/sponsor.html#donate       # 微信 / 支付宝捐赠环节（GitHub Pages）
+
+# —— 暂缓渠道（拿到资质后 uncomment）——
+# github: [edrin09]                 # 需 GitHub Sponsors 支持地区 + 银行账户
+# open_collective: boki             # 需以 Collective + 国际收款方式开通
+# ko_fi:                            # 可选
+# patreon:                          # 可选
+# tidelift:                         # 可选
+# liberapay:                        # 可选

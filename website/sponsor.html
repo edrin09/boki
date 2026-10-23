@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>赞助 BOKI — 用社区支持让离线财务软件走下去</title>
+  <meta name="description" content="BOKI 赞助方案：个人捐赠（爱发电 / 微信 / 支付宝，国内优先）与企业赞助（青铜 / 白银 / 黄金档位，签服务协议、对公转账、可开票）。赞助不影响技术决策、不换取代码投票权。" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      --indigo: #4F46E5;
+      --indigo-deep: #4338CA;
+      --sky: #0EA5E9;
+      --gold: #FBBF24;
+      --ink: #0F172A;
+      --slate: #64748B;
+      --mist: #E0E7FF;
+      --bg: #FFFFFF;
+      --bg-soft: #F8FAFC;
+      --border: #E2E8F0;
+      --radius: 14px;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, .05);
+      --shadow-md: 0 8px 24px rgba(15, 23, 42, .08);
+      --shadow-lg: 0 24px 60px rgba(15, 23, 42, .14);
+      --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font);
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+    img { max-width: 100%; display: block; }
+    a { color: inherit; text-decoration: none; }
+    section { scroll-margin-top: 76px; }
+
+    .container { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+
+    /* ============ 导航（同 index.html） ============ */
+    .site-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(255, 255, 255, .86);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid transparent;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .site-nav.scrolled { border-bottom-color: var(--border); box-shadow: var(--shadow-sm); }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 22px; letter-spacing: -1.5px; }
+    .nav-brand img { width: 32px; height: 32px; }
+    .nav-links { display: flex; align-items: center; gap: 28px; list-style: none; }
+    .nav-links a { font-size: 14.5px; color: var(--slate); font-weight: 500; transition: color .15s; }
+    .nav-links a:hover, .nav-links a.active { color: var(--indigo); }
+    .nav-cta { display: flex; align-items: center; gap: 12px; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      font-weight: 600; font-size: 14.5px; border-radius: 10px; cursor: pointer;
+      padding: 10px 20px; border: 1px solid transparent; transition: all .18s; white-space: nowrap;
+      font-family: var(--font);
+    }
+    .btn-primary { background: linear-gradient(135deg, var(--indigo), var(--sky)); color: #fff; box-shadow: 0 4px 14px rgba(79, 70, 229, .35); }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(79, 70, 229, .45); }
+    .btn-outline { background: #fff; border-color: var(--border); color: var(--ink); }
+    .btn-outline:hover { border-color: var(--indigo); color: var(--indigo); }
+    .btn-ghost { background: var(--bg-soft); color: var(--ink); }
+    .btn-ghost:hover { background: var(--mist); color: var(--indigo-deep); }
+    .btn svg { width: 17px; height: 17px; flex-shrink: 0; }
+    .nav-toggle {
+      display: none; background: none; border: 1px solid var(--border); border-radius: 8px;
+      width: 40px; height: 40px; cursor: pointer; align-items: center; justify-content: center; color: var(--ink);
+    }
+    .mobile-menu {
+      display: none; border-top: 1px solid var(--border); background: #fff;
+      padding: 12px 24px 20px;
+    }
+    .mobile-menu.open { display: block; }
+    .mobile-menu a { display: block; padding: 12px 4px; font-size: 15px; color: var(--ink); font-weight: 500; border-bottom: 1px solid var(--bg-soft); }
+    .mobile-menu a:last-of-type { border-bottom: none; }
+    .mobile-menu .btn { width: 100%; margin-top: 12px; }
+
+    /* ============ 通用区块 ============ */
+    .section { padding: 88px 0; }
+    .section-head { max-width: 640px; margin: 0 auto 52px; text-align: center; }
+    .eyebrow {
+      display: inline-block; font-size: 12.5px; font-weight: 700; letter-spacing: 2px;
+      color: var(--indigo); text-transform: uppercase; margin-bottom: 12px;
+    }
+    .section-head h2 { font-size: clamp(26px, 3.2vw, 36px); font-weight: 800; letter-spacing: -.6px; margin-bottom: 14px; }
+    .section-head p { color: var(--slate); font-size: 16px; }
+
+    /* ============ Hero ============ */
+    .sp-hero {
+      padding: 148px 0 72px;
+      background:
+        radial-gradient(640px 320px at 88% -10%, rgba(251, 191, 36, .12), transparent 60%),
+        radial-gradient(560px 300px at -8% 0%, rgba(79, 70, 229, .10), transparent 60%),
+        var(--bg);
+      text-align: center;
+    }
+    .sp-hero .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+      color: var(--indigo-deep); background: var(--mist); border-radius: 999px; padding: 6px 14px; margin-bottom: 22px;
+    }
+    .sp-hero .hero-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--indigo); }
+    .sp-hero h1 { font-size: clamp(30px, 4vw, 46px); line-height: 1.24; font-weight: 800; letter-spacing: -1px; margin-bottom: 16px; }
+    .sp-hero h1 .grad {
+      background: linear-gradient(120deg, var(--indigo), var(--sky));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .sp-hero .hero-sub { font-size: 16.5px; color: var(--slate); max-width: 620px; margin: 0 auto 30px; }
+    .sp-hero .hero-sub strong { color: var(--ink); font-weight: 600; }
+    .sp-cta { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+
+    /* ============ 为什么赞助 ============ */
+    .why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .why-card {
+      border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 22px; background: #fff;
+      display: flex; gap: 14px; align-items: flex-start;
+    }
+    .why-card .wico {
+      width: 40px; height: 40px; flex: none; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      background: var(--mist); color: var(--indigo); font-size: 18px;
+    }
+    .why-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .why-card p { font-size: 13px; color: var(--slate); }
+
+    /* ============ 档位表（同 index.html） ============ */
+    .tiers-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+    table.tiers { width: 100%; border-collapse: collapse; min-width: 640px; font-size: 14px; }
+    table.tiers th, table.tiers td { padding: 13px 18px; text-align: left; border-bottom: 1px solid var(--bg-soft); }
+    table.tiers th { background: var(--bg-soft); font-size: 13px; color: var(--slate); font-weight: 600; }
+    table.tiers tr:last-child td { border-bottom: none; }
+    table.tiers td:first-child { font-weight: 700; white-space: nowrap; }
+    table.tiers td .price { color: var(--indigo-deep); font-weight: 600; font-family: var(--mono); font-size: 13px; }
+    .tiers-note { margin-top: 22px; font-size: 13.5px; color: var(--slate); text-align: center; }
+    .tiers-note a { color: var(--indigo-deep); font-weight: 600; }
+    .tiers-note a:hover { text-decoration: underline; }
+
+    /* ============ 捐赠渠道 ============ */
+    .channels-soft { background: var(--bg-soft); }
+    .channel-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+    .channel-card {
+      border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 22px; background: #fff;
+      display: flex; flex-direction: column; gap: 10px; transition: border-color .15s, transform .15s, box-shadow .15s;
+    }
+    .channel-card:hover { border-color: var(--indigo); transform: translateY(-3px); box-shadow: var(--shadow-md); }
+    .channel-card .cico {
+      width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center;
+      background: var(--mist); color: var(--indigo); margin-bottom: 2px; font-size: 18px;
+    }
+    .channel-card .cico svg { width: 21px; height: 21px; }
+    .channel-card h3 { font-size: 15.5px; font-weight: 700; }
+    .channel-card p { font-size: 13px; color: var(--slate); flex: 1; }
+    .channel-card .ctag {
+      align-self: flex-start; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 10px;
+    }
+    .channel-card .ctag.ok { color: #166534; background: #ecfdf5; border: 1px solid #a7f3d0; }
+    .channel-card .ctag.todo { color: #92400e; background: #fffbeb; border: 1px solid #fde68a; }
+    .channel-card .ctag.inv { color: var(--indigo-deep); background: var(--mist); border: 1px solid #c7d2fe; }
+    .channel-card .go { font-size: 13px; font-weight: 700; color: var(--indigo-deep); }
+    .channel-card .go:hover { text-decoration: underline; }
+    .channel-note { text-align: center; margin-top: 26px; font-size: 13px; color: var(--slate); }
+    .channel-note b { color: var(--ink); }
+
+    /* ============ 企业赞助流程 ============ */
+    .flow-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+    .flow-card {
+      position: relative; background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 24px 22px 22px; transition: transform .18s, box-shadow .18s;
+    }
+    .flow-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+    .flow-card .fstep {
+      font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--indigo);
+      background: var(--mist); border-radius: 999px; padding: 3px 12px; display: inline-block; margin-bottom: 14px;
+    }
+    .flow-card h3 { font-size: 15.5px; font-weight: 700; margin-bottom: 6px; }
+    .flow-card p { font-size: 13px; color: var(--slate); }
+    .invoice-box {
+      margin-top: 26px; background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--radius);
+      padding: 20px 24px; display: flex; gap: 14px; align-items: flex-start;
+    }
+    .invoice-box .iico { font-size: 20px; line-height: 1.4; }
+    .invoice-box h4 { font-size: 14.5px; font-weight: 700; color: #92400e; margin-bottom: 4px; }
+    .invoice-box p { font-size: 13.5px; color: #78350f; }
+    .invoice-box b { font-weight: 700; }
+
+    /* ============ 赞助商墙 ============ */
+    .wall-title {
+      display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 800; margin: 44px 0 18px;
+    }
+    .wall-title:first-child { margin-top: 0; }
+    .wall-title small { font-weight: 500; font-size: 12.5px; color: var(--slate); }
+    .wall-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .wall-card {
+      border: 1.5px dashed var(--border); border-radius: var(--radius); background: #fff;
+      padding: 26px 22px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    }
+    .wall-card .wlogo {
+      width: 112px; height: 56px; border-radius: 10px; background: var(--bg-soft);
+      display: flex; align-items: center; justify-content: center;
+      color: #94a3b8; font-size: 12px; font-weight: 600; letter-spacing: 1px;
+    }
+    .wall-card h4 { font-size: 14px; font-weight: 700; color: var(--ink); }
+    .wall-card p { font-size: 12px; color: var(--slate); }
+    .wall-grid.partners { grid-template-columns: repeat(2, 1fr); }
+    .wall-grid.partners .wall-card { border-color: var(--mist); }
+
+    /* ============ FAQ ============ */
+    .faq-list { max-width: 780px; margin: 0 auto; display: grid; gap: 12px; }
+    .faq-item { border: 1px solid var(--border); border-radius: var(--radius); background: #fff; padding: 18px 22px; }
+    .faq-item h3 { font-size: 14.5px; font-weight: 700; margin-bottom: 6px; }
+    .faq-item p { font-size: 13.5px; color: var(--slate); }
+    .faq-item a { color: var(--indigo-deep); font-weight: 600; }
+    .faq-item a:hover { text-decoration: underline; }
+
+    /* ============ 页脚（同 index.html） ============ */
+    .site-footer { border-top: 1px solid var(--border); background: var(--bg-soft); padding: 56px 0 32px; }
+    .footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 36px; margin-bottom: 40px; }
+    .footer-brand img.lockup { width: 240px; margin-bottom: 14px; }
+    .footer-brand p { font-size: 13px; color: var(--slate); max-width: 300px; }
+    .footer-col h4 { font-size: 13px; font-weight: 700; margin-bottom: 14px; color: var(--ink); }
+    .footer-col a { display: block; font-size: 13.5px; color: var(--slate); padding: 5px 0; transition: color .15s; }
+    .footer-col a:hover { color: var(--indigo); }
+    .footer-bottom {
+      border-top: 1px solid var(--border); padding-top: 24px;
+      display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; justify-content: space-between;
+      font-size: 12.5px; color: var(--slate);
+    }
+    .footer-bottom .lic { display: flex; gap: 16px; flex-wrap: wrap; }
+
+    /* ============ 弹窗（联系我们，同 index.html） ============ */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(15, 23, 42, .55); backdrop-filter: blur(3px);
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      position: relative; width: 100%; max-width: 420px;
+      background: #fff; border-radius: 18px; padding: 30px 26px 26px;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, .28);
+      animation: modal-pop .18s ease-out;
+    }
+    @keyframes modal-pop { from { transform: translateY(12px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+    .modal h3 { margin: 0 0 6px; font-size: 19px; color: var(--ink); }
+    .modal-sub { margin: 0 0 18px; font-size: 13px; color: var(--slate); }
+    .modal-close {
+      position: absolute; top: 14px; right: 16px; width: 30px; height: 30px;
+      border: none; background: #f1f5f9; border-radius: 8px; cursor: pointer;
+      font-size: 20px; line-height: 1; color: var(--slate);
+    }
+    .modal-close:hover { background: #e2e8f0; }
+    #contactBtn { font: inherit; cursor: pointer; }
+    .contact-publisher { font-weight: 600; color: var(--ink); }
+    .contact-list { display: grid; gap: 10px; margin-bottom: 16px; }
+    .contact-row {
+      display: flex; align-items: center; gap: 14px; text-decoration: none;
+      padding: 12px 16px; border: 1.5px solid #e2e8f0; border-radius: 12px;
+      color: var(--ink); transition: border-color .15s, box-shadow .15s, transform .1s;
+    }
+    .contact-row:hover { border-color: var(--indigo); box-shadow: 0 6px 18px rgba(79, 70, 229, .12); transform: translateY(-1px); }
+    .contact-row .contact-ico {
+      width: 38px; height: 38px; flex: none; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      background: #eef2ff; color: var(--indigo); font-size: 15px; font-weight: 700;
+    }
+    .contact-row .contact-label { display: block; font-size: 12px; color: var(--slate); }
+    .contact-row .contact-value { display: block; font-weight: 700; font-size: 15px; margin-top: 1px; }
+    .contact-note { margin: 0; font-size: 12px; color: var(--slate); line-height: 1.6; }
+
+    /* ============ 响应式 ============ */
+    @media (max-width: 1024px) {
+      .nav-links { gap: 18px; }
+      .nav-links a { font-size: 13.5px; }
+      .sp-hero { padding-top: 128px; }
+      .channel-grid, .flow-grid { grid-template-columns: repeat(2, 1fr); }
+      .why-grid { grid-template-columns: 1fr; }
+      .wall-grid { grid-template-columns: repeat(2, 1fr); }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 768px) {
+      .nav-links, .nav-cta .btn { display: none; }
+      .nav-toggle { display: inline-flex; }
+      .section { padding: 64px 0; }
+      .sp-cta .btn { flex: 1 1 40%; }
+    }
+    @media (max-width: 520px) {
+      .container { padding: 0 18px; }
+      .sp-hero { padding: 112px 0 56px; }
+      .channel-grid, .flow-grid, .wall-grid, .wall-grid.partners { grid-template-columns: 1fr; }
+      .footer-grid { grid-template-columns: 1fr; gap: 28px; }
+      .footer-bottom { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ================= 导航 ================= -->
+  <header class="site-nav" id="siteNav">
+    <div class="container nav-inner">
+      <a class="nav-brand" href="index.html" aria-label="BOKI 首页">
+        <img src="assets/boki-mark.svg" alt="BOKI 标志" />
+        <span>boki</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#tiers">档位</a></li>
+        <li><a href="#donate">捐赠渠道</a></li>
+        <li><a href="#invoice">企业赞助与开票</a></li>
+        <li><a href="#wall">赞助商墙</a></li>
+        <li><a href="#faq">常见问题</a></li>
+        <li><a href="index.html#features">产品</a></li>
+      </ul>
+      <div class="nav-cta">
+        <a class="btn btn-outline" href="https://github.com/edrin09/boki" target="_blank" rel="noopener" aria-label="GitHub 仓库">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+          GitHub
+        </a>
+        <button class="btn btn-primary" id="contactBtn" type="button">联系合作</button>
+        <button class="nav-toggle" id="navToggle" aria-label="打开菜单" aria-expanded="false" aria-controls="mobileMenu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+      </div>
+    </div>
+    <nav class="mobile-menu" id="mobileMenu">
+      <a href="#tiers">档位</a>
+      <a href="#donate">捐赠渠道</a>
+      <a href="#invoice">企业赞助与开票</a>
+      <a href="#wall">赞助商墙</a>
+      <a href="#faq">常见问题</a>
+      <a href="index.html#features">返回产品页</a>
+      <a class="btn btn-primary" href="#donate">捐赠与档位</a>
+      <a class="btn btn-outline" href="https://github.com/edrin09/boki/blob/main/.github/SPONSORS.md" target="_blank" rel="noopener">赞助政策全文</a>
+    </nav>
+  </header>
+
+  <main id="top">
+
+    <!-- ================= Hero ================= -->
+    <section class="sp-hero">
+      <div class="container">
+        <span class="hero-badge"><span class="dot"></span>AGPL-3.0 开源 · 账本公开 · 企业赞助可开票</span>
+        <h1>让离线财务软件<br /><span class="grad">持续走下去</span></h1>
+        <p class="hero-sub">
+          BOKI 靠社区支持长期维护：<strong>个人捐赠</strong>支付服务器与构建成本，
+          <strong>企业赞助</strong>资助核心开发。<strong>赞助不影响技术决策、不换取代码投票权</strong>——只买展示权益，不买控制权。
+        </p>
+        <div class="sp-cta">
+          <a class="btn btn-primary" href="#donate">
+            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M12 21s-7.5-4.7-10-9.2C.3 8.6 2 5 5.5 5c2 0 3.4 1.1 4.3 2.5h4.4C15.1 6.1 16.5 5 18.5 5 22 5 23.7 8.6 22 11.8 19.5 16.3 12 21 12 21Z"/></svg>
+            捐赠渠道
+          </a>
+          <a class="btn btn-outline" href="#tiers">查看企业档位</a>
+          <button class="btn btn-ghost" id="contactBtn2" type="button">企业合作联系</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 为什么赞助 ================= -->
+    <section class="section" style="padding-top: 64px;">
+      <div class="container">
+        <div class="why-grid">
+          <div class="why-card">
+            <span class="wico">🛠</span>
+            <div>
+              <h3>资助开发时间</h3>
+              <p>复式记账内核、新报表、插件运行时的持续迭代，靠赞助换出全职投入。</p>
+            </div>
+          </div>
+          <div class="why-card">
+            <span class="wico">🔐</span>
+            <div>
+              <h3>支付基础成本</h3>
+              <p>代码签名证书、构建服务器、官网与插件市场托管、国内镜像同步，全是真金白银。</p>
+            </div>
+          </div>
+          <div class="why-card">
+            <span class="wico">📖</span>
+            <div>
+              <h3>账本公开</h3>
+              <p>赞助去向定期公告：本期收入 / 支出 / 结余三栏公开，企业赞助可签透明条款。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 档位 ================= -->
+    <section class="section channels-soft" id="tiers" style="padding-top: 72px;">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Tiers</span>
+          <h2>赞助档位与权益</h2>
+          <p>个人小额、团队展示、企业深度合作，各有对应位置。权益以 <a href="https://github.com/edrin09/boki/blob/main/.github/SPONSORS.md" target="_blank" rel="noopener" style="color:var(--indigo-deep);font-weight:600;">SPONSORS.md</a> 为准。</p>
+        </div>
+        <div class="tiers-table-wrap">
+          <table class="tiers">
+            <thead>
+              <tr><th>档位</th><th>面向</th><th>金额（示例）</th><th>权益</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>❤️ 支持者</td><td>个人</td><td><span class="price">¥10–50 / 月</span></td><td>名字进鸣谢榜（可匿名）</td></tr>
+              <tr><td>❤️ 挚友</td><td>个人</td><td><span class="price">¥100 / 月</span></td><td>鸣谢榜 + 社群专属身份</td></tr>
+              <tr><td>🥉 青铜</td><td>小团队</td><td><span class="price">¥500 / 月</span></td><td>README 赞助墙小 logo + 官网赞助墙卡片</td></tr>
+              <tr><td>🥈 白银</td><td>公司</td><td><span class="price">¥2,000 / 月</span></td><td>README 较大 logo + 官网卡片 + 一句简介 + 外链</td></tr>
+              <tr><td>🥇 黄金</td><td>企业</td><td><span class="price">¥10,000 / 月</span></td><td>官网首屏 logo + Release 公告致谢 + 首位展示</td></tr>
+              <tr><td>🤝 基础设施伙伴</td><td>云 / 存储 / CDN / 签名</td><td><span class="price">资源置换</span></td><td>伙伴卡片 + 文档致谢 + 资源署名</td></tr>
+              <tr><td>🤝 生态合作伙伴</td><td>财税 SaaS / 事务所</td><td><span class="price">互推</span></td><td>伙伴卡片 + 联合内容 / 活动</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="tiers-note">一次性赞助 12 个月展示期；月度赞助展示期覆盖已付费月份。完整条款见 <a href="https://github.com/edrin09/boki/blob/main/.github/SPONSORS.md" target="_blank" rel="noopener">SPONSORS.md</a>。</p>
+      </div>
+    </section>
+
+    <!-- ================= 捐赠渠道 ================= -->
+    <section class="section" id="donate">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Donate</span>
+          <h2>捐赠渠道（国内优先）</h2>
+          <p>小额随意：打赏一杯咖啡，或按月订阅。捐赠者名字进鸣谢榜（默认可匿名）。</p>
+        </div>
+        <div class="channel-grid">
+          <a class="channel-card" href="https://afdian.com/a/boki" target="_blank" rel="noopener">
+            <span class="cico">⚡</span>
+            <h3>爱发电 Afdian</h3>
+            <p>国内优先：按月支持，支持会员与一次性发电。</p>
+            <span class="ctag todo">⏳ 开通中</span>
+            <span class="go">前往赞助 →</span>
+          </a>
+          <div class="channel-card">
+            <span class="cico">💚</span>
+            <h3>微信 / 支付宝</h3>
+            <p>国内一次性小额捐赠（商家收款码），扫码直达。</p>
+            <span class="ctag todo">⏳ 收款码上线后展示</span>
+            <span class="go" style="color:var(--slate);">占位：此处放收款码</span>
+          </div>
+          <a class="channel-card" href="https://github.com/sponsors/edrin09" target="_blank" rel="noopener">
+            <span class="cico"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></span>
+            <h3>GitHub Sponsors</h3>
+            <p>国际社区通道：支持信用卡 / 银行卡。</p>
+            <span class="ctag todo">⏳ 地区受限（暂缓开通）</span>
+            <span class="go" style="color:var(--slate);">大陆主体暂无法收款，国内渠道优先</span>
+          </a>
+          <div class="channel-card">
+            <span class="cico">🧾</span>
+            <h3>Open Collective</h3>
+            <p>国际企业赞助，账本公开。</p>
+            <span class="ctag todo">⏳ 暂缓（需国际收款资质）</span>
+            <span class="go" style="color:var(--slate);">占位：集体账本链接</span>
+          </div>
+        </div>
+        <p class="channel-note">企业赞助请不要使用个人打赏渠道——走 <b>对公转账</b> 才能<b>签协议 + 开发票</b>，见下节。</p>
+      </div>
+    </section>
+
+    <!-- ================= 企业赞助与开票 ================= -->
+    <section class="section channels-soft" id="invoice">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">For Companies</span>
+          <h2>企业赞助：签约 + 对公转账 + 可开票</h2>
+          <p>青铜及以上档位走标准商务流程，四步完成。</p>
+        </div>
+        <div class="flow-grid">
+          <div class="flow-card">
+            <span class="fstep">STEP 1</span>
+            <h3>联系意向</h3>
+            <p>邮件说明意向档位、公司名称、期望展示物料与起止时间。</p>
+          </div>
+          <div class="flow-card">
+            <span class="fstep">STEP 2</span>
+            <h3>方案确认</h3>
+            <p>回复"合作方案确认单"：档位、金额、权益、展示期、退款规则，含签约主体与开票信息。</p>
+          </div>
+          <div class="flow-card">
+            <span class="fstep">STEP 3</span>
+            <h3>签约付款</h3>
+            <p>签订《市场推广 / 技术开发服务协议》后对公转账；logo（SVG 优先）与外链一并发送。</p>
+          </div>
+          <div class="flow-card">
+            <span class="fstep">STEP 4</span>
+            <h3>开票上线</h3>
+            <p>收款后 7 个工作日内开票；物料在 README 与赞助商墙上线。</p>
+          </div>
+        </div>
+        <div class="invoice-box">
+          <span class="iico">🧾</span>
+          <div>
+            <h4>签约与发票说明（主体已具备开票能力）</h4>
+            <p>合同以服务协议形式签订（<b>《市场推广服务协议》/《技术开发服务协议》</b>，不用"捐赠"名义，便于贵司财务按推广费入账并取得增值税发票）。签约主体：默认 <b>西安市未央区鹏云智码软件开发部（个体工商户）</b>（BOKI 开发与维护主体），企业赞助亦可按对等资质用关联公司主体签约——以确认单为准。可开类目：信息技术服务 / 软件开发服务 / 市场推广服务；普票默认，专票视签约主体纳税人资质。<b>个人收款码渠道不开票，仅适合小额个人捐赠。</b></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 赞助商墙 ================= -->
+    <section class="section" id="wall">
+      <div class="container">
+        <div class="wall-title">❤️ 赞助商 <small>虚位以待——成为第一批，你的 logo 会留在这里</small></div>
+        <div class="wall-grid">
+          <div class="wall-card">
+            <div class="wlogo">LOGO 位</div>
+            <h4>第一个赞助商</h4>
+            <p>黄金 / 白银档 · 官网首屏 + README + 发布公告</p>
+          </div>
+          <div class="wall-card">
+            <div class="wlogo">LOGO 位</div>
+            <h4>赞助商虚位</h4>
+            <p>青铜档及以上 · 卡片 + 简介 + 外链</p>
+          </div>
+          <div class="wall-card">
+            <div class="wlogo">LOGO 位</div>
+            <h4>赞助商虚位</h4>
+            <p>青铜档及以上 · 卡片 + 外链</p>
+          </div>
+        </div>
+
+        <div class="wall-title">🤝 合作伙伴 <small>提供基础设施或生态资源的团队</small></div>
+        <div class="wall-grid partners">
+          <div class="wall-card">
+            <div class="wlogo">LOGO 位</div>
+            <h4>基础设施伙伴虚位</h4>
+            <p>云主机 / 对象存储 / CDN / 代码签名证书 · 资源置换</p>
+          </div>
+          <div class="wall-card">
+            <div class="wlogo">LOGO 位</div>
+            <h4>生态伙伴虚位</h4>
+            <p>财税 SaaS / 会计事务所 / 财务社群 · 互推合作</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= FAQ ================= -->
+    <section class="section channels-soft" id="faq">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">FAQ</span>
+          <h2>常见问题</h2>
+        </div>
+        <div class="faq-list">
+          <div class="faq-item">
+            <h3>赞助了能提功能需求吗？</h3>
+            <p>可以，和任何用户一样提需求、提 issue；但需求采纳走社区统一流程。赞助只能买到协议里明确写明的展示权益（logo 位、致谢、认证位），买不到需求优先级。</p>
+          </div>
+          <div class="faq-item">
+            <h3>能靠赞助变成闭源或"买断"吗？</h3>
+            <p>不能。BOKI 是 AGPL-3.0 开源项目，不接受影响开源承诺的条款。<a href="https://github.com/edrin09/boki/blob/main/.github/GOVERNANCE.md" target="_blank" rel="noopener">治理文件</a>已写死"赞助不换控制权"。想要闭源集成走<a href="index.html#commercial">商业授权</a>，那是另一条通道。</p>
+          </div>
+          <div class="faq-item">
+            <h3>合同为什么叫"服务协议"不叫"赞助协议"？</h3>
+            <p>为了企业赞助方财务能按推广费 / 服务费正常入账并取得增值税发票，对外合同以《市场推广服务协议》/《技术开发服务协议》签订；实质支持关系与"赞助"一致，账本公开承诺不变。</p>
+          </div>
+          <div class="faq-item">
+            <h3>捐赠者信息会公开吗？</h3>
+            <p>鸣谢默认展示名字（或 ID），可要求匿名。企业赞助商展示 logo / 链接 / 简介（不含联系人）。名单不会被转卖或用于其他用途。</p>
+          </div>
+          <div class="faq-item">
+            <h3>赞助可以退吗？</h3>
+            <p>月度赞助可随时停止，已付月份不退、后续自动取消；一次性赞助在物料上线前 7 天内可全额退款，上线后不退。</p>
+          </div>
+          <div class="faq-item">
+            <h3>怎么知道钱用在哪？</h3>
+            <p>一次性 / 专项支出发公告说明；官网公开"本期收入 / 支出 / 结余"；企业赞助方协商后可申请查阅收支明细。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================= 页脚 ================= -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img class="lockup" src="assets/boki-lockup.svg" alt="BOKI — 开源财务软件" />
+          <p>离线优先 · 复式记账内核 · 插件化。数据不出机器，账本只属于你。</p>
+        </div>
+        <div class="footer-col">
+          <h4>产品</h4>
+          <a href="index.html#features">核心特性</a>
+          <a href="index.html#offline">离线能力</a>
+          <a href="index.html#security">安全边界</a>
+          <a href="index.html#plugins">插件市场</a>
+          <a href="index.html#download">下载</a>
+        </div>
+        <div class="footer-col">
+          <h4>社区</h4>
+          <a href="https://github.com/edrin09/boki">GitHub</a>
+          <a href="https://gitee.com/edrin/boki">Gitee</a>
+          <a href="index.html#commercial">商业支持</a>
+          <a href="#tiers">赞助档位</a>
+          <a href="mailto:y_p09@163.com">联系我们</a>
+        </div>
+        <div class="footer-col">
+          <h4>赞助</h4>
+          <a href="https://github.com/edrin09/boki/blob/main/.github/SPONSORS.md" target="_blank" rel="noopener">赞助政策全文</a>
+          <a href="https://github.com/edrin09/boki/blob/main/.github/GOVERNANCE.md" target="_blank" rel="noopener">治理与赞助中立</a>
+          <a href="https://github.com/edrin09/boki/blob/main/.github/PRIVACY.md" target="_blank" rel="noopener">隐私政策</a>
+          <a href="https://github.com/edrin09/boki/blob/main/.github/SECURITY.md" target="_blank" rel="noopener">安全策略</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© <span id="year">2026</span> BOKI · 开源财务软件 · 开发与维护：<span id="footerPublisher">西安市未央区鹏云智码软件开发部（个体工商户）</span></span>
+        <span class="lic">
+          <span>内核 AGPL-3.0</span><span>官方插件 Apache-2.0</span><span>闭源商用需商业授权</span><span>商标归 BOKI 所有</span>
+        </span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 联系我们弹窗（静态值为快照，运行时由 website/contact.js 覆盖，源头是仓库根 .env） -->
+  <div class="modal-overlay" id="contactModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
+      <button class="modal-close" id="contactModalClose" type="button" aria-label="关闭">&times;</button>
+      <h3 id="contactModalTitle">联系我们</h3>
+      <p class="modal-sub">开发与维护：<span class="contact-publisher" id="contactPublisher">西安市未央区鹏云智码软件开发部（个体工商户）</span></p>
+      <div class="contact-list">
+        <a class="contact-row" id="contactEmailRow" href="mailto:y_p09@163.com">
+          <span class="contact-ico">✉</span>
+          <span><span class="contact-label">电子邮箱</span><span class="contact-value" id="contactEmail">y_p09@163.com</span></span>
+        </a>
+        <div class="contact-row">
+          <span class="contact-ico">☎</span>
+          <span><span class="contact-label">联系电话</span><span class="contact-value" id="contactPhone">15389232340</span></span>
+        </div>
+        <div class="contact-row">
+          <span class="contact-ico">微</span>
+          <span><span class="contact-label">微信号</span><span class="contact-value" id="contactWechat">PengYunZhiMa</span></span>
+        </div>
+        <a class="contact-row" id="contactSite" href="https://github.com/edrin09/boki" target="_blank" rel="noopener">
+          <span class="contact-ico">站</span>
+          <span><span class="contact-label">官方网站</span><span class="contact-value">https://github.com/edrin09/boki</span></span>
+        </a>
+      </div>
+      <p class="contact-note">企业赞助 / 商业授权请通过邮箱联系，说明公司与需求；问题反馈也可通过 GitHub Issues 提交。</p>
+    </div>
+  </div>
+
+  <script src="contact.js"></script>
+  <script>
+    (function () {
+      var nav = document.getElementById('siteNav');
+      var toggle = document.getElementById('navToggle');
+      var menu = document.getElementById('mobileMenu');
+
+      function onScroll() {
+        nav.classList.toggle('scrolled', window.scrollY > 8);
+      }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+
+      toggle.addEventListener('click', function () {
+        var open = menu.classList.toggle('open');
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        toggle.setAttribute('aria-label', open ? '关闭菜单' : '打开菜单');
+      });
+      menu.querySelectorAll('a').forEach(function (a) {
+        a.addEventListener('click', function () {
+          menu.classList.remove('open');
+          toggle.setAttribute('aria-expanded', 'false');
+        });
+      });
+
+      // 联系弹窗（联系信息来自 website/contact.js，源头为仓库根 .env）
+      var ctModal = document.getElementById('contactModal');
+      var ctClose = document.getElementById('contactModalClose');
+      var C = window.BOKI_CONTACT || {};
+
+      function fillContact() {
+        var pub = document.getElementById('contactPublisher');
+        var emailRow = document.getElementById('contactEmailRow');
+        var emailVal = document.getElementById('contactEmail');
+        var phoneVal = document.getElementById('contactPhone');
+        var wechatVal = document.getElementById('contactWechat');
+        var siteRow = document.getElementById('contactSite');
+        var siteVal = siteRow && siteRow.querySelector('.contact-value');
+        var footerPub = document.getElementById('footerPublisher');
+        if (pub && C.publisher) pub.textContent = C.publisher;
+        if (emailRow && C.email) emailRow.href = 'mailto:' + C.email;
+        if (emailVal && C.email) emailVal.textContent = C.email;
+        if (phoneVal && C.phone) phoneVal.textContent = C.phone;
+        if (wechatVal && C.wechat) wechatVal.textContent = C.wechat;
+        if (siteRow && C.officialSite) siteRow.href = C.officialSite;
+        if (siteVal && C.officialSite) siteVal.textContent = C.officialSite;
+        if (footerPub && C.publisher) footerPub.textContent = C.publisher;
+      }
+
+      function openContact() {
+        if (!ctModal) return;
+        ctModal.classList.add('open');
+        ctModal.setAttribute('aria-hidden', 'false');
+      }
+      function closeContact() {
+        if (!ctModal) return;
+        ctModal.classList.remove('open');
+        ctModal.setAttribute('aria-hidden', 'true');
+      }
+      fillContact();
+      Array.prototype.forEach.call(
+        document.querySelectorAll('#contactBtn, #contactBtn2'),
+        function (b) { b.addEventListener('click', openContact); }
+      );
+      if (ctClose) ctClose.addEventListener('click', closeContact);
+      if (ctModal) {
+        ctModal.addEventListener('click', function (e) {
+          if (e.target === ctModal) closeContact();
+        });
+      }
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && ctModal && ctModal.classList.contains('open')) closeContact();
+      });
+
+      document.getElementById('year').textContent = new Date().getFullYear();
+    })();
+  </script>
+</body>
+</html>

@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/edrin09/boki">GitHub</a> ·
+  <a href="https://edrin09.github.io/boki/">官网站点</a> ·
   <a href="https://gitee.com/edrin/boki">码云镜像</a> ·
   <a href="#-快速开始">快速开始</a> ·
   <a href="#-全离线能力">离线能力</a> ·
@@ -384,7 +384,7 @@ boki/
 | 🤝 | **商业授权许可** | 允许把本系统集成进闭源商业产品，**豁免 AGPL-3.0 的传染性**（copyleft） |
 | 🛠 | **专属技术支持** | SLA 保障的响应时效、版本升级协助、数据迁移与性能调优 |
 
-📩 **获取企业版报价或定制方案**：hello@boki.app（企业采购通常需要可开票主体，请说明规模、部署环境与合规要求）
+📩 **获取企业版报价或定制方案**：y_p09@163.com（企业采购通常需要可开票主体，请说明规模、部署环境与合规要求）
 
 ---
 
@@ -392,11 +392,11 @@ boki/
 
 BOKI 靠社区支持持续维护。赞助不影响技术决策、不换取代码投票权。
 
-- [GitHub Sponsors](https://github.com/sponsors/edrin09)（个人 / 企业月度）
-- Open Collective（企业赞助，可开票，账本透明）
-- 爱发电 / 微信 / 支付宝（国内个人小额捐赠）
+- 爱发电 / 微信 / 支付宝（国内个人小额捐赠，**国内优先**）
+- 企业赞助（青铜及以上）：**签服务协议 + 对公转账 + 可开发票**，见 [SPONSORS.md](.github/SPONSORS.md)
+- GitHub Sponsors / Open Collective（国际通道，地区受限，暂缓开通）
 
-> 档位与权益、开票说明见 `SPONSORS.md`（随赞助通道开通后发布）。企业赞助通常需要可开票主体，欢迎通过 hello@boki.app 联系。
+> 档位与权益、开票说明、企业赞助流程见 [SPONSORS.md](.github/SPONSORS.md)，官网赞助页见 <https://edrin09.github.io/boki/sponsor.html>（GitHub Pages）。企业赞助（青铜及以上）可签服务协议 + 对公转账 + 开发票，欢迎邮件 [y_p09@163.com](mailto:y_p09@163.com) 联系。
 >
 > 赞助者将获得新版企业级功能的抢先体验权与专属支持通道；赞助不改变开源协议，也不影响技术决策。
 
@@ -407,6 +407,22 @@ BOKI 靠社区支持持续维护。赞助不影响技术决策、不换取代码
 - GitHub Issues / Discussions：问题、建议、投票
 - 码云镜像：国内快速克隆（GitHub 访问慢时可用）
 - 贡献方式：欢迎通过 Issue 提交建议；写插件是成本最低的贡献（开发指南见开发者文档）
+
+---
+
+## 📇 开发与联系
+
+BOKI 由**西安市未央区鹏云智码软件开发部（个体工商户）**开发与维护：
+
+| 渠道 | |
+|:--|:--|
+| 电子邮箱 | y_p09@163.com |
+| 联系电话 | 15389232340 |
+| 微信号 | PengYunZhiMa |
+| 官网 | https://edrin09.github.io/boki/ |
+| 源码 | https://github.com/edrin09/boki |
+
+> 以上信息与桌面安装包、软件「关于」对话框、官网「联系我们」同源，统一维护在仓库根目录 `.env`（`PUBLISHER_NAME` / `CONTACT_EMAIL` / `CONTACT_PHONE` / `CONTACT_WECHAT` / `OFFICIAL_SITE`）。
 
 ---
 

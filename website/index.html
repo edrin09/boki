@@ -481,6 +481,24 @@
     .choice svg { width: 26px; height: 26px; flex: none; color: var(--indigo); }
     .choice .choice-title { display: block; font-weight: 700; font-size: 15px; }
     .choice .choice-desc { display: block; font-size: 12px; color: var(--slate); margin-top: 2px; }
+    /* 联系我们弹窗（联系信息由 website/contact.js 填充，源头为仓库根 .env） */
+    #contactBtn { font: inherit; cursor: pointer; }
+    .contact-publisher { font-weight: 600; color: var(--ink); }
+    .contact-list { display: grid; gap: 10px; margin-bottom: 16px; }
+    .contact-row {
+      display: flex; align-items: center; gap: 14px; text-decoration: none;
+      padding: 12px 16px; border: 1.5px solid #e2e8f0; border-radius: 12px;
+      color: var(--ink); transition: border-color .15s, box-shadow .15s, transform .1s;
+    }
+    .contact-row:hover { border-color: var(--indigo); box-shadow: 0 6px 18px rgba(79, 70, 229, .12); transform: translateY(-1px); }
+    .contact-row .contact-ico {
+      width: 38px; height: 38px; flex: none; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      background: #eef2ff; color: var(--indigo); font-size: 15px; font-weight: 700;
+    }
+    .contact-row .contact-label { display: block; font-size: 12px; color: var(--slate); }
+    .contact-row .contact-value { display: block; font-weight: 700; font-size: 15px; margin-top: 1px; }
+    .contact-note { margin: 0; font-size: 12px; color: var(--slate); line-height: 1.6; }
   </style>
 </head>
 <body>
@@ -550,6 +568,10 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
               下载 BOKI
             </a>
+            <button class="btn btn-outline" id="contactBtn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+              联系我们
+            </button>
             <a class="btn btn-primary" href="#plugins">插件市场 →</a>
             <a class="btn btn-outline" href="https://github.com/edrin09/boki">
               <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
@@ -929,10 +951,11 @@
           </table>
         </div>
         <div class="sponsors-note">
-          <span><b>GitHub Sponsors</b> · 个人与企业月度</span>
-          <span><b>Open Collective</b> · 企业赞助可开票、账本透明</span>
-          <span><b>爱发电 / 微信 / 支付宝</b> · 国内个人小额</span>
+          <span><b>爱发电 / 微信 / 支付宝</b> · 国内个人小额（国内优先）</span>
+          <span><b>企业赞助</b> · 签服务协议 + 对公转账 + 可开发票</span>
+          <span><b>GitHub Sponsors / Open Collective</b> · 国际通道，地区受限暂缓</span>
           <span>企业赞助请联系 <a href="mailto:y_p09@163.com"><b>y_p09@163.com</b></a></span>
+          <a href="sponsor.html" class="btn btn-outline" style="padding:8px 18px;">赞助方案与档位详情 →</a>
         </div>
       </div>
     </section>
@@ -953,7 +976,7 @@
           </a>
           <a class="community-card" href="https://gitee.com/edrin/boki">
             <span class="cicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg></span>
-            <h3>码云镜像</h3>
+            <h3>Gitee</h3>
             <p>国内快速克隆，GitHub 访问慢时可用。</p>
           </a>
           <a class="community-card" href="docs-plugin.html">
@@ -990,7 +1013,7 @@
         <div class="footer-col">
           <h4>社区</h4>
           <a href="https://github.com/edrin09/boki">GitHub</a>
-          <a href="https://gitee.com/edrin/boki">码云镜像</a>
+          <a href="https://gitee.com/edrin/boki">Gitee</a>
           <a href="#commercial">商业支持</a>
           <a href="#sponsors">赞助档位</a>
           <a href="mailto:y_p09@163.com">联系我们</a>
@@ -1004,7 +1027,7 @@
         </div>
       </div>
       <div class="footer-bottom">
-        <span>© <span id="year">2026</span> BOKI · 开源财务软件</span>
+        <span>© <span id="year">2026</span> BOKI · 开源财务软件 · 开发与维护：<span id="footerPublisher">西安市未央区鹏云智码软件开发部（个体工商户）</span></span>
         <span class="lic">
           <span>内核 AGPL-3.0</span><span>官方插件 Apache-2.0</span><span>闭源商用需商业授权</span><span>商标归 BOKI 所有</span>
         </span>
@@ -1037,6 +1060,35 @@
     </div>
   </div>
 
+  <!-- 联系我们弹窗（静态值为快照，运行时由 website/contact.js 覆盖，源头是仓库根 .env） -->
+  <div class="modal-overlay" id="contactModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
+      <button class="modal-close" id="contactModalClose" type="button" aria-label="关闭">&times;</button>
+      <h3 id="contactModalTitle">联系我们</h3>
+      <p class="modal-sub">开发与维护：<span class="contact-publisher" id="contactPublisher">西安市未央区鹏云智码软件开发部（个体工商户）</span></p>
+      <div class="contact-list">
+        <a class="contact-row" id="contactEmailRow" href="mailto:y_p09@163.com">
+          <span class="contact-ico">✉</span>
+          <span><span class="contact-label">电子邮箱</span><span class="contact-value" id="contactEmail">y_p09@163.com</span></span>
+        </a>
+        <div class="contact-row">
+          <span class="contact-ico">☎</span>
+          <span><span class="contact-label">联系电话</span><span class="contact-value" id="contactPhone">15389232340</span></span>
+        </div>
+        <div class="contact-row">
+          <span class="contact-ico">微</span>
+          <span><span class="contact-label">微信号</span><span class="contact-value" id="contactWechat">PengYunZhiMa</span></span>
+        </div>
+        <a class="contact-row" id="contactSite" href="https://github.com/edrin09/boki" target="_blank" rel="noopener">
+          <span class="contact-ico">站</span>
+          <span><span class="contact-label">官方网站</span><span class="contact-value">https://github.com/edrin09/boki</span></span>
+        </a>
+      </div>
+      <p class="contact-note">BOKI 为开源财务软件（AGPL-3.0），安装包由上述开发者签名发布；问题反馈也可通过 GitHub Issues 提交。</p>
+    </div>
+  </div>
+
+  <script src="contact.js"></script>
   <script>
     (function () {
       var nav = document.getElementById('siteNav');
@@ -1102,6 +1154,53 @@
       }
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && dlModal && dlModal.classList.contains('open')) closeModal();
+      });
+
+      // 联系我们弹窗：联系信息来自 website/contact.js（由 website/sync-contact.mjs 从根 .env 生成）
+      var contactBtn = document.getElementById('contactBtn');
+      var ctModal = document.getElementById('contactModal');
+      var ctClose = document.getElementById('contactModalClose');
+      var C = window.BOKI_CONTACT || {};
+
+      function fillContact() {
+        var pub = document.getElementById('contactPublisher');
+        var emailRow = document.getElementById('contactEmailRow');
+        var emailVal = document.getElementById('contactEmail');
+        var phoneVal = document.getElementById('contactPhone');
+        var wechatVal = document.getElementById('contactWechat');
+        var siteRow = document.getElementById('contactSite');
+        var siteVal = siteRow && siteRow.querySelector('.contact-value');
+        var footerPub = document.getElementById('footerPublisher');
+        if (pub && C.publisher) pub.textContent = C.publisher;
+        if (emailRow && C.email) emailRow.href = 'mailto:' + C.email;
+        if (emailVal && C.email) emailVal.textContent = C.email;
+        if (phoneVal && C.phone) phoneVal.textContent = C.phone;
+        if (wechatVal && C.wechat) wechatVal.textContent = C.wechat;
+        if (siteRow && C.officialSite) siteRow.href = C.officialSite;
+        if (siteVal && C.officialSite) siteVal.textContent = C.officialSite;
+        if (footerPub && C.publisher) footerPub.textContent = C.publisher;
+      }
+
+      function openContact() {
+        if (!ctModal) return;
+        ctModal.classList.add('open');
+        ctModal.setAttribute('aria-hidden', 'false');
+      }
+      function closeContact() {
+        if (!ctModal) return;
+        ctModal.classList.remove('open');
+        ctModal.setAttribute('aria-hidden', 'true');
+      }
+      fillContact();
+      if (contactBtn) contactBtn.addEventListener('click', openContact);
+      if (ctClose) ctClose.addEventListener('click', closeContact);
+      if (ctModal) {
+        ctModal.addEventListener('click', function (e) {
+          if (e.target === ctModal) closeContact();
+        });
+      }
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && ctModal && ctModal.classList.contains('open')) closeContact();
       });
 
       document.getElementById('year').textContent = new Date().getFullYear();
