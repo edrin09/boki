@@ -77,7 +77,13 @@ starts/
 brand/
 
 # 桌面版（Electron 壳 + 打包 / 发布脚本，仅本地）
-desktop/
+desktop/*
+!desktop/src
+!desktop/scripts
+!desktop/package.json
+!desktop/package-lock.json
+!desktop/electron-builder.yml
+!desktop/installer-hooks.nsh
 
 # 内部文档
 docs/

@@ -1,0 +1,17 @@
+{
+  "name": "boki-desktop",
+  "version": "1.0.0",
+  "description": "BOKI - 开源财务软件",
+  "author": "西安市未央区鹏云智码软件开发部（个体工商户）",
+  "private": true,
+  "license": "AGPL-3.0",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "node scripts/build-package.mjs"
+  },
+  "devDependencies": {
+    "electron": "^44.6.0",
+    "electron-builder": "^26.15.3"
+  }
+}

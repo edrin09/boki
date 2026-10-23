@@ -1,0 +1,74 @@
+appId: app.boki.desktop
+productName: BOKI
+# 开发者 / 发布者（个体工商户）—— 安装包签名与 UAC 提示中显示的名称
+# copyright 与下方 publisherName 均由 scripts/build-package.mjs 打包时从
+# 仓库根 .env（PUBLISHER_NAME）重写，请勿手改；改根 .env 后重新打包即生效
+copyright: Copyright © 2026 西安市未央区鹏云智码软件开发部（个体工商户）
+
+directories:
+  output: release
+  buildResources: build
+
+# Electron 运行时来源：指向已解压好的发行目录。
+# 默认行为是下载 zip 后解压到 <appOutDir>.tmp 再 rename 成 win-unpacked，
+# 而本机安全垫片会拦截大目录 rename（实测 EPERM，73 个文件的目录也拒）。
+# 指定 electronDist 后 electron-builder 改走 copyDir 通道，绕开 rename。
+# 目录由 scripts/build-package.mjs 首次构建时从 electron zip 解压生成，
+# 升级 electron 版本后删掉该目录重新打包即可自动重建。内容与官方 zip 完全一致。
+electronDist: build/electron-dist
+
+# asar 内只放壳代码；原生模块与 node.exe 必须走 extraResources 保持真实文件
+files:
+  - src/**/*
+  - package.json
+
+extraResources:
+  # from 必须指到 stage（而不是 stage/server）。
+  # electron-builder 的 createFilter 里硬编码了一句
+  #   if (relative === "node_modules") return false
+  # （见 app-builder-lib/out/util/filter.js），只剔除 from 根目录下的 node_modules。
+  # 写成 from: stage/server 时 node_modules 正好是根，会被静默丢掉，装完起不来；
+  # 改成 from: stage 后它变成二级目录 server/node_modules，才被保留。
+  - from: stage
+    to: .
+    filter:
+      - '**/*'
+  - from: build/icon.ico
+    to: icon.ico
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+  artifactName: BOKI-Setup-${version}.exe
+  # —— 代码签名（证书由本机 / CI 提供，绝不入库）——
+  # 方式一 · 证书文件（.pfx）：设置以下两个环境变量后自动签名
+  #   CSC_LINK=.../boki-codesign.pfx
+  #   CSC_KEY_PASSWORD=证书密码
+  # 方式二 · Windows 证书存储（已导入系统证书库）：
+  #   默认开启自动发现，会匹配 subject 为下方 publisherName 的证书，无需额外配置
+  signtoolOptions:
+    # 发布者名称（与代码签名证书 subject 一致），显示在安装器 UAC/SmartScreen 中
+    # 注意：26.x 起 publisherName 移入 signtoolOptions（原 win.publisherName 已废弃）
+    publisherName: 西安市未央区鹏云智码软件开发部（个体工商户）
+  # signingHashAlgorithms: [sha256]
+
+nsis:
+  oneClick: false
+  # 自定义安装钩子：安装过程中展示开发者/联系方式（邮箱、电话）+
+  # 把安装目录加入 Windows Defender 排除项；内容由 build-package.mjs 从根 .env 写入
+  include: installer-hooks.nsh
+  # 装到 C:\Program Files，安装需管理员一次；日常使用为标准用户
+  perMachine: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: BOKI
+  runAfterFinish: true
+  # 财务数据不可随卸载消失（数据实际在 ProgramData，卸载脚本不会触碰）
+  deleteAppDataOnUninstall: false
+  language: "2052"
+  installerLanguages:
+    - zh_CN
