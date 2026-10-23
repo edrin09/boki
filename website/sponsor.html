@@ -165,6 +165,20 @@
     .channel-card .ctag.inv { color: var(--indigo-deep); background: var(--mist); border: 1px solid #c7d2fe; }
     .channel-card .go { font-size: 13px; font-weight: 700; color: var(--indigo-deep); }
     .channel-card .go:hover { text-decoration: underline; }
+
+    /* ============ 扫码直捐横条 ============ */
+    .scan-strip { margin-top: 18px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; padding: 20px 24px; display: flex; align-items: center; gap: 30px; }
+    .scan-strip .scan-title { font-weight: 800; font-size: 15.5px; line-height: 1.55; flex: 0 0 auto; }
+    .scan-row { display: flex; gap: 28px; }
+    .scan-row figure { margin: 0; text-align: center; }
+    .scan-row a { display: block; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #fff; transition: border-color .15s, transform .15s, box-shadow .15s; }
+    .scan-row a:hover { border-color: var(--indigo); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .scan-row img { display: block; width: 148px; height: 148px; object-fit: cover; }
+    .scan-row figcaption { margin-top: 8px; font-size: 12.5px; color: var(--slate); }
+    @media (max-width: 760px) {
+      .scan-strip { flex-direction: column; gap: 16px; text-align: center; }
+      .scan-row { flex-wrap: wrap; justify-content: center; }
+    }
     .channel-note { text-align: center; margin-top: 26px; font-size: 13px; color: var(--slate); }
     .channel-note b { color: var(--ink); }
 
@@ -435,13 +449,6 @@
             <span class="ctag ok">✅ 已开通</span>
             <span class="go">前往赞助 →</span>
           </a>
-          <div class="channel-card">
-            <span class="cico">💚</span>
-            <h3>微信 / 支付宝</h3>
-            <p>国内一次性小额捐赠（个人收款码），扫码直达。</p>
-            <span class="ctag ok">✅ 已开通（个人收款码）</span>
-            <span class="go" style="color:var(--slate);">收款码图片整理中，急用可发邮箱索取</span>
-          </div>
           <a class="channel-card" href="https://github.com/sponsors/edrin09" target="_blank" rel="noopener">
             <span class="cico"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></span>
             <h3>GitHub Sponsors</h3>
@@ -455,6 +462,19 @@
             <p>国际企业赞助，账本公开。</p>
             <span class="ctag todo">⏳ 暂缓（需国际收款资质）</span>
             <span class="go" style="color:var(--slate);">占位：集体账本链接</span>
+          </div>
+        </div>
+        <div class="scan-strip">
+          <div class="scan-title">💚 微信 / 支付宝 · 个人收款码<br><small style="color:var(--slate);font-weight:500;">小额捐赠 · 扫码直达 · 点击二维码可放大</small></div>
+          <div class="scan-row">
+            <figure>
+              <a href="assets/donate-wechat.png" target="_blank" rel="noopener"><img src="assets/donate-wechat.png" alt="微信收款码" loading="lazy"></a>
+              <figcaption>微信支付</figcaption>
+            </figure>
+            <figure>
+              <a href="assets/donate-alipay.jpg" target="_blank" rel="noopener"><img src="assets/donate-alipay.jpg" alt="支付宝收款码" loading="lazy"></a>
+              <figcaption>支付宝</figcaption>
+            </figure>
           </div>
         </div>
         <p class="channel-note">企业赞助请不要使用个人打赏渠道——走 <b>对公转账</b> 才能<b>签协议 + 开发票</b>，见下节。</p>
