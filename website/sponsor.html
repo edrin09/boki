@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>赞助 BOKI — 用社区支持让离线财务软件走下去</title>
   <meta name="description" content="BOKI 赞助方案：个人捐赠（爱发电 / 微信 / 支付宝，国内优先）与企业赞助（青铜 / 白银 / 黄金档位，签服务协议、对公转账、可开票）。赞助不影响技术决策、不换取代码投票权。" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="BOKI" />
+  <meta property="og:locale" content="zh_CN" />
+  <meta property="og:url" content="https://edrin09.github.io/boki/sponsor.html" />
+  <meta property="og:title" content="赞助 BOKI — 用社区支持让离线财务软件走下去" />
+  <meta property="og:description" content="个人捐赠与企业赞助方案。赞助不影响技术决策、不换取代码投票权。" />
+  <meta property="og:image" content="https://edrin09.github.io/boki/assets/boki-social-preview.png" />
+  <meta property="og:image:width" content="1536" />
+  <meta property="og:image:height" content="768" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="赞助 BOKI" />
+  <meta name="twitter:description" content="个人捐赠与企业赞助方案。赞助不影响技术决策、不换取代码投票权。" />
+  <meta name="twitter:image" content="https://edrin09.github.io/boki/assets/boki-social-preview.png" />
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
   <style>
     :root {
@@ -167,17 +180,252 @@
     .channel-card .go:hover { text-decoration: underline; }
 
     /* ============ 扫码直捐横条 ============ */
-    .scan-strip { margin-top: 18px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; padding: 20px 24px; display: flex; align-items: center; gap: 30px; }
-    .scan-strip .scan-title { font-weight: 800; font-size: 15.5px; line-height: 1.55; flex: 0 0 auto; }
-    .scan-row { display: flex; gap: 28px; }
-    .scan-row figure { margin: 0; text-align: center; }
-    .scan-row a { display: block; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #fff; transition: border-color .15s, transform .15s, box-shadow .15s; }
-    .scan-row a:hover { border-color: var(--indigo); transform: translateY(-2px); box-shadow: var(--shadow-md); }
-    .scan-row img { display: block; width: 148px; height: 148px; object-fit: cover; }
-    .scan-row figcaption { margin-top: 8px; font-size: 12.5px; color: var(--slate); }
+    .scan-strip {
+      margin-top: 18px; border: 1px solid var(--border); border-radius: 16px;
+      background: linear-gradient(180deg, #fff 0%, var(--bg-soft) 100%);
+      padding: 30px 28px; display: flex; align-items: center; gap: 36px;
+      box-shadow: var(--shadow-sm);
+    }
+    .scan-strip .scan-title { font-weight: 800; font-size: 16px; line-height: 1.6; flex: 0 0 auto; }
+    .scan-row { display: flex; gap: 44px; flex: 1; justify-content: center; }
+    .scan-row figure { margin: 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .scan-row a {
+      position: relative; display: block; padding: 12px; background: #fff;
+      border: 1px solid var(--border); border-radius: 16px;
+      box-shadow: var(--shadow-md);
+      transition: border-color .18s, transform .18s, box-shadow .18s;
+    }
+    /* 四角取景框装饰 */
+    .scan-row a::before, .scan-row a::after,
+    .scan-row .corner-b::before, .scan-row .corner-b::after {
+      content: ""; position: absolute; width: 16px; height: 16px; pointer-events: none;
+      border: 2.5px solid var(--indigo); opacity: .55; transition: opacity .18s, border-color .18s;
+    }
+    .scan-row a::before { top: 6px; left: 6px; border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
+    .scan-row a::after { top: 6px; right: 6px; border-left: none; border-bottom: none; border-radius: 0 8px 0 0; }
+    .scan-row .corner-b::before { bottom: 6px; left: 6px; border-right: none; border-top: none; border-radius: 0 0 0 8px; }
+    .scan-row .corner-b::after { bottom: 6px; right: 6px; border-left: none; border-top: none; border-radius: 0 0 8px 0; }
+    .scan-row a:hover { border-color: var(--indigo); transform: translateY(-3px) scale(1.02); box-shadow: var(--shadow-lg); }
+    .scan-row a:hover::before, .scan-row a:hover::after,
+    .scan-row a:hover .corner-b::before, .scan-row a:hover .corner-b::after { opacity: 1; }
+    .scan-row img {
+      display: block; width: 200px; height: 200px; object-fit: contain;
+      background: #fff; border-radius: 8px; image-rendering: -webkit-optimize-contrast;
+    }
+    .scan-row figcaption {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 13px; font-weight: 700; padding: 5px 14px; border-radius: 999px;
+    }
+    .scan-row .cap-wechat { color: #0b7a3d; background: #e8f8ee; }
+    .scan-row .cap-wechat::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #07C160; }
+    .scan-row .cap-alipay { color: #0b5cc7; background: #e8f1ff; }
+    .scan-row .cap-alipay::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #1677FF; }
+    .scan-strip {
+      margin-top: 18px; border: 1px solid var(--border); border-radius: 16px;
+      background: linear-gradient(180deg, #fff 0%, var(--bg-soft) 100%);
+      padding: 30px 28px; display: flex; align-items: center; gap: 36px;
+      box-shadow: var(--shadow-sm);
+    }
+    .scan-strip .scan-title { font-weight: 800; font-size: 16px; line-height: 1.6; flex: 0 0 auto; }
+    .scan-row { display: flex; gap: 44px; flex: 1; justify-content: center; }
+    .scan-row figure { margin: 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .scan-row a {
+      position: relative; display: block; padding: 12px; background: #fff;
+      border: 1px solid var(--border); border-radius: 16px;
+      box-shadow: var(--shadow-md);
+      transition: border-color .18s, transform .18s, box-shadow .18s;
+    }
+    /* 四角取景框装饰 */
+    .scan-row a::before, .scan-row a::after,
+    .scan-row .corner-b::before, .scan-row .corner-b::after {
+      content: ""; position: absolute; width: 16px; height: 16px; pointer-events: none;
+      border: 2.5px solid var(--indigo); opacity: .55; transition: opacity .18s, border-color .18s;
+    }
+    .scan-row a::before { top: 6px; left: 6px; border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
+    .scan-row a::after { top: 6px; right: 6px; border-left: none; border-bottom: none; border-radius: 0 8px 0 0; }
+    .scan-row .corner-b::before { bottom: 6px; left: 6px; border-right: none; border-top: none; border-radius: 0 0 0 8px; }
+    .scan-row .corner-b::after { bottom: 6px; right: 6px; border-left: none; border-top: none; border-radius: 0 0 8px 0; }
+    .scan-row a:hover { border-color: var(--indigo); transform: translateY(-3px) scale(1.02); box-shadow: var(--shadow-lg); }
+    .scan-row a:hover::before, .scan-row a:hover::after,
+    .scan-row a:hover .corner-b::before, .scan-row a:hover .corner-b::after { opacity: 1; }
+    .scan-row img {
+      display: block; width: 200px; height: 200px; object-fit: contain;
+      background: #fff; border-radius: 8px; image-rendering: -webkit-optimize-contrast;
+    }
+    .scan-row figcaption {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 13px; font-weight: 700; padding: 5px 14px; border-radius: 999px;
+    }
+    .scan-row .cap-wechat { color: #0b7a3d; background: #e8f8ee; }
+    .scan-row .cap-wechat::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #07C160; }
+    .scan-row .cap-alipay { color: #0b5cc7; background: #e8f1ff; }
+    .scan-row .cap-alipay::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #1677FF; }
+    .scan-strip {
+      margin-top: 18px; border: 1px solid var(--border); border-radius: 16px;
+      background: linear-gradient(180deg, #fff 0%, var(--bg-soft) 100%);
+      padding: 30px 28px; display: flex; align-items: center; gap: 36px;
+      box-shadow: var(--shadow-sm);
+    }
+    .scan-strip .scan-title { font-weight: 800; font-size: 16px; line-height: 1.6; flex: 0 0 auto; }
+    .scan-row { display: flex; gap: 44px; flex: 1; justify-content: center; }
+    .scan-row figure { margin: 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .scan-row a {
+      position: relative; display: block; padding: 12px; background: #fff;
+      border: 1px solid var(--border); border-radius: 16px;
+      box-shadow: var(--shadow-md);
+      transition: border-color .18s, transform .18s, box-shadow .18s;
+    }
+    /* 四角取景框装饰 */
+    .scan-row a::before, .scan-row a::after,
+    .scan-row .corner-b::before, .scan-row .corner-b::after {
+      content: ""; position: absolute; width: 16px; height: 16px; pointer-events: none;
+      border: 2.5px solid var(--indigo); opacity: .55; transition: opacity .18s, border-color .18s;
+    }
+    .scan-row a::before { top: 6px; left: 6px; border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
+    .scan-row a::after { top: 6px; right: 6px; border-left: none; border-bottom: none; border-radius: 0 8px 0 0; }
+    .scan-row .corner-b::before { bottom: 6px; left: 6px; border-right: none; border-top: none; border-radius: 0 0 0 8px; }
+    .scan-row .corner-b::after { bottom: 6px; right: 6px; border-left: none; border-top: none; border-radius: 0 0 8px 0; }
+    .scan-row a:hover { border-color: var(--indigo); transform: translateY(-3px) scale(1.02); box-shadow: var(--shadow-lg); }
+    .scan-row a:hover::before, .scan-row a:hover::after,
+    .scan-row a:hover .corner-b::before, .scan-row a:hover .corner-b::after { opacity: 1; }
+    .scan-row img {
+      display: block; width: 200px; height: 200px; object-fit: contain;
+      background: #fff; border-radius: 8px; image-rendering: -webkit-optimize-contrast;
+    }
+    .scan-row figcaption {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 13px; font-weight: 700; padding: 5px 14px; border-radius: 999px;
+    }
+    .scan-row .cap-wechat { color: #0b7a3d; background: #e8f8ee; }
+    .scan-row .cap-wechat::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #07C160; }
+    .scan-row .cap-alipay { color: #0b5cc7; background: #e8f1ff; }
+    .scan-row .cap-alipay::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #1677FF; }
+    .scan-strip {
+      margin-top: 18px; border: 1px solid var(--border); border-radius: 16px;
+      background: linear-gradient(180deg, #fff 0%, var(--bg-soft) 100%);
+      padding: 30px 28px; display: flex; align-items: center; gap: 36px;
+      box-shadow: var(--shadow-sm);
+    }
+    .scan-strip .scan-title { font-weight: 800; font-size: 16px; line-height: 1.6; flex: 0 0 auto; }
+    .scan-row { display: flex; gap: 44px; flex: 1; justify-content: center; }
+    .scan-row figure { margin: 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .scan-row a {
+      position: relative; display: block; padding: 12px; background: #fff;
+      border: 1px solid var(--border); border-radius: 16px;
+      box-shadow: var(--shadow-md);
+      transition: border-color .18s, transform .18s, box-shadow .18s;
+    }
+    /* 四角取景框装饰 */
+    .scan-row a::before, .scan-row a::after,
+    .scan-row .corner-b::before, .scan-row .corner-b::after {
+      content: ""; position: absolute; width: 16px; height: 16px; pointer-events: none;
+      border: 2.5px solid var(--indigo); opacity: .55; transition: opacity .18s, border-color .18s;
+    }
+    .scan-row a::before { top: 6px; left: 6px; border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
+    .scan-row a::after { top: 6px; right: 6px; border-left: none; border-bottom: none; border-radius: 0 8px 0 0; }
+    .scan-row .corner-b::before { bottom: 6px; left: 6px; border-right: none; border-top: none; border-radius: 0 0 0 8px; }
+    .scan-row .corner-b::after { bottom: 6px; right: 6px; border-left: none; border-top: none; border-radius: 0 0 8px 0; }
+    .scan-row a:hover { border-color: var(--indigo); transform: translateY(-3px) scale(1.02); box-shadow: var(--shadow-lg); }
+    .scan-row a:hover::before, .scan-row a:hover::after,
+    .scan-row a:hover .corner-b::before, .scan-row a:hover .corner-b::after { opacity: 1; }
+    .scan-row img {
+      display: block; width: 200px; height: 200px; object-fit: contain;
+      background: #fff; border-radius: 8px; image-rendering: -webkit-optimize-contrast;
+    }
+    .scan-row figcaption {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 13px; font-weight: 700; padding: 5px 14px; border-radius: 999px;
+    }
+    .scan-row .cap-wechat { color: #0b7a3d; background: #e8f8ee; }
+    .scan-row .cap-wechat::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #07C160; }
+    .scan-row .cap-alipay { color: #0b5cc7; background: #e8f1ff; }
+    .scan-row .cap-alipay::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #1677FF; }
+    .scan-strip {
+      margin-top: 18px; border: 1px solid var(--border); border-radius: 16px;
+      background: linear-gradient(180deg, #fff 0%, var(--bg-soft) 100%);
+      padding: 30px 28px; display: flex; align-items: center; gap: 36px;
+      box-shadow: var(--shadow-sm);
+    }
+    .scan-strip .scan-title { font-weight: 800; font-size: 16px; line-height: 1.6; flex: 0 0 auto; }
+    .scan-row { display: flex; gap: 44px; flex: 1; justify-content: center; }
+    .scan-row figure { margin: 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .scan-row a {
+      position: relative; display: block; padding: 12px; background: #fff;
+      border: 1px solid var(--border); border-radius: 16px;
+      box-shadow: var(--shadow-md);
+      transition: border-color .18s, transform .18s, box-shadow .18s;
+    }
+    /* 四角取景框装饰 */
+    .scan-row a::before, .scan-row a::after,
+    .scan-row .corner-b::before, .scan-row .corner-b::after {
+      content: ""; position: absolute; width: 16px; height: 16px; pointer-events: none;
+      border: 2.5px solid var(--indigo); opacity: .55; transition: opacity .18s, border-color .18s;
+    }
+    .scan-row a::before { top: 6px; left: 6px; border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
+    .scan-row a::after { top: 6px; right: 6px; border-left: none; border-bottom: none; border-radius: 0 8px 0 0; }
+    .scan-row .corner-b::before { bottom: 6px; left: 6px; border-right: none; border-top: none; border-radius: 0 0 0 8px; }
+    .scan-row .corner-b::after { bottom: 6px; right: 6px; border-left: none; border-top: none; border-radius: 0 0 8px 0; }
+    .scan-row a:hover { border-color: var(--indigo); transform: translateY(-3px) scale(1.02); box-shadow: var(--shadow-lg); }
+    .scan-row a:hover::before, .scan-row a:hover::after,
+    .scan-row a:hover .corner-b::before, .scan-row a:hover .corner-b::after { opacity: 1; }
+    .scan-row img {
+      display: block; width: 200px; height: 200px; object-fit: contain;
+      background: #fff; border-radius: 8px; image-rendering: -webkit-optimize-contrast;
+    }
+    .scan-row figcaption {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 13px; font-weight: 700; padding: 5px 14px; border-radius: 999px;
+    }
+    .scan-row .cap-wechat { color: #0b7a3d; background: #e8f8ee; }
+    .scan-row .cap-wechat::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #07C160; }
+    .scan-row .cap-alipay { color: #0b5cc7; background: #e8f1ff; }
+    .scan-row .cap-alipay::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #1677FF; }
+    .scan-strip {
+      margin-top: 18px; border: 1px solid var(--border); border-radius: 16px;
+      background: linear-gradient(180deg, #fff 0%, var(--bg-soft) 100%);
+      padding: 30px 28px; display: flex; align-items: center; gap: 36px;
+      box-shadow: var(--shadow-sm);
+    }
+    .scan-strip .scan-title { font-weight: 800; font-size: 16px; line-height: 1.6; flex: 0 0 auto; }
+    .scan-row { display: flex; gap: 44px; flex: 1; justify-content: center; }
+    .scan-row figure { margin: 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .scan-row a {
+      position: relative; display: block; padding: 12px; background: #fff;
+      border: 1px solid var(--border); border-radius: 16px;
+      box-shadow: var(--shadow-md);
+      transition: border-color .18s, transform .18s, box-shadow .18s;
+    }
+    /* 四角取景框装饰 */
+    .scan-row a::before, .scan-row a::after,
+    .scan-row .corner-b::before, .scan-row .corner-b::after {
+      content: ""; position: absolute; width: 16px; height: 16px; pointer-events: none;
+      border: 2.5px solid var(--indigo); opacity: .55; transition: opacity .18s, border-color .18s;
+    }
+    .scan-row a::before { top: 6px; left: 6px; border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
+    .scan-row a::after { top: 6px; right: 6px; border-left: none; border-bottom: none; border-radius: 0 8px 0 0; }
+    .scan-row .corner-b::before { bottom: 6px; left: 6px; border-right: none; border-top: none; border-radius: 0 0 0 8px; }
+    .scan-row .corner-b::after { bottom: 6px; right: 6px; border-left: none; border-top: none; border-radius: 0 0 8px 0; }
+    .scan-row a:hover { border-color: var(--indigo); transform: translateY(-3px) scale(1.02); box-shadow: var(--shadow-lg); }
+    .scan-row a:hover::before, .scan-row a:hover::after,
+    .scan-row a:hover .corner-b::before, .scan-row a:hover .corner-b::after { opacity: 1; }
+    .scan-row img {
+      display: block; width: 200px; height: 200px; object-fit: contain;
+      background: #fff; border-radius: 8px; image-rendering: -webkit-optimize-contrast;
+    }
+    .scan-row figcaption {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 13px; font-weight: 700; padding: 5px 14px; border-radius: 999px;
+    }
+    .scan-row .cap-wechat { color: #0b7a3d; background: #e8f8ee; }
+    .scan-row .cap-wechat::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #07C160; }
+    .scan-row .cap-alipay { color: #0b5cc7; background: #e8f1ff; }
+    .scan-row .cap-alipay::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #1677FF; }
     @media (max-width: 760px) {
-      .scan-strip { flex-direction: column; gap: 16px; text-align: center; }
-      .scan-row { flex-wrap: wrap; justify-content: center; }
+      .scan-strip { flex-direction: column; gap: 18px18px18px18px18px18px; text-align: center; padding: 26px 18px; }
+      .scan-row { flex-wrap: wrap; justify-content: center; gap: 32px; }
+    }
+    @media (max-width: 420px) {
+      .scan-row img { width: calc(50vw - 72px); height: calc(50vw - 72px); min-width: 150px; min-height: 150px; }
     }
     .channel-note { text-align: center; margin-top: 26px; font-size: 13px; color: var(--slate); }
     .channel-note b { color: var(--ink); }
@@ -468,12 +716,12 @@
           <div class="scan-title">💚 微信 / 支付宝 · 个人收款码<br><small style="color:var(--slate);font-weight:500;">小额捐赠 · 扫码直达 · 点击二维码可放大</small></div>
           <div class="scan-row">
             <figure>
-              <a href="assets/donate-wechat.png" target="_blank" rel="noopener"><img src="assets/donate-wechat.png" alt="微信收款码" loading="lazy"></a>
-              <figcaption>微信支付</figcaption>
+              <a href="assets/donate-wechat.png" target="_blank" rel="noopener"><img src="assets/donate-wechat.png" alt="微信收款码" loading="lazy"><span class="corner-b" aria-hidden="true"></span></a>
+              <figcaption class="cap-wechat">微信支付</figcaption>
             </figure>
             <figure>
-              <a href="assets/donate-alipay.jpg" target="_blank" rel="noopener"><img src="assets/donate-alipay.jpg" alt="支付宝收款码" loading="lazy"></a>
-              <figcaption>支付宝</figcaption>
+              <a href="assets/donate-alipay.jpg" target="_blank" rel="noopener"><img src="assets/donate-alipay.jpg" alt="支付宝收款码" loading="lazy"><span class="corner-b" aria-hidden="true"></span></a>
+              <figcaption class="cap-alipay">支付宝</figcaption>
             </figure>
           </div>
         </div>
