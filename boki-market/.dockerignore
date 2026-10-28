@@ -1,0 +1,28 @@
+# 环境与密钥不进镜像（运行时用 -e / env_file 注入）
+.env
+.env.*
+!.env.example
+
+# 本地数据、制品、构建产物
+db
+data
+dist
+backups
+logs
+node_modules
+
+# 开发机 / CI 专用，镜像运行不需要
+cli
+plugins
+scripts
+deploy
+docker
+docker-compose-market.yml
+
+# 杂物
+.git
+.gitignore
+*.log
+*.db
+*.db-wal
+*.db-shm

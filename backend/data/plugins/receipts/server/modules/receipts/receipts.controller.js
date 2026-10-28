@@ -58,6 +58,7 @@ const operation_decorator_1 = require("@core/common/decorators/operation.decorat
 const skip_wrap_decorator_1 = require("@core/common/decorators/skip-wrap.decorator");
 const permissions_decorator_1 = require("@core/common/decorators/permissions.decorator");
 const enums_1 = require("@core/common/enums");
+const attachment_cipher_1 = require("@core/vault/attachment-cipher");
 const workbench_dto_1 = require("./dto/workbench.dto");
 const ALLOWED_MIME = /^(image\/(jpeg|png|webp|bmp|tiff)|application\/pdf)$/;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -179,7 +180,7 @@ let ReceiptsController = class ReceiptsController {
             throw new common_1.NotFoundException('文件不存在');
         res.setHeader('Content-Type', String(receipt.mimeType ?? 'application/octet-stream'));
         res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(String(receipt.fileName ?? 'file'))}"`);
-        (0, node_fs_1.createReadStream)(abs).pipe(res);
+        (0, attachment_cipher_1.createAttachmentReadStream)(abs).pipe(res);
     }
 };
 exports.ReceiptsController = ReceiptsController;

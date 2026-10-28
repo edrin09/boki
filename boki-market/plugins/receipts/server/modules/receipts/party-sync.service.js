@@ -1,0 +1,137 @@
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PartySyncService = void 0;
+const common_1 = require("@nestjs/common");
+const partner_entity_1 = require("@core/entities/partner.entity");
+const enums_1 = require("@core/common/enums");
+const code_util_1 = require("@core/common/utils/code.util");
+const company_repository_1 = require("@core/common/company/company.repository");
+const company_repo_decorator_1 = require("@core/common/company/company-repo.decorator");
+const system_service_1 = require("@core/modules/system/system.service");
+const parser_utils_1 = require("@plugin/ocr/server/modules/ocr/parsers/parser.utils");
+function str(v) {
+    return v === null || v === undefined ? '' : String(v).trim();
+}
+function cut(s, max) {
+    return s ? s.slice(0, max) : null;
+}
+/**
+ * 往来单位建档/回填（购买方/销售方共用）：
+ * 按纳税人识别号优先去重、其次按名称；命中已有档案只回填空字段，不覆盖手工填写。
+ */
+let PartySyncService = class PartySyncService {
+    partnerRepo;
+    systemService;
+    constructor(partnerRepo, systemService) {
+        this.partnerRepo = partnerRepo;
+        this.systemService = systemService;
+    }
+    /** 单边同步：识别出名称即入库；返回往来单位 id（未识别名称返回 null） */
+    async syncParty(f, side) {
+        const name = str(f.name);
+        if (!name)
+            return null;
+        const taxNo = str(f.taxNo);
+        const addr = str(f.address);
+        const phone = str(f.phone);
+        const bank = str(f.bank);
+        const bankAcct = str(f.bankAccount);
+        // 本公司（当前记账公司）是票据的购/销一方时不能建档为客户/供应商：
+        // 它是账套主体本身，不是交易对手（销项票的销售方、进项票的购买方都是自己）
+        if (await this.isSelfCompany(taxNo, name))
+            return null;
+        let partner = taxNo ? await this.partnerRepo.findOne({ where: { taxNo } }) : null;
+        if (!partner)
+            partner = await this.partnerRepo.findOne({ where: { name: name.slice(0, 100) } });
+        // 命中已有档案：只回填空字段，不覆盖手工填写
+        if (partner) {
+            const patch = {};
+            if (taxNo && !partner.taxNo)
+                patch.taxNo = taxNo;
+            if (addr && !partner.address)
+                patch.address = cut(addr, 200);
+            if (phone && !partner.phone)
+                patch.phone = cut(phone, 30);
+            if (bank && !partner.bankName)
+                patch.bankName = cut(bank, 100);
+            if (bankAcct && !partner.bankAccount)
+                patch.bankAccount = cut(bankAcct, 50);
+            if (Object.keys(patch).length > 0) {
+                Object.assign(partner, patch);
+                await this.partnerRepo.save(partner);
+            }
+            return partner.id;
+        }
+        // 自动建档：识别字段按字段名全部入库
+        const code = await (0, code_util_1.nextCode)(this.partnerRepo, code_util_1.CODE_PREFIX.partner);
+        const saved = await this.partnerRepo.save(this.partnerRepo.create({
+            code,
+            name: name.slice(0, 100),
+            taxNo: taxNo || null,
+            address: cut(addr, 200),
+            phone: cut(phone, 30),
+            bankName: cut(bank, 100),
+            bankAccount: cut(bankAcct, 50),
+            type: side === 'buyer' ? enums_1.PartnerType.CUSTOMER : enums_1.PartnerType.SUPPLIER,
+            status: 1,
+        }));
+        return saved.id;
+    }
+    /** 购销双方同步入库（按纳税人识别号去重）；识别到哪方就建哪方。串行执行避免同税号同时建档重复 */
+    async syncBoth(fields) {
+        const buyerId = await this.syncParty({
+            name: fields['buyer_name'],
+            taxNo: fields['buyer_tax_no'],
+            address: fields['buyer_address'],
+            phone: fields['buyer_phone'],
+            bank: fields['buyer_bank'],
+            bankAccount: fields['buyer_bank_account'],
+        }, 'buyer');
+        const sellerId = await this.syncParty({
+            name: fields['seller_name'],
+            taxNo: fields['seller_tax_no'],
+            address: fields['seller_address'],
+            phone: fields['seller_phone'],
+            bank: fields['seller_bank'],
+            bankAccount: fields['seller_bank_account'],
+        }, 'seller');
+        return { buyerId, sellerId };
+    }
+    /**
+     * 判断票据一侧是否是本公司（当前记账公司）自身。
+     * 优先按纳税人识别号比对；识别号缺失时按归一化名称互相包含比对
+     * （与 ClassifyService 的方向判定口径一致，兼容 OCR 产生的空格差异）。
+     */
+    async isSelfCompany(taxNo, name) {
+        const company = await this.systemService.getCompanyInfo().catch(() => null);
+        if (!company)
+            return false; // 无公司上下文时无法判定，保持原有建档行为
+        if (taxNo && company.taxNo && taxNo.toUpperCase() === company.taxNo.toUpperCase()) {
+            return true;
+        }
+        const partyName = (0, parser_utils_1.normName)(name);
+        const companyName = (0, parser_utils_1.normName)(company.companyName ?? '');
+        if (!partyName || !companyName)
+            return false;
+        return partyName.includes(companyName) || companyName.includes(partyName);
+    }
+};
+exports.PartySyncService = PartySyncService;
+exports.PartySyncService = PartySyncService = __decorate([
+    (0, common_1.Injectable)(),
+    __param(0, (0, company_repo_decorator_1.InjectCompanyRepo)(partner_entity_1.Partner)),
+    __metadata("design:paramtypes", [company_repository_1.CompanyScopedRepository,
+        system_service_1.SystemService])
+], PartySyncService);

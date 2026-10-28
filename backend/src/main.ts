@@ -15,15 +15,29 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { LogInterceptor } from './common/interceptors/log.interceptor'
 import { TransformInterceptor } from './common/interceptors/transform.interceptor'
 import { SystemService } from './modules/system/system.service'
-import { checkVerifier, readVaultMeta, resolveVaultProvider, type VaultMeta } from './sdk/vault'
-import { setBootKey, setVaultEnabled } from './vault/keystore'
-import { startVaultBootstrapShell } from './vault/vault-bootstrap'
+import {
+  DEFAULT_CIPHER_PARAMS,
+  checkVerifier,
+  isLegacyVaultMeta,
+  readVaultMeta,
+  vaultFilePath,
+  writeVaultMetaAtomic,
+  type AnyVaultMeta,
+} from './sdk/vault'
+import { deriveSubKey, INFO_DB, makeVerifier } from './sdk/vault-kdf'
+import { resolveDatabasePath } from './config/database.config'
+import { setMasterKey } from './vault/keystore'
+import { startVaultConvertShell } from './vault/vault-bootstrap'
+import { ensureVaultKeyFile, readVaultKeyFile, vaultKeyFilePath } from './vault/key-file'
+import { canOpenDatabase, createEmptyDatabase } from './vault/db-open'
+import { enableVaultEncryption, settleVaultMigration } from './vault/vault-migrate'
+import { isPlaintextDatabase } from './vault/vault-backup'
+import { encryptLegacyAttachments } from './vault/vault-attachments'
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap')
 
   // 插件运行时：先加载已启用插件，再把模块与实体交给 Nest / TypeORM
-  // ⚠️ 必须早于 vault 解锁：插件在 server/index.js 顶层注册 vault provider
   const runtime = loadPluginRuntime()
   for (const error of runtime.errors) {
     logger.warn(`插件 ${error.id} 未加载：${error.message}`)
@@ -84,77 +98,209 @@ async function bootstrap(): Promise<void> {
   logger.log(`接口文档: http://localhost:${port}/${prefix}`)
 }
 
+/** 密钥缺失 / 不匹配等致命错误：打印原因并退出，绝不让 TypeORM 用错密钥去开库 */
+function exitVaultError(logger: Logger, message: string): never {
+  logger.error(message)
+  process.exit(1)
+}
+
+/** 读取密钥文件；不存在或非法则退出 */
+function loadKeyFileOrExit(keyFile: string, logger: Logger): Buffer {
+  try {
+    const mk = readVaultKeyFile(keyFile)
+    if (!mk) exitVaultError(logger, `密钥文件缺失：${keyFile}`)
+    return mk
+  } catch (err) {
+    return exitVaultError(logger, (err as Error).message)
+  }
+}
+
+/** 首次加密后，把历史明文附件就地加密一次（幂等） */
+async function encryptAttachmentsOnce(logger: Logger, vaultFile: string): Promise<void> {
+  const current = readVaultMeta()
+  if (!current || isLegacyVaultMeta(current) || current.attachments?.enabled) return
+  const count = await encryptLegacyAttachments((message) => logger.log(message))
+  const after = readVaultMeta()
+  if (after && !isLegacyVaultMeta(after)) {
+    writeVaultMetaAtomic(vaultFile, {
+      ...after,
+      attachments: { enabled: true, encryptedAt: new Date().toISOString(), count },
+    })
+  }
+}
+
 /**
- * Vault 启动分支（§5.1）。
+ * Vault 启动流程。
  *
- * | vault.json | bootKey | 分支 | 行为 |
- * |:--|:--|:--|:--|
- * | 不存在 | — | A | 现状，直接启动完整 app |
- * | `migrating` | — | R | 拒绝启动，打印恢复指引 |
- * | `true` | 有（BOKI_VAULT_KEY） | B | 直接启动（无人值守，放弃零知识） |
- * | `true` | 无 | C | 先起 bootstrap shell，解锁后再起完整 app |
+ * 唯一密钥来源：程序根目录的 `vault.key`（32 字节 hex）。
+ * | vault.json | vault.key | 行为 |
+ * |:--|:--|:--|
+ * | v1（旧主密码库） | — | 强制起转换页，输入一次原主密码/恢复码 → 写 vault.key + v2 元数据 |
+ * | v2 | 存在且匹配 | 直接启动 |
+ * | v2 | 缺失 / 不匹配 | 拒绝启动（加密库无法打开） |
+ * | 不存在 + 明文库 | 存在/缺失 | 用现有或新生成的密钥强制加密 |
+ * | 不存在 + 新库 | 缺失 | 生成 vault.key，建库并加密 |
+ *
+ * 任何情况下都不会在「库已是密文」时静默换一把新钥匙。
  */
 async function prepareVault(
-  meta: VaultMeta | null,
+  meta: AnyVaultMeta | null,
   port: number,
   prefix: string,
   logger: Logger,
 ): Promise<void> {
-  if (!meta || meta.enabled === false) {
-    setVaultEnabled(false)
+  // 仅回归测试使用：显式明文库模式，跳过密钥文件
+  if ((process.env.DB_CIPHER ?? '').toLowerCase() === 'plain') {
+    logger.warn('DB_CIPHER=plain：已跳过密钥文件与库加密（仅限回归测试）')
     return
   }
 
-  // 分支 R：迁移中间态 —— 拒绝服务，打印恢复指引
-  if (meta.enabled === 'migrating') {
-    logger.error('检测到未完成的加密迁移，已拒绝启动以保护数据。')
-    logger.error('请执行 `npm run vault:recover` 按提示恢复。')
-    process.exit(1)
-  }
+  const dbPath = resolveDatabasePath()
+  const vaultFile = vaultFilePath()
+  const keyFile = vaultKeyFilePath()
 
-  const provider = resolveVaultProvider(meta)
-  if (!provider) {
-    // 最高危场景（M5）：库是密文，但拿不到 provider。
-    // 此时**绝不能**让 TypeORM 用「无 key」的方式去开库 ——
-    // SQLite 会把加密文件当成损坏文件，而 synchronize 可能尝试重建表，数据就没了。
-    logger.error(`缺少 vault provider（${meta.provider}），无法打开加密数据库。`)
-    logger.error('请恢复 data/plugins 下的 vault 插件目录，或从备份恢复数据。')
-    process.exit(1)
-  }
-
-  // 分支 B：无人值守（服务器场景）
-  const envKey = process.env.BOKI_VAULT_KEY
-  if (envKey) {
-    logger.warn('BOKI_VAULT_KEY 已启用：本机不具备零知识保护，主密码不再起到保护作用。')
-    const mk = provider.deriveKey(envKey, meta)
-    if (!checkVerifier(mk, meta.verifier)) {
-      logger.error('BOKI_VAULT_KEY 与数据库不匹配，无法打开。')
-      process.exit(1)
+  // ============ 1. 旧版主密码库：强制转换 ============
+  if (isLegacyVaultMeta(meta)) {
+    if (!fs.existsSync(dbPath)) {
+      exitVaultError(
+        logger,
+        `检测到旧版加密元数据，但数据库文件不存在：${dbPath}\n请先恢复数据库文件，再启动完成转换。`,
+      )
     }
-    setBootKey(mk)
-    setVaultEnabled(true)
+    logger.warn('检测到旧版主密码加密库，升级必须一次性转换为密钥文件模式。')
+    logger.warn(`转换后将生成密钥文件：${keyFile}（请务必备份，丢失后库无法打开）`)
+
+    const shell = await startVaultConvertShell({
+      port,
+      prefix,
+      meta,
+      dbPath,
+      vaultFile,
+      keyFile,
+      webDistDir: process.env.WEB_DIST_DIR,
+      log: (message) => logger.log(message),
+    })
+    const result = shell.result
+    await shell.close()
+
+    if (!checkVerifier(result.mk, result.meta.verifier)) {
+      exitVaultError(logger, '旧库转换完成，但密钥校验失败，请从备份恢复。')
+    }
+    setMasterKey(result.mk)
+    logger.log('旧库已转换为密钥文件模式，原主密码/恢复码已失效。')
+    await encryptAttachmentsOnce(logger, vaultFile)
     return
   }
 
-  // 分支 C：先起引导壳，拿到 MK 后让出端口给 Nest
-  logger.log('数据库已加密，等待主密码解锁…')
-  const shell = await startVaultBootstrapShell({
-    port,
-    prefix,
-    meta,
-    provider,
-    webDistDir: process.env.WEB_DIST_DIR,
-    log: (message) => logger.log(message),
-  })
-  await shell.close()
+  // ============ 2. 已有 v2 元数据 ============
+  if (meta) {
+    if (!fs.existsSync(dbPath)) {
+      exitVaultError(
+        logger,
+        `检测到 vault.json 但数据库文件不存在：${dbPath}\n请恢复数据库文件后再启动。`,
+      )
+    }
+    if (!fs.existsSync(keyFile)) {
+      exitVaultError(
+        logger,
+        `数据库已加密，但密钥文件缺失：${keyFile}\n` +
+          '没有 vault.key 无法打开数据库，系统不会启动。\n' +
+          '请从备份恢复 vault.key（或恢复整套数据），不要新建同名文件。',
+      )
+    }
+    const mk = loadKeyFileOrExit(keyFile, logger)
+    if (!checkVerifier(mk, meta.verifier)) {
+      exitVaultError(
+        logger,
+        `密钥文件与数据库不匹配：${keyFile}\n` +
+          '当前 vault.key 不是这把库的钥匙。请恢复正确的密钥文件，或从备份恢复整套数据。',
+      )
+    }
 
-  if (!checkVerifier(shell.mk, meta.verifier)) {
-    logger.error('解锁校验失败：密钥与数据文件不匹配。')
-    process.exit(1)
+    if (meta.enabled === 'migrating') {
+      logger.warn('检测到未完成的加密迁移，正在自动恢复…')
+      const settled = await settleVaultMigration(vaultFile, dbPath, keyFile, mk)
+      logger.log(settled.message)
+      if (settled.result === 'rolled-back') {
+        logger.warn('已回滚到明文库，正在重新执行加密…')
+        await enableVaultEncryption({
+          dbPath,
+          vaultFile,
+          keyFile,
+          mk,
+          cipher: meta.cipher ?? DEFAULT_CIPHER_PARAMS,
+          onProgress: (step) => logger.log(`[vault] ${step}`),
+        })
+      }
+    }
+
+    setMasterKey(mk)
+    logger.log(`数据库已加密，密钥文件：${keyFile}`)
+    await encryptAttachmentsOnce(logger, vaultFile)
+    return
   }
-  setBootKey(shell.mk)
-  setVaultEnabled(true)
-  logger.log('已解锁，正在启动应用…')
+
+  // ============ 3. 没有 vault.json ============
+  // 3.1 库是密文但元数据丢了：只能用现有 vault.key 补回状态，绝不新建钥匙
+  if (fs.existsSync(dbPath) && !isPlaintextDatabase(dbPath)) {
+    if (!fs.existsSync(keyFile)) {
+      exitVaultError(
+        logger,
+        `数据库已是加密状态，但缺少 vault.json 与 vault.key：${dbPath}\n` +
+          '无法确定密钥，系统不会启动。请从备份恢复整套数据。',
+      )
+    }
+    const mk = loadKeyFileOrExit(keyFile, logger)
+    const cipher = DEFAULT_CIPHER_PARAMS
+    if (!canOpenDatabase(dbPath, deriveSubKey(mk, INFO_DB).toString('hex'), cipher.legacy)) {
+      exitVaultError(
+        logger,
+        `vault.key 无法打开该加密数据库：${keyFile}\n请恢复正确的密钥文件，或从备份恢复整套数据。`,
+      )
+    }
+    writeVaultMetaAtomic(vaultFile, {
+      version: 2,
+      enabled: true,
+      cipher,
+      verifier: makeVerifier(mk),
+      createdAt: new Date().toISOString(),
+    })
+    setMasterKey(mk)
+    logger.warn('检测到加密数据库缺少 vault.json，已用现有 vault.key 补齐加密状态。')
+    return
+  }
+
+  // 3.2 明文库 / 全新库：用密钥文件强制加密
+  const hasKeyFile = fs.existsSync(keyFile)
+  let mk: Buffer
+  if (hasKeyFile) {
+    mk = loadKeyFileOrExit(keyFile, logger)
+  } else {
+    const ensured = ensureVaultKeyFile(keyFile)
+    mk = ensured.mk
+    logger.warn(`未找到密钥文件，已生成新密钥：${keyFile}`)
+    logger.warn('请将 vault.key 与数据库备份分开保管 —— 丢失后数据库将无法打开。')
+  }
+
+  if (!fs.existsSync(dbPath)) {
+    logger.log('未找到数据库文件，正在创建并加密新库…')
+    createEmptyDatabase(dbPath)
+    // 空库还没有业务表，必须让 TypeORM 建表
+    process.env.DB_SYNCHRONIZE = 'true'
+  } else {
+    logger.warn('检测到明文数据库，正在用密钥文件强制加密…')
+  }
+
+  await enableVaultEncryption({
+    dbPath,
+    vaultFile,
+    keyFile,
+    mk,
+    onProgress: (step) => logger.log(`[vault] ${step}`),
+  })
+  setMasterKey(mk)
+  logger.log(`数据库已加密，密钥文件：${keyFile}`)
+  await encryptAttachmentsOnce(logger, vaultFile)
 }
 
 /**

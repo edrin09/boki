@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "enabled": true,
+  "cipher": {
+    "name": "sqlcipher",
+    "legacy": 4,
+    "memorySecurity": true
+  },
+  "verifier": "7aaf173127b224c28a595b9822318ef5f48ae488200867b53c050ca43aede6a2",
+  "createdAt": "2026-10-27T03:37:28.538Z",
+  "attachments": {
+    "enabled": true,
+    "encryptedAt": "2026-10-27T03:37:28.850Z",
+    "count": 0
+  }
+}

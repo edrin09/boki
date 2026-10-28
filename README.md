@@ -5,26 +5,26 @@
 <h1 align="center">BOKI — 离线优先的开源财务软件</h1>
 
 <p align="center">
-  <strong>你的数据，永远只属于你 · 复式记账内核 · 插件化 · 全离线运行</strong>
+  <strong>加密数据库 · AI 智能记账 · 你的数据，永远只属于你</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/edrin09/boki/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-AGPL%20v3-4F46E5.svg" alt="License: AGPL v3" /></a>
+  <img src="https://img.shields.io/badge/%E6%95%B0%E6%8D%AE%E5%BA%93%E5%8A%A0%E5%AF%86-SQLCipher-16A34A.svg" alt="SQLCipher encrypted" />
   <img src="https://img.shields.io/badge/Offline%20First-100%25-16A34A.svg" alt="Offline First" />
   <img src="https://img.shields.io/badge/%E4%BA%91%E7%AB%AF%E4%BE%9D%E8%B5%96-0-16A34A.svg" alt="no cloud" />
   <img src="https://img.shields.io/badge/官方插件-14-0EA5E9.svg" alt="plugins 14" />
   <img src="https://img.shields.io/badge/Vue-3.5-42b883.svg" alt="Vue 3.5" />
   <img src="https://img.shields.io/badge/NestJS-11-e0234e.svg" alt="NestJS 11" />
-  <img src="https://img.shields.io/badge/SQLite-003B57.svg?logo=sqlite&logoColor=white" alt="SQLite" />
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-64748B.svg" alt="platform" />
 </p>
 
 <p align="center">
   <a href="https://edrin09.github.io/boki/">官网站点</a> ·
   <a href="https://gitee.com/edrin/boki">码云镜像</a> ·
+  <a href="#-安全与加密">安全与加密</a> ·
+  <a href="#-ai-记账">AI 记账</a> ·
   <a href="#-快速开始">快速开始</a> ·
-  <a href="#-全离线能力">离线能力</a> ·
-  <a href="#-安全边界">安全边界</a> ·
   <a href="#-插件仓库在线获取更新">插件仓库</a> ·
   <a href="#-商业支持与企业级服务">商业支持</a> ·
   <a href="#️-赞助">赞助</a>
@@ -34,23 +34,23 @@
 
 ## BOKI 是什么
 
-> **你的数据，永远只属于你。**
+> **库文件被拷走也打不开。AI 帮你记账，数据永远不出机器。**
 
-BOKI 是一套**离线优先**的开源财务软件：前端 Vue 3 + 后端 NestJS + SQLite 单文件数据库，单命令启动，开箱即用。
+BOKI 是一套**离线优先**的开源财务软件：前端 Vue 3 + 后端 NestJS + SQLCipher 加密单文件数据库，单命令启动，开箱即用。
 
-在云端数据泄露频发的今天，财务隐私不该被妥协。BOKI 把数据主权 100% 交还给你：装在你自己的机器上，跑在你自己的内网里——**没有云端、没有第三方 SDK 回传、没有任何埋点与遥测**。
+在云端数据泄露频发的今天，财务隐私不该被妥协。BOKI 把数据主权 100% 交还给你：装在你自己的机器上，跑在你自己的内网里——**没有云端、没有第三方 SDK 回传、没有任何埋点与遥测**，而且**数据库文件本身就是加密的**。
 
-无论你是**小微企业主、个体工商户、代理记账公司**，还是对**私有化部署、数据不出境**有硬性要求的团队，BOKI 都可以作为**免费记账软件**替代商业财务系统：一套系统覆盖日常记账、票据识别、工资报销、财务报表全流程，**离线可用、断网可用、数据永远在自己手里**。
+无论你是**小微企业主、个体工商户、代理记账公司**，还是对**私有化部署、数据不出境**有硬性要求的团队，BOKI 都可以作为**免费记账软件**替代商业财务系统：一套系统覆盖日常记账、AI 票据识别、工资报销、财务报表全流程，**离线可用、断网可用、数据永远在自己手里**。
 
 内核只保留记账必需的**复式记账引擎**（科目、凭证、期初、公司上下文），其余能力全部**插件化**——想要什么功能装什么插件，不装的插件在界面里不留一丝痕迹。
 
-**数据、语音识别、大模型全部可以离线运行**：SQLite 单文件 + 本地 OCR + 本地流式语音识别 + 可选本地大模型，**断网也能用，数据不出机器**。
+**数据、语音识别、大模型全部可以离线运行**：SQLCipher 加密单文件 + 本地 OCR + 本地流式语音识别 + 可选本地大模型，**断网也能用，数据不出机器**。
 
 - 记账方式：**复式记账**（借贷必相等，后端强校验）
 - 报表：资产负债表、利润表（本期 + 本年累计）、票据台账、现金流量简表、费用结构分析
-- 权限：JWT 登录 + RBAC（菜单级 + 操作级）
+- 安全：**SQLCipher 全库加密** + 附件 AES-256-GCM + JWT + RBAC + 审计日志
 - 多公司：一个账号可管理多家记账公司，数据完全隔离，顶部一键切换
-- 数据库：SQLite 单文件，零配置，支持一键备份/恢复
+- 数据库：SQLCipher 加密 SQLite 单文件，零配置，支持一键备份/恢复
 
 ---
 
@@ -58,53 +58,75 @@ BOKI 是一套**离线优先**的开源财务软件：前端 Vue 3 + 后端 Nest
 
 | | 理由 | 具体是什么 |
 |:--|:--|:--|
+| 🔐 | **数据库加密，文件被拷走也打不开** | 库文件用 SQLCipher（AES-256）整库加密，密钥由 HKDF 从主密钥派生；`financial.db` 即使被拷走，没有 `vault.key` 就只是一串密文。备份恢复前强制校验密钥一致性，密钥不符的备份拒绝恢复 |
+| 🤖 | **AI 记账，会聊天就会记账** | 上传发票 PDF / 扫描件自动解析金额税额生成凭证；本地大模型（Ollama 等）自然语言问答与记账查询；语音助手本地流式识别——AI 全链路可完全离线 |
 | 🚫 | **绝对离线，拒绝云端** | 安装包自带运行时，**不联网也能安装、启动、记账**；没有埋点、没有遥测、没有后台上传，从物理层面收窄泄露面 |
-| 🗄 | **数据主权在你手里** | 全部账务数据就是本机一个 `financial.db`：整目录拷走、直接备份、离线搬到另一台机器，**不必向任何服务商申请导出** |
+| 🗄 | **数据主权在你手里** | 全部账务数据就是本机一个**加密的** `financial.db`：整目录拷走、直接备份、离线搬到另一台机器，**不必向任何服务商申请导出** |
 | ⚡ | **快，因为不绕远路** | 本地数据库直连，没有云端 API 往返；断网环境下依然是毫秒级的记账与查询 |
 | 📊 | **报表够用且可审计** | 资产负债表 / 利润表 / 科目余额表 / 试算平衡表 / 票据台账 / 现金流简表；借贷必相等由前后端双重强校验，已审核凭证禁止改动 |
 | 🧩 | **不会被功能绑架** | 只用内核也能跑完整闭环（登录 → 建账 → 记账 → 出表）；需要什么装插件，不用就卸载，界面里不留痕迹 |
 
 ---
 
-## 🔌 全离线能力
+## 🔐 安全与加密
 
-| 能力 | 离线方式 | 说明 |
-|:--|:--|:--|
-| **数据离线** | SQLite 单文件 | 所有账务数据落在本机单文件（WAL 模式），一键备份 / 恢复；**无任何外部服务依赖**，财务数据不出机器 |
-| **语音识别离线** | sherpa-onnx 本地推理 | 流式中文 ASR（zipformer-zh int8，约 160MB，`npm run models:fetch-asr`），**完全本地解码，音频不上传** |
-| **大模型可选离线** | Ollama / llama.cpp / vLLM | AI 插件内置本地大模型预设（OpenAI 兼容协议、**无需 API Key**）：Ollama（`qwen2.5:1.5b-instruct`）、llama.cpp server、vLLM；也可随时切换 DeepSeek / 通义千问 / Kimi / 智谱 / OpenAI 等云端模型 |
+### 数据库加密：默认开启，零配置
 
-> 离线模型缺失时服务照常启动（自动降级），仅「识别 / 票据上传 / 证件建档 / 语音」相关功能提示模型未就绪；`GET /api/ocr/status`、`/api/voice/status` 可查看就绪状态。
-
----
-
-## 🔐 安全边界
-
-BOKI 的原则是**先把边界画清楚，再把承诺写明白**。下表是当前代码的真实状态——做到的写做到，没做的明确标出来。
-
-**已经做到**
+数据落盘即密文，不需要任何手动配置：
 
 | 层面 | 实现 |
 |:--|:--|
+| **全库加密** | SQLite 驱动为 `better-sqlite3-multiple-ciphers`，以 SQLCipher 兼容模式整库加密（`backend/src/config/database.config.ts`）——拿到 `.db` 文件，没有密钥就无法用任何 SQLite 工具直读 |
+| **密钥体系** | 32 字节随机主密钥（MK）存放在程序根目录 `vault.key`；通过 HKDF-SHA256 域分离派生三把子密钥：库密钥（`PRAGMA key`）、附件密钥（AES-256-GCM）、校验密钥（HMAC 完整性校验块），见 `backend/src/sdk/vault-kdf.ts` |
+| **附件加密** | `data/uploads/**` 下的发票 PDF / 图片是独立文件，SQLCipher 管不到——单独用 **AES-256-GCM** 流式加密（`backend/src/vault/attachment-cipher.ts`）；历史明文附件在首次加密后自动就地加密（幂等） |
+| **启动强制加密** | 启动时自动检测：明文库 → 用密钥文件**强制加密**；全新安装 → 生成密钥并建加密库；密钥文件缺失 / 不匹配 → **拒绝启动**，绝不静默换钥匙（`backend/src/main.ts` 的 `prepareVault`） |
+| **迁移安全** | rekey 前自动留 `.pre-encrypt.bak`；中断自动恢复 / 回滚；密钥文件先落盘、再落「已加密」状态，断电不会出现「状态已加密而钥匙丢失」 |
+| **备份加密校验** | 备份与恢复前强制校验加密状态与密钥一致性——密钥不符的备份**拒绝恢复**，防止恢复后永久打不开（`backend/src/vault/vault-backup.ts`） |
+| **状态查询** | `GET /api/vault/status` 查看当前加密状态与密钥文件位置 |
+
+### 已经做到
+
+| 层面 | 实现 |
+|:--|:--|
+| 数据库加密 | SQLCipher 兼容整库加密，默认开启、零配置；密钥文件模式（v2），密钥丢失则库无法打开 |
+| 附件加密 | 上传的发票 PDF / 图片用 AES-256-GCM 流式加密，历史附件自动迁移 |
 | 部署边界 | 单机 / 内网自部署，前后端同源单端口；无云端依赖、无第三方 SDK 回传、代码中不含埋点与遥测 |
 | 口令存储 | `bcrypt` 加盐散列，不保存明文（`backend/src/common/utils/crypto.util.ts`）；JWT 短期令牌由本机签发 |
 | 授权体系 | RBAC：权限点覆盖菜单级 + 操作级，前端指令（`v-permission`）+ 后端守卫双重校验 |
 | 多公司隔离 | 所有业务表带 `company_id`，仓储层强制追加过滤；令牌内 `companyId` 由服务端签名保证不可伪造 |
 | 操作审计 | 登录、增删改、审核等动作本地留存操作日志，可查询、可清理 |
-| 数据可迁移 | 全部数据即一个 `financial.db`，支持一键备份 / 下载 / 恢复，可离线搬到另一台机器 |
+| 数据可迁移 | 全部数据即一个加密的 `financial.db` + `vault.key`，支持一键备份 / 下载 / 恢复，可离线搬到另一台机器 |
 | 传输加固 | 单端口同源即可用；对公网暴露时建议前置 Nginx + TLS（部署侧配置，仓库不含证书） |
 
-**还没做到（如实标注，不写话术）**
+### 还没做到（如实标注，不写话术）
 
 | 缺口 | 现状 |
 |:--|:--|
-| 数据库加密 | `financial.db` 当前是**明文文件**——拿到文件即可用任意 SQLite 工具直读 |
 | 密钥 / 主密码登录 | 尚无「免用户名口令、单 Key 解锁」与零知识（Zero-Knowledge）主密码体系 |
-| 敏感字段加密 | 金额、往来单位等字段未做列级加密 |
+| 敏感字段列级加密 | 金额、往来单位等字段依赖全库加密保护，未再做列级加密 |
 | MFA 二次验证 | 当前仅单因子口令 |
-| 备份加密 | 备份出的 `.db` 文件本身未加密，需自行放到加密盘 / 加密压缩包 |
 
-> 本项目**不会**宣称「银行级 AES-256 零知识加密」——**没做到的就不写进文档**。数据库加密与密钥登录已列入下方「路线图 · 安全与加密」，计划以**插件**形式交付：装与不装由你决定，不装就保持现在的零配置体验。
+> 本项目**不会**宣称「银行级 AES-256 零知识加密」——**没做到的就不写进文档**。诚实标注的安全边界，才是企业用户敢用的底气。
+
+### 密钥文件：丢了 = 库没了，请务必备份
+
+- 密钥文件位于程序根目录 `vault.key`（32 字节 hex）。**没有它，加密数据库无法打开，系统不会启动。**
+- **迁移 / 搬机器时必须连同 `vault.key` 一起带走**；建议把它放进密码管理器或加密盘再备份一份。
+
+---
+
+## 🤖 AI 记账
+
+BOKI 的 AI 能力全部围绕「少打字、少手工」设计，且**每一环都可以完全离线**：
+
+| 能力 | 怎么用 | 离线方式 |
+|:--|:--|:--|
+| **票据智能记账** | 上传电子发票 PDF / 扫描件 → 自动解析类型、金额、税额、购销方 → sha256 去重、归类规则、待确认工作台 → 确认后**自动生成凭证** | 本地 OCR（PP-OCRv4）+ PDF 文本层解析 |
+| **AI 会计员** | AI 插件内置本地大模型预设（OpenAI 兼容协议、**无需 API Key**）：Ollama（`qwen2.5:1.5b-instruct`）/ llama.cpp server / vLLM；也可随时切换 DeepSeek / 通义千问 / Kimi / 智谱 / OpenAI 等云端模型 | Ollama / llama.cpp / vLLM 本地推理 |
+| **语音助手** | 自然语言即问即答，记账查询动口不动手 | sherpa-onnx 本地流式 ASR（zipformer-zh int8，约 160MB） |
+| **档案一键录入** | 上传营业执照 / 身份证离线 OCR，批量填充往来单位与员工表单 | 本地 OCR |
+
+> 离线模型缺失时服务照常启动（自动降级），仅「识别 / 票据上传 / 证件建档 / 语音」相关功能提示模型未就绪；`GET /api/ocr/status`、`/api/voice/status` 可查看就绪状态。
 
 ---
 
@@ -112,13 +134,12 @@ BOKI 的原则是**先把边界画清楚，再把承诺写明白**。下表是�
 
 | | 特性 | 说明 |
 |:--|:--|:--|
+| 🔐 | **数据库加密** | SQLCipher 兼容整库加密默认开启，密钥文件模式零配置；附件 AES-256-GCM 加密，备份恢复带密钥校验 |
+| 🤖 | **AI 智能记账** | 票据自动解析生成凭证、本地大模型问答、语音记账查询——AI 全链路可完全离线，数据不出机器 |
 | 📒 | **复式记账强校验** | 每张凭证至少 2 条分录，借方合计 = 贷方合计，前后端双重校验，不平衡无法保存；明细科目限制、辅助核算必填 |
 | 🧩 | **插件化架构** | 后端业务模块 29 → 8，前端页面 45 → 18；14 个官方插件覆盖档案/资金/薪酬/票据/报表/AI/语音/IAM/多公司，系统内一键安装、停用、卸载 |
-| 🔒 | **离线私有化** | 数据 / 语音 / 大模型三层全离线：SQLite 单文件 + 本地 OCR（PP-OCRv4）+ 本地流式语音识别（sherpa-onnx）+ 可选本地大模型（Ollama / llama.cpp / vLLM），内网/断网环境完整可用，财务数据不出机器 |
-| 🔐 | **安全边界透明** | 认证、授权、多公司隔离、审计做到什么、还缺什么（数据库加密 / 密钥登录 / MFA），README 逐项标注，不写「银行级加密」话术 |
+| 🔒 | **离线私有化** | 数据 / 语音 / 大模型三层全离线：加密 SQLite 单文件 + 本地 OCR（PP-OCRv4）+ 本地流式语音识别（sherpa-onnx）+ 可选本地大模型（Ollama / llama.cpp / vLLM），内网/断网环境完整可用 |
 | 🏢 | **多公司隔离** | 所有业务表带 `company_id`，仓储层自动追加过滤；令牌内 `companyId` 由服务端签名保证不可伪造 |
-| 🧾 | **票据智能记账** | 上传电子发票 PDF / 扫描件，自动解析类型、金额、税额、购销方；sha256 去重、归类规则、待确认工作台，确认后自动生成凭证 |
-| 🤖 | **AI 会计员** | AI 插件内置 Ollama / llama.cpp / vLLM 本地大模型预设（OpenAI 兼容、无需 API Key），也可切换云端模型；语音插件本地流式 ASR，自然语言即问即答 |
 | 💻 | **一键安装包** | Electron 桌面壳 + NestJS sidecar，产出单个 `BOKI-Setup.exe`；未装 Node、未装数据库、不能联网的 Windows 机器装完即用，同机即局域网服务器 |
 | 📊 | **报表与导出** | 资产负债表 / 利润表 / 科目余额表 / 试算平衡表 / 票据台账 / 月度报表包，支持导出 Excel |
 
@@ -150,7 +171,7 @@ copy .env.example .env      # Windows；macOS/Linux 用 cp
 npm run start:dev
 ```
 
-首次启动会自动创建 `backend/data/financial.db`，并写入种子数据：1 家默认记账公司、80+ 条权限、4 个角色、75 个中文会计科目、4 个默认用户。
+首次启动会自动创建**加密的** `backend/data/financial.db` 与密钥文件 `vault.key`，并写入种子数据：1 家默认记账公司、80+ 条权限、4 个角色、75 个中文会计科目、4 个默认用户。
 
 离线模型首次使用前需下载（OCR 约 25MB、流式语音识别约 160MB，均放 `backend/models/`）：
 
@@ -180,7 +201,7 @@ npm run dev
 | 出纳 | `cashier` | `123456` | 现金银行、往来核销、其他收支 |
 | 查看员 | `viewer` | `123456` | 只读账簿与报表 |
 
-> 首次登录后请尽快在「系统管理 → 个人中心」修改密码。
+> 首次登录后请尽快在「系统管理 → 个人中心」修改密码。**开发库的 `vault.key` 与 `financial.db` 请一并备份，密钥丢失后开发数据无法恢复。**
 
 ---
 
@@ -236,7 +257,7 @@ BOKI 的「插件仓库」是一套**版本化、支持在线获取更新**的�
 
 ```bash
 # 指向同步后的官方插件仓库副本
-export BOKI_MARKETPLACE_DIR=/path/to/boki-marketplace
+export BOKI_MARKETPLACE_DIR=/path/to/boki-market/plugins
 # 重启后端 → 插件市场刷新目录 → 有更新的插件出现「更新」按钮
 ```
 
@@ -249,7 +270,8 @@ export BOKI_MARKETPLACE_DIR=/path/to/boki-marketplace
 | 模块 | 功能 |
 |:--|:--|
 | 记账公司 | 多公司建账、公司成员授权、顶部一键切换、各公司数据完全隔离 |
-| 系统管理 | 用户管理、角色管理、权限管理（RBAC）、操作日志、数据备份/恢复、个人中心、插件管理 |
+| 系统管理 | 用户管理、角色管理、权限管理（RBAC）、操作日志、数据备份/恢复、加密状态查询、个人中心 |
+| 插件市场 | 浏览官方插件目录、已安装插件启停与卸载、在线安装与更新 |
 | 基础资料 | 会计科目（多级树 + 辅助核算）、往来单位、资金账户、部门、项目、公司信息 |
 | 期初设置 | 按年度 + 科目 + 辅助核算录入期初余额，一键试算平衡 |
 | 凭证管理 | 复式记账凭证录入（借贷强校验）、草稿/审核/反审核/作废、凭证号按月连续 |
@@ -262,7 +284,7 @@ export BOKI_MARKETPLACE_DIR=/path/to/boki-marketplace
 | 票据智能记账 | 票据上传与解析（PDF 文本层/扫描件 OCR）、发票去重、归类规则、待确认工作台、确认后自动生成凭证 |
 | 档案一键录入 | 上传营业执照/身份证离线 OCR，批量填充往来单位与员工表单 |
 | 离线 OCR | PP-OCRv4（det/cls/rec）本地推理，断网可用，`/ocr/status` 探活 |
-| 数据维护 | SQLite 备份、下载、恢复；操作日志清理 |
+| 数据维护 | SQLite 备份、下载、恢复（加密库带密钥校验）；操作日志清理 |
 
 ### 核心会计规则
 
@@ -298,7 +320,7 @@ npm run test:extract     # 证件一键录入端到端
 npm run test:reports     # 报表接口（台账 / 现金流 / 费用分析 / 月结 / 看板）
 ```
 
-> `smoke / smoke2 / smoke3` 依赖凭证号从 0001 起算，必须各自在全新数据库上执行（之间跑 `npm run db:reset -- --yes` 并重启后端）。
+> `smoke / smoke2 / smoke3` 依赖凭证号从 0001 起算，必须各自在全新数据库上执行（之间跑 `npm run db:reset -- --yes` 并重启后端）。回归测试可用 `DB_CIPHER=plain` 跳过库加密（仅限测试环境）。
 
 ---
 
@@ -307,8 +329,9 @@ npm run test:reports     # 报表接口（台账 / 现金流 / 费用分析 / �
 | 层 | 技术 |
 |:--|:--|
 | 前端 | Vue 3.5 + TypeScript + Vite 6 + Element Plus 2.9 + Pinia 2 + Vue Router 4 + Axios + xlsx + dayjs |
-| 后端 | NestJS 11 + TypeScript + TypeORM 0.3 + better-sqlite3 + JWT + Passport + class-validator |
-| 数据库 | SQLite（better-sqlite3 驱动，开启 WAL） |
+| 后端 | NestJS 11 + TypeScript + TypeORM 0.3 + better-sqlite3-multiple-ciphers（SQLCipher 兼容加密）+ JWT + Passport + class-validator |
+| 数据库 | SQLite（better-sqlite3 驱动，开启 WAL，**SQLCipher 兼容整库加密**） |
+| 加密 | SQLCipher（库加密）· HKDF-SHA256（子密钥派生）· AES-256-GCM（附件加密）· HMAC-SHA256（完整性校验）· bcrypt（口令散列） |
 | 离线识别 | onnxruntime-node + PP-OCRv4（det/cls/rec）、pdfjs-dist（PDF 文本层）、sharp / @napi-rs/canvas（图像处理） |
 | 桌面壳 | Electron + electron-builder（NSIS 安装包） |
 | 插件系统 | manifest 驱动的运行时（后端动态 AppModule + 前端路由/菜单/插槽），`.finplugin` 分发格式 |
@@ -320,17 +343,19 @@ npm run test:reports     # 报表接口（台账 / 现金流 / 费用分析 / �
 
 ```text
 boki/
-├── backend/                    # NestJS API（内核：记账引擎 + 插件运行时 + 插件市场）
-│   ├── data/                   # SQLite 数据库（运行时自动生成，不入版本库）
+├── backend/                    # NestJS API（内核：记账引擎 + 加密 Vault + 插件运行时 + 插件市场）
+│   ├── data/                   # 加密 SQLite 数据库 + vault.key 密钥文件（运行时自动生成，不入版本库）
 │   ├── models/ocr/             # 离线 OCR 模型（npm run models:fetch 获取）
 │   ├── scripts/reset-db.ts     # 数据库重置脚本
 │   ├── test/                   # 端到端验证脚本（10 个）
 │   └── src/
 │       ├── common/             # 装饰器、守卫、拦截器、过滤器、工具
 │       │   └── company/        # 多公司：请求上下文、隔离仓储、作用域拦截器
-│       ├── config/             # 数据库与 JWT 配置
+│       ├── config/             # 数据库（SQLCipher 加密参数）与 JWT 配置
 │       ├── db/                 # 种子数据
 │       ├── entities/           # TypeORM 实体
+│       ├── sdk/                # Vault 公开契约（密钥派生 / 加密元数据）
+│       ├── vault/              # 加密内核：密钥文件、库加密迁移、附件加密、备份校验
 │       ├── modules/            # 内核业务模块（auth/setup/plugins/...）
 │       └── plugins/            # 后端插件运行时（manifest 校验 / loader / 动态 AppModule）
 ├── frontend/                   # Vue 3 前端
@@ -363,15 +388,12 @@ boki/
 
 建议的迭代顺序：期末结转损益 → 完整现金流量表 → 固定资产 → 审批流 → 插件 SDK 开放。
 
-### 安全与加密（阶段计划）
+### 安全与加密（下一步）
 
 | 阶段 | 内容 | 落点 |
 |:--|:--|:--|
-| P1 | **备份加密**：导出备份时用口令派生密钥（scrypt / Argon2）加密，恢复时校验口令 | 内核 · 备份模块 |
-| P2 | **数据库加密**：换用带 SQLCipher 的 SQLite 驱动，首次启动生成主密钥并写盘校验，库文件拷走也无法直读 | 内核 · 数据库配置层 + 迁移脚本 |
-| P3 | **密钥登录插件**：安装后登录页切换为「主密钥 / 恢复码」模式，口令登录保留为兜底；主密码只用于本地解锁，不上传、不可找回 | 插件 `vault` |
-
-> 顺序是刻意这样排的：**先让「文件落到别人手里」变得无害（P1/P2），再改登录方式（P3）**。反过来做没有意义——登录方式再强，一个明文 `.db` 被拷走就全泄露了。
+| P1 | **密钥登录插件**：安装后登录页切换为「主密钥 / 恢复码」模式，口令登录保留为兜底；主密码只用于本地解锁，不上传、不可找回 | 插件 `vault` |
+| P2 | **敏感字段列级加密**与 MFA 二次验证 | 内核 / 插件 |
 
 ---
 
@@ -444,7 +466,7 @@ BOKI 由**西安市未央区鹏云智码软件开发部（个体工商户）**�
 
 <!--
 关键词 / Keywords（便于 GitHub / Gitee 站内搜索与搜索引擎收录）：
-开源记账软件, 免费财务软件, 财务管理系统, 复式记账, 私有化部署, 自托管, 内网部署, 离线记账, 会计软件, 代理记账, 小微企业记账, 个体户记账, 电子发票识别, 发票 OCR, SQLite 财务系统, 记账软件推荐, 数据主权, open-source accounting software, self-hosted bookkeeping, offline-first finance, double-entry bookkeeping, accounting ERP, invoice OCR, local-first
+开源记账软件, 免费财务软件, 财务管理系统, 复式记账, 数据库加密, SQLCipher, 私有化部署, 自托管, 内网部署, 离线记账, 会计软件, 代理记账, 小微企业记账, 个体户记账, AI 记账, 电子发票识别, 发票 OCR, SQLite 财务系统, 记账软件推荐, 数据主权, open-source accounting software, self-hosted bookkeeping, offline-first finance, double-entry bookkeeping, encrypted database, SQLCipher, accounting ERP, invoice OCR, local-first
 -->
 
 <p align="center">

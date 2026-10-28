@@ -21,6 +21,7 @@ import { InitialBalanceModule } from './initial-balance/initial-balance.module'
 import { BooksModule } from './books/books.module'
 import { SystemModule } from './system/system.module'
 import { SetupModule } from './setup/setup.module'
+import { MetaModule } from './meta/meta.module'
 import { CompanyReposModule } from '../common/company/company-repos.module'
 import { CompanyScopeInterceptor } from '../common/company/company-scope.interceptor'
 import { PluginsModule } from '../plugins/plugins.module'
@@ -29,8 +30,8 @@ import { VaultModule } from '../vault/vault.module'
 /** 内核模块（迁移完成后只保留记账底座与系统管理） */
 const CORE_MODULES = [
   SetupModule,
-  // Vault 必须排在 AuthModule 之前：它提供内核级的「解锁 / 锁定 / 状态」能力，
-  // 拔掉 vault 插件后这套能力依然可用（方案 D1 的判定标准）。
+  // Vault 必须在 AuthModule 之前：启动时的密钥加载与旧库转换都在内核完成，
+  // 这里只保留公开的加密状态查询接口。
   VaultModule,
   AuthModule,
   AccountsModule,
@@ -39,6 +40,9 @@ const CORE_MODULES = [
   InitialBalanceModule,
   BooksModule,
   SystemModule,
+  // /api/meta：应用身份与联系方式（根 .env → 桌面 sidecar env / ConfigModule），
+  // 前端登录页署名等消费；无数据库依赖，必须排在最前尽快就绪
+  MetaModule,
 ]
 
 @Module({})
@@ -55,7 +59,9 @@ export class AppModule {
       imports: [
         ConfigModule.forRoot({
           isGlobal: true,
-          envFilePath: ['.env.local', '.env'],
+          // 应用身份与联系方式的统一源在仓库根 .env；桌面 sidecar 由 Electron 主进程
+          // 经 spawn env 注入（见 desktop/src/server.js buildEnv），此处按 cwd 逐级回退
+          envFilePath: ['.env.local', '.env', '../.env'],
           ignoreEnvFile: false,
         }),
         TypeOrmModule.forRootAsync({

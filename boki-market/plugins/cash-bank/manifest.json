@@ -1,0 +1,54 @@
+{
+  "id": "cash-bank",
+  "name": "现金银行",
+  "version": "1.0.0",
+  "apiVersion": "^1.0.0",
+  "engines": { "boki": ">=1.0.0" },
+  "kind": "domain",
+  "scopeMode": "scoped",
+  "trust": "official",
+  "author": "boki",
+  "license": "Apache-2.0",
+  "description": "现金银行收付款、内部转账与银行对账单智能入账",
+  "dependencies": {},
+  "optionalDependencies": { "banks": "^1.0.0" },
+  "permissions": [
+    "cash-bank",
+    "cash-bank:create",
+    "cash-bank:update",
+    "cash-bank:delete",
+    "bank-stmt",
+    "bank-stmt:import",
+    "bank-stmt:book",
+    "bank-stmt:delete"
+  ],
+  "contributes": {
+    "server": "server/index.js",
+    "client": "client/index.js",
+    "style": "client/style.css",
+    "routes": [
+      {
+        "path": "/cash-bank",
+        "name": "CashBank",
+        "component": "CashBankPage",
+        "meta": { "title": "现金银行", "permission": "cash-bank" }
+      },
+      {
+        "path": "/cash/bank-stmt",
+        "name": "BankStmt",
+        "component": "BankStmtPage",
+        "meta": { "title": "银行流水", "permission": "bank-stmt" }
+      }
+    ],
+    "menu": [
+      {
+        "group": "cash",
+        "title": "现金银行",
+        "path": "/cash-bank",
+        "permission": "cash-bank"
+      }
+    ],
+    "slots": []
+  },
+  "tables": ["fin_cash_flow", "fin_bank_stmt_row"]
+}

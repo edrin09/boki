@@ -70,7 +70,6 @@ npm-shrinkwrap.json
 # =====================================================================
 # 营销 / 分发：插件市场、启动脚本
 # 注：官网 website/ 已改为公开托管（GitHub Pages，见 .github/workflows/pages.yml），不在此列
-marketplace/
 starts/
 
 # 品牌 / 商标资产（含内部知识产权方案）
@@ -91,3 +90,7 @@ docs/
 # boki-market 是独立项目，其 docs/ 必须入库（上面的 docs/ 规则会按目录名匹配任意层级）
 !boki-market/docs/
 !boki-market/docs/**
+
+# 远程插件市场索引缓存（运行时自动生成）
+backend/data/market-cache/
+/.dsh-acl-recovery

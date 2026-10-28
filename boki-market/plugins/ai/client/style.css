@@ -1,0 +1,26 @@
+
+.page-card--narrow[data-v-0eaa9f5a] {
+  max-width: 720px;
+}
+.page-title[data-v-0eaa9f5a] {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.mb12[data-v-0eaa9f5a] {
+  margin-bottom: 12px;
+}
+.unit[data-v-0eaa9f5a] {
+  margin-left: 8px;
+  color: var(--el-text-color-secondary);
+}
+.text-muted[data-v-0eaa9f5a] {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.form-hint[data-v-0eaa9f5a] {
+  margin-left: 10px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}

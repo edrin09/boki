@@ -1,0 +1,33 @@
+{
+  "id": "voice",
+  "name": "语音助手",
+  "version": "1.0.0",
+  "apiVersion": "^1.0.0",
+  "engines": { "boki": ">=1.0.0" },
+  "kind": "ai",
+  "scopeMode": "scoped",
+  "trust": "official",
+  "author": "boki",
+  "license": "Apache-2.0",
+  "description": "按住 Alt 语音提问，自动查询账务数据并导出 Excel",
+  "dependencies": {
+    "ai": "^1.0.0",
+    "report-pack": "^1.0.0"
+  },
+  "optionalDependencies": {
+    "ar-ap": "^1.0.0",
+    "hr": "^1.0.0"
+  },
+  "permissions": ["voice", "voice:use"],
+  "contributes": {
+    "server": "server/index.js",
+    "client": "client/index.js",
+    "style": "client/style.css",
+    "routes": [],
+    "menu": [],
+    "slots": [
+      { "name": "layout.floating", "component": "VoiceAssistant" }
+    ]
+  },
+  "tables": []
+}

@@ -135,31 +135,6 @@ export class AuthService {
     return { message: '密码修改成功，请重新登录' }
   }
 
-  /**
-   * 供 vault「单密钥直入」使用：跳过密码校验，仍走同一套 JWT 签发。
-   *
-   * ⚠️ 这是**唯一**为加密功能新增的方法，`login()` / `changePassword()` /
-   * `switchCompany()` / `buildResult()` 一行未改 ——
-   * 解锁（key）与登录（账号）是两件独立的事（方案 D2）。
-   *
-   * 注意：调用方必须自己确认「这个人有资格直接进入」，
-   * 本方法只负责签发与账号密码登录**完全一致**的令牌。
-   */
-  async issueForUser(userId: string): Promise<AuthResult> {
-    const user = await this.userRepo
-      .createQueryBuilder('u')
-      .leftJoinAndSelect('u.roles', 'roles')
-      .leftJoinAndSelect('roles.permissions', 'permissions')
-      .where('u.id = :id', { id: userId })
-      .getOne()
-
-    if (!user) throw new UnauthorizedException('用户不存在')
-    if (user.status !== 1) throw new UnauthorizedException('账号已被禁用，请联系管理员')
-
-    const companies = await this.listCompanies(user.id)
-    return this.buildResult(user, companies, companies[0]?.id ?? null)
-  }
-
   // ==================== 私有方法 ====================
 
   private async buildResult(

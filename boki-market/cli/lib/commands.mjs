@@ -1,7 +1,7 @@
 /**
  * marketctl 命令实现。
  *
- * 发布链与方案 8.3 一致：pack → release →（上架）→ candidate → sign → activate。
+ * 发布链与接入说明 7 一致：pack → release →（上架）→ candidate → sign → activate。
  * 私钥只在本文件的 sign 步骤出现，且只来自 PLUGIN_MARKET_PRIVATE_KEY。
  */
 import fs from 'node:fs'
@@ -399,16 +399,7 @@ export async function doPublish(config, flags, out) {
   const signed = signRaw(config, candidate.raw, str(flags, 'key-id'))
   out?.step(`✔ sign       keyId=${signed.keyId}（${signed.publicKeyFingerprint}）`)
 
-  const activated = await api.activate({
-    raw: candidate.raw,
-    signature: signed.signature,
-    keyId: signed.keyId,
-    version: candidate.snapshotVersion,
-    publishedAt: candidate.publishedAt,
-  })
-  out?.step(`✔ activate   快照 v${activated.version}`)
-
-  // 留档：候选原文与签名（便于回滚核对；不含私钥）
+  // 留档：候选原文与签名（便于回滚核对；不含私钥）。先落盘再激活，避免激活成功但本地无记录。
   const indexDir = path.join(config.distDir, 'index')
   const candidateFile = path.join(indexDir, `${candidate.snapshotVersion}-candidate.json`)
   const signatureFile = path.join(indexDir, `${candidate.snapshotVersion}-signature.json`)
@@ -419,6 +410,15 @@ export async function doPublish(config, flags, out) {
     snapshotVersion: candidate.snapshotVersion,
     publishedAt: candidate.publishedAt,
   })
+
+  const activated = await api.activate({
+    raw: candidate.raw,
+    signature: signed.signature,
+    keyId: signed.keyId,
+    version: candidate.snapshotVersion,
+    publishedAt: candidate.publishedAt,
+  })
+  out?.step(`✔ activate   快照 v${activated.version}`)
 
   return {
     packed: packed

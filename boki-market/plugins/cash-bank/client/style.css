@@ -1,0 +1,30 @@
+.text-muted[data-v-c2571bd0] {
+  color: #9ca3af;
+}
+.mt8[data-v-c2571bd0] {
+  margin-top: 8px;
+}
+.page[data-v-6170f026] { padding: 12px;
+}
+.summary[data-v-6170f026] { margin-bottom: 12px;
+}
+.s-label[data-v-6170f026] { font-size: 12px; color: #909399;
+}
+.s-value[data-v-6170f026] { font-size: 22px; font-weight: 600; margin-top: 4px;
+}
+.s-value.warn[data-v-6170f026] { color: #e6a23c;
+}
+.s-value.small[data-v-6170f026] { font-size: 16px;
+}
+.toolbar[data-v-6170f026] { margin-bottom: 12px;
+}
+.toolbar[data-v-6170f026] .el-card__body { display: flex; align-items: center;
+}
+.tip[data-v-6170f026] { margin-left: 12px; color: #e6a23c; font-size: 12px;
+}
+.suggest[data-v-6170f026] { color: #409eff; margin-left: 4px;
+}
+.pager[data-v-6170f026] { margin-top: 12px; justify-content: flex-end;
+}
+.amount[data-v-6170f026] { font-size: 18px; font-weight: 600; color: #303133;
+}

@@ -122,6 +122,8 @@ class ServerProcess {
       NODE_PATH: path.join(layout.serverDir, 'node_modules'),
       // 加密状态文件路径（后端默认取 DB_DATABASE 同目录，这里显式指定更直白）
       VAULT_FILE: paths.vaultFile,
+      // 主密钥文件：固定放程序根目录，安装版落在 ProgramData\BOKI\vault.key
+      VAULT_KEY_FILE: paths.vaultKeyFile,
       // 保留 true：升级后新增实体/字段可自动同步，无需手工迁移
       DB_SYNCHRONIZE: 'true',
       DB_LOGGING: 'false',

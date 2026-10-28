@@ -137,21 +137,4 @@ async function onSubmit() {
 .login__submit {
   width: 100%;
 }
-
-.login__tips {
-  margin-top: 8px;
-  padding-top: 14px;
-  border-top: 1px dashed var(--app-border);
-
-  &-title {
-    font-size: 12px;
-    color: var(--app-text-secondary);
-    margin-bottom: 8px;
-  }
-}
-
-.login__tag {
-  margin: 0 6px 6px 0;
-  cursor: pointer;
-}
 </style>

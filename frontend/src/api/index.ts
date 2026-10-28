@@ -79,6 +79,13 @@ export const systemApi = {
   removeBackup: (filename: string) => del(`/system/backups/${encodeURIComponent(filename)}`),
   downloadBackup: (filename: string) =>
     download('/system/backups/download', { filename }, filename),
+  /** 明文导出：前端须二次确认，导出的文件无需密钥即可打开 */
+  downloadBackupPlain: (filename: string) =>
+    download(
+      '/system/backups/download',
+      { filename, format: 'plain' },
+      filename.replace(/\.db$/, '-plain.db'),
+    ),
   // ============ AI 模型设置 ============
   aiConfig: () =>
     get<{
@@ -485,7 +492,7 @@ export const reportApi = {
   overview: (params?: Record<string, any>) => get<any>('/reports/overview', params),
 }
 
-// ============ 插件市场 / 插件管理 ============
+// ============ 插件市场 ============
 export interface PluginManifest {
   id: string
   name: string
@@ -532,12 +539,59 @@ export interface PluginActionResult {
   keepData?: boolean
 }
 
+// ============ 远程插件市场（boki-market 独立服务端）============
+
+export interface RemoteMarketCategory {
+  id: string
+  name: string
+  parentId?: string | null
+  sort?: number
+  icon?: string
+}
+
+export interface RemoteMarketPlugin extends MarketPlugin {
+  kind?: string
+  category?: string
+  categories?: string[]
+  price?: number
+  currency?: string
+  download?: string
+  sha256?: string
+  size?: number
+}
+
+export interface RemoteMarketCatalog {
+  source: 'remote' | 'cache'
+  verified: boolean
+  degraded?: boolean
+  error?: string
+  market?: string
+  publishedAt?: string
+  version?: number
+  categories?: RemoteMarketCategory[]
+  plugins: RemoteMarketPlugin[]
+}
+
+export interface RemoteMarketStatus {
+  enabled: boolean
+  url?: string
+  market?: string
+  snapshotVersion?: number
+  publishedAt?: string
+  snapshotStale?: boolean
+  publicKeysConfigured?: boolean
+}
+
 export const pluginApi = {
   installed: () => get<InstalledPlugin[]>('/plugins'),
   manifests: () => get<PluginManifest[]>('/plugins/manifests'),
   detail: (id: string) => get<{ manifest: PluginManifest; installed: boolean; enabled: boolean }>(`/plugins/${id}`),
   catalog: () => get<MarketPlugin[]>('/market/catalog'),
   install: (id: string) => post<PluginActionResult>(`/market/plugins/${id}/install`),
+  remoteStatus: () => get<RemoteMarketStatus>('/market/remote/status'),
+  remoteCatalog: () => get<RemoteMarketCatalog>('/market/remote/catalog'),
+  remoteInstall: (id: string, licenseKey?: string) =>
+    post<PluginActionResult>(`/market/remote/plugins/${id}/install`, licenseKey ? { licenseKey } : {}),
   enable: (id: string) => post<PluginActionResult>(`/plugins/${id}/enable`),
   disable: (id: string) => post<PluginActionResult>(`/plugins/${id}/disable`),
   uninstall: (id: string, keepData = true) =>

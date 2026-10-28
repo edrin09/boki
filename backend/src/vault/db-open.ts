@@ -52,6 +52,43 @@ export function openDatabase(file: string, options: OpenDatabaseOptions = {}): S
 }
 
 /**
+ * 用指定密钥尝试打开数据库并读一次 sqlite_master。
+ *
+ * 用于在 Nest 之外判断「这把钥匙能不能开这个库」，不会改动数据。
+ */
+export function canOpenDatabase(file: string, keyHex: string, legacy = 4): boolean {
+  if (!fs.existsSync(file)) return false
+  let db: SqliteDatabase | null = null
+  try {
+    db = openDatabase(file, { readonly: true, keyHex, legacy, fileMustExist: true })
+    db.prepare('SELECT count(*) AS c FROM sqlite_master').get()
+    return true
+  } catch {
+    return false
+  } finally {
+    try { db?.close() } catch { /* noop */ }
+  }
+}
+
+/**
+ * 创建一个可被 rekey 的空 SQLite 文件。
+ *
+ * 0 字节文件没有有效的库头，直接 `PRAGMA rekey` 会失败；
+ * 先建一张临时表再删除，让文件拥有合法的 sqlite_master 页。
+ */
+export function createEmptyDatabase(file: string): void {
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  const db = openDatabase(file)
+  try {
+    db.pragma('journal_mode = DELETE')
+    db.exec('CREATE TABLE IF NOT EXISTS __vault_init (x INTEGER)')
+    db.exec('DROP TABLE IF EXISTS __vault_init')
+  } finally {
+    db.close()
+  }
+}
+
+/**
  * 用「一致性快照」的方式复制数据库文件。
  *
  * ⚠️ `db.backup()` 在密文库上会抛

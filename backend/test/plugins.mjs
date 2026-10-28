@@ -35,7 +35,7 @@ import { fileURLToPath } from 'node:url'
 const here = path.dirname(fileURLToPath(import.meta.url))
 const backendRoot = path.resolve(here, '..')
 const repoRoot = path.resolve(backendRoot, '..')
-const marketplaceRoot = process.env.BOKI_MARKETPLACE_DIR || path.join(repoRoot, 'marketplace')
+const marketplaceRoot = process.env.BOKI_MARKETPLACE_DIR || path.join(repoRoot, 'boki-market')
 const outputRoot = path.join(here, 'output')
 fs.mkdirSync(outputRoot, { recursive: true })
 const sandbox = fs.mkdtempSync(path.join(outputRoot, 'plugin-lifecycle-'))

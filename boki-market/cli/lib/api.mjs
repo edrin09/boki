@@ -2,7 +2,6 @@
  * 市场管理接口客户端（fetch，零依赖）。
  *
  * 约定：
- *   - 令牌只放 Authorization 头，不写日志、不进 URL；
  *   - 服务端错误保留 code/message/problems，便于定位「哪个插件缺主分类」；
  *   - 市场地址允许带路径前缀（例如 https://example.com/market）。
  */
@@ -26,19 +25,12 @@ export function createApi(config) {
       query,
       body,
       contentType = 'application/json',
-      auth = true,
       timeoutMs = config.timeoutMs,
       extraHeaders = {},
     } = {},
   ) {
     if (!config.marketUrl) throw new CliError('缺少市场地址（MARKET_URL 或 --url）')
     const headers = { accept: 'application/json', 'user-agent': 'boki-marketctl', ...extraHeaders }
-    if (auth) {
-      if (!config.adminToken) {
-        throw new CliError('缺少管理令牌（MARKET_ADMIN_TOKEN 或 --token）')
-      }
-      headers.authorization = `Bearer ${config.adminToken}`
-    }
     if (body !== undefined) headers['content-type'] = contentType
 
     let payload
@@ -48,8 +40,12 @@ export function createApi(config) {
     }
 
     let response
+    const targetUrl = buildUrl(config.marketUrl, pathname, query)
+    if (process.env.MARKETCTL_DEBUG === '1') {
+      process.stderr.write(`[marketctl] ${method} ${targetUrl.href} body=${payload?.length ?? 0}\n`)
+    }
     try {
-      response = await fetch(buildUrl(config.marketUrl, pathname, query), {
+      response = await fetch(targetUrl, {
         method,
         headers,
         body: payload,
@@ -60,6 +56,9 @@ export function createApi(config) {
         throw new CliError(`请求超时（${Math.round(timeoutMs / 1000)}s）：${method} ${pathname}`)
       }
       throw new CliError(`无法连接市场服务 ${config.marketUrl}：${error.cause?.message || error.message}`)
+    }
+    if (process.env.MARKETCTL_DEBUG === '1') {
+      process.stderr.write(`[marketctl] <- ${response.status}\n`)
     }
 
     const text = await response.text()
@@ -73,10 +72,7 @@ export function createApi(config) {
     }
 
     if (!response.ok) {
-      let hint = ''
-      if (response.status === 401) hint = '\n  提示：检查 MARKET_ADMIN_TOKEN 是否为服务端当前令牌'
-      else if (response.status === 503) hint = '\n  提示：服务端未配置 MARKET_ADMIN_TOKEN，管理接口未启用'
-      throw new CliError(`${formatApiError(response.status, json, text)}${hint}`)
+      throw new CliError(formatApiError(response.status, json, text))
     }
 
     if (json !== null) return json
@@ -85,7 +81,7 @@ export function createApi(config) {
 
   return {
     request,
-    health: () => request('/v1/health', { auth: false }),
+    health: () => request('/v1/health'),
     candidate: () => request('/v1/admin/index/candidate'),
     activate: (body) => request('/v1/admin/index/activate', { method: 'POST', body }),
     release: ({ zip, pluginId, version, apiVersion, engines, publishedAt, signature, sha256 }) =>
@@ -106,7 +102,7 @@ export function createApi(config) {
     issueLicense: (body) => request('/v1/admin/licenses', { method: 'POST', body }),
     revokeLicense: (id) =>
       request(`/v1/admin/licenses/${encodeURIComponent(id)}/revoke`, { method: 'POST' }),
-    verifyLicense: (body) => request('/v1/license/verify', { method: 'POST', body, auth: false }),
+    verifyLicense: (body) => request('/v1/license/verify', { method: 'POST', body }),
     audit: ({ action, limit = 20, offset = 0 } = {}) =>
       request('/v1/admin/audit', { query: { action, limit, offset } }),
   }

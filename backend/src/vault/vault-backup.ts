@@ -8,15 +8,15 @@
  *    统一走 `VACUUM INTO`；产物与源库同密钥可读。
  * 2. **恢复前必须校验一致性**：把别的密钥 / 明文的备份恢复到密文库上，
  *    结果就是永久打不开。因此恢复前先「用当前密钥试着开一下」。
- * 3. **下载明文备份需要二次鉴权**：密文备份拿出去没有密钥就是废文件，
- *    明文导出必须重新输入主密码（`X-Vault-Reauth` 头），且要二次确认。
+ * 3. **明文导出需要用户二次确认**：密文备份拿出去没有密钥就是废文件，
+ *    明文导出会生成无密钥即可打开的文件（前端必须弹确认框提示妥善保管）。
  *
  * 本模块**不依赖 Nest**：备份/恢复在 Nest 之外也可能被脚本调用。
  */
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { checkVerifier, readVaultMeta, resolveVaultProvider } from '../sdk/vault'
-import { getBootKeyHex, isVaultEnabledState } from './keystore'
+import { readVaultMeta } from '../sdk/vault'
+import { getBootKeyHex } from './keystore'
 import { copyDatabaseSnapshot, openDatabase } from './db-open'
 
 /** 恢复 / 导出结果的统一结构 */
@@ -32,7 +32,6 @@ export interface VaultBackupCheck {
  */
 export function isVaultEncrypted(): boolean {
   if (getBootKeyHex()) return true
-  if (isVaultEnabledState()) return true
   const meta = readVaultMeta()
   return !!meta && meta.enabled !== false
 }
@@ -81,14 +80,14 @@ export function checkBackupCompatibility(backupFile: string): VaultBackupCheck {
     } catch {
       return {
         ok: false,
-        message: '该备份已加密，而当前数据库未启用加密，恢复后将无法打开。请先在「数据加密」中开启加密。',
+        message: '该备份已加密，而当前数据库未启用加密（仅 DB_CIPHER=plain 回归模式），恢复后将无法打开。',
       }
     }
   }
 
   // 当前是密文库：备份必须能用当前密钥打开
   if (!keyHex) {
-    return { ok: false, message: '数据库已锁定，请先解锁后再恢复备份' }
+    return { ok: false, message: '未加载数据库密钥，无法校验备份' }
   }
   try {
     const db = openDatabase(backupFile, { readonly: true, keyHex })
@@ -107,32 +106,6 @@ export function checkBackupCompatibility(backupFile: string): VaultBackupCheck {
 }
 
 /**
- * 校验主密码（用于明文导出等敏感操作的二次鉴权）。
- *
- * 不比较密码本身，只比较「由密码派生出的 MK 是否与库匹配」。
- */
-export function verifyMasterPassword(password: string): VaultBackupCheck {
-  const meta = readVaultMeta()
-  if (!meta || meta.enabled === false) {
-    return { ok: true, message: '当前数据库未启用加密，无需二次鉴权' }
-  }
-  const provider = resolveVaultProvider(meta)
-  if (!provider) {
-    return { ok: false, message: '缺少 vault provider，无法校验主密码' }
-  }
-  let mk: Buffer
-  try {
-    mk = provider.deriveKey(password, meta)
-  } catch {
-    return { ok: false, message: '主密码错误' }
-  }
-  if (!checkVerifier(mk, meta.verifier)) {
-    return { ok: false, message: '主密码错误' }
-  }
-  return { ok: true, message: '主密码校验通过' }
-}
-
-/**
  * 把（密文）备份导出为**明文** SQLite 文件。
  *
  * 实现要点（实测于 better-sqlite3-multiple-ciphers 12.11.1）：
@@ -147,7 +120,7 @@ export function verifyMasterPassword(password: string): VaultBackupCheck {
 export async function exportPlainDatabase(source: string, target: string): Promise<void> {
   const keyHex = getBootKeyHex()
   if (!keyHex) {
-    throw new Error('数据库已锁定，无法导出')
+    throw new Error('未加载数据库密钥，无法导出')
   }
 
   fs.mkdirSync(path.dirname(target), { recursive: true })
@@ -176,9 +149,16 @@ export async function exportPlainDatabase(source: string, target: string): Promi
   )
   const others = objects.filter((o) => o.type !== 'table')
 
-  // ---------- 2. 明文连接建目标库（schema 用原始 SQL，不改写） ----------
-  const plain = require('better-sqlite3')
-  const dest = new plain(target)
+  // ---------- 2. 在目标明文库上按原始 SQL 建 schema ----------
+  //（实测于 better-sqlite3-multiple-ciphers 12.11.1：
+  //  a) 在只读连接上 ATTACH 明文库再 INSERT → "attempt to write a readonly database"；
+  //  b) 在明文连接上以 x'hex' KEY 挂载密文库 → "file is not a database"（attach 时
+  //     目标库需要独立的一串 cipher_* 配置，连接级配置不覆盖 attach 库）。
+  //  故采用两步：明文库（普通驱动直开，journal DELETE）建 schema；
+  //  再用「可写密文连接（openDatabase 应用完整 cipher 配置）+ 空密钥挂载明文库」搬数。
+  //  对源库不产生数据变化，仅打开权级为可写。）
+  const Database = require('better-sqlite3')
+  const dest = new Database(target)
   try {
     dest.pragma('journal_mode = DELETE')
     for (const obj of [...tables, ...others]) {
@@ -193,14 +173,18 @@ export async function exportPlainDatabase(source: string, target: string): Promi
   }
 
   // ---------- 3. 密文连接挂载目标库并搬数据 ----------
-  const mover = openDatabase(source, { readonly: true, keyHex })
+  const mover = openDatabase(source, { keyHex })
   try {
+    mover.pragma('journal_mode = DELETE')
     mover.exec(`ATTACH DATABASE '${target.replace(/'/g, "''")}' AS plain KEY ''`)
-    for (const obj of tables) {
-      mover.exec(`INSERT INTO plain."${obj.name}" SELECT * FROM main."${obj.name}"`)
+    try {
+      for (const obj of tables) {
+        mover.exec(`INSERT INTO plain."${obj.name}" SELECT * FROM main."${obj.name}"`)
+      }
+    } finally {
+      try { mover.exec('DETACH DATABASE plain') } catch { /* noop */ }
     }
   } finally {
-    try { mover.exec('DETACH DATABASE plain') } catch { /* noop */ }
     mover.close()
   }
 }

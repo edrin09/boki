@@ -1,61 +1,31 @@
 /**
- * Vault 内核接口。
+ * Vault 状态查询（无任何口令/解锁接口）。
  *
- * 只暴露**内核自己**需要的三个接口；开启加密 / 改主密码 / 恢复码等
- * 「策略型」能力由 vault 插件提供（见 marketplace/plugins/vault）。
- *
- * 这样切分的原因：拔掉插件后，内核仍必须能完成
- * 「查询状态 → 解锁 → 锁定」这条最基本链路。
+ * 前端只在启动时读一次：若返回 `legacy: true`，说明当前是旧版主密码库，
+ * 转换壳会接管并渲染一次性转换页；正常启动后这里恒为 `legacy: false`。
  */
-import { Body, Controller, Get, Header, Post, Req } from '@nestjs/common'
-import { Request } from 'express'
+import { Controller, Get } from '@nestjs/common'
 import { Public } from '../common/decorators/public.decorator'
-import { VaultService } from './vault.service'
-import { VaultUnlockDto } from './dto/vault.dto'
-/** 提取调用方来源标识：X-Forwarded-For 首段优先，退回直连 IP */
-function clientIp(req: Request): string {
-  const forwarded = req.headers['x-forwarded-for']
-  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded
-  if (raw) return raw.split(',')[0].trim()
-  return req.ip || 'unknown'
-}
+import { isLegacyVaultMeta, readVaultMeta } from '../sdk/vault'
+import { vaultKeyFilePath } from './key-file'
 
 @Controller('vault')
 export class VaultController {
-  constructor(private readonly vaultService: VaultService) {}
-
-  /**
-   * 加密状态。
-   *
-   * @Public 前端在挂载路由前就要知道是否需要显示解锁页
-   */
+  /** 当前加密状态与密钥文件位置 */
   @Public()
-  @Header('Cache-Control', 'no-store')
   @Get('status')
-  status() {
-    return this.vaultService.status()
-  }
-
-  /**
-   * 解锁（进程内锁定后的重新解锁）。
-   *
-   * @Public 解锁时用户还没有登录态
-   */
-  @Public()
-  @Post('unlock')
-  unlock(@Body() dto: VaultUnlockDto, @Req() req: Request) {
-    return this.vaultService.unlock({
-      password: dto.password,
-      recoveryCode: dto.recoveryCode,
-      clientIp: clientIp(req),
-    })
-  }
-
-  /** 立即锁定（丢弃内存密钥并关闭数据库连接） */
-  @Post('lock')
-  lock() {
-    return this.vaultService.lock()
+  status(): {
+    enabled: boolean
+    legacy: boolean
+    migrating: boolean
+    keyFile: string
+  } {
+    const meta = readVaultMeta()
+    return {
+      enabled: !!meta && meta.enabled !== false,
+      legacy: isLegacyVaultMeta(meta),
+      migrating: meta?.enabled === 'migrating',
+      keyFile: vaultKeyFilePath(),
+    }
   }
 }
-
-

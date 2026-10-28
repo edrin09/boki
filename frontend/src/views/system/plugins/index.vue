@@ -101,7 +101,166 @@
         </el-table-column>
       </el-table>
 
-      <!-- 市场 -->
+      <!-- 市场：远程插件市场（boki-market，配置 PLUGIN_MARKET_URL 后自动启用） -->
+      <template v-else-if="remoteEnabled && remoteCatalog">
+        <el-alert
+          v-if="remoteCatalog.degraded"
+          type="warning"
+          show-icon
+          :closable="false"
+          :title="`远程市场暂不可达，当前展示本地缓存目录（${remoteCatalog.error ?? ''}）`"
+          class="tip"
+        />
+        <el-alert
+          v-else-if="!remoteCatalog.verified"
+          type="warning"
+          show-icon
+          :closable="false"
+          title="远程目录未验签：后端未配置 PLUGIN_MARKET_PUBLIC_KEYS，仅传输层保护"
+          class="tip"
+        />
+
+        <div class="remote-toolbar">
+          <div class="remote-toolbar__cats">
+            <el-check-tag
+              :checked="remoteCategory === 'all'"
+              @change="remoteCategory = 'all' as never"
+            >
+              全部（{{ remoteCatalog.plugins.length }}）
+            </el-check-tag>
+            <el-check-tag
+              v-for="cat in remoteCatalog.categories"
+              :key="cat.id"
+              :checked="remoteCategory === cat.id"
+              @change="(remoteCategory = cat.id) as never"
+            >
+              {{ cat.name }}
+            </el-check-tag>
+          </div>
+          <el-input
+            v-model="remoteSearch"
+            placeholder="搜索插件"
+            clearable
+            class="remote-toolbar__search"
+          />
+        </div>
+
+        <el-table v-loading="loading" :data="remotePlugins" empty-text="该分类下暂无可用插件">
+          <el-table-column prop="manifest.name" label="插件" min-width="200">
+            <template #default="{ row }">
+              <div class="plugin-name">
+                <span class="plugin-name__title">{{ row.manifest.name }}</span>
+                <span class="plugin-name__id">{{ row.manifest.id }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="分类" width="100">
+            <template #default="{ row }">{{ remoteCategoryName(row.category) }}</template>
+          </el-table-column>
+          <el-table-column prop="manifest.version" label="远程版本" width="100" />
+          <el-table-column prop="manifest.description" label="说明" min-width="220" show-overflow-tooltip />
+          <el-table-column label="状态" width="110">
+            <template #default="{ row }">
+              <el-tag v-if="!row.installed" size="small" effect="plain">未安装</el-tag>
+              <el-tag v-else-if="row.enabled" type="success" size="small">已启用</el-tag>
+              <el-tag v-else type="info" size="small">已停用</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="140" fixed="right">
+            <template #default="{ row }">
+              <el-button v-if="!row.installed" link type="primary" @click="onInstall(row.manifest.id)">
+                安装
+              </el-button>
+              <el-button v-else-if="row.hasUpdate" link type="warning" @click="onInstall(row.manifest.id)">
+                更新
+              </el-button>
+              <span v-else class="muted">已是最新</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
+
+      <!-- 市场：本地目录（未配置远程市场时） -->
+      <!-- 市场：远程插件市场（boki-market，配置 PLUGIN_MARKET_URL 后自动启用） -->
+      <template v-else-if="remoteEnabled && remoteCatalog">
+        <el-alert
+          v-if="remoteCatalog.degraded"
+          type="warning"
+          show-icon
+          :closable="false"
+          :title="`远程市场暂不可达，当前展示本地缓存目录（${remoteCatalog.error ?? ''}）`"
+          class="tip"
+        />
+        <el-alert
+          v-else-if="!remoteCatalog.verified"
+          type="warning"
+          show-icon
+          :closable="false"
+          title="远程目录未验签：后端未配置 PLUGIN_MARKET_PUBLIC_KEYS，仅传输层保护"
+          class="tip"
+        />
+
+        <div class="remote-toolbar">
+          <div class="remote-toolbar__cats">
+            <el-check-tag
+              :checked="remoteCategory === 'all'"
+              @change="remoteCategory = 'all' as never"
+            >
+              全部（{{ remoteCatalog.plugins.length }}）
+            </el-check-tag>
+            <el-check-tag
+              v-for="cat in remoteCatalog.categories"
+              :key="cat.id"
+              :checked="remoteCategory === cat.id"
+              @change="(remoteCategory = cat.id) as never"
+            >
+              {{ cat.name }}
+            </el-check-tag>
+          </div>
+          <el-input
+            v-model="remoteSearch"
+            placeholder="搜索插件"
+            clearable
+            class="remote-toolbar__search"
+          />
+        </div>
+
+        <el-table v-loading="loading" :data="remotePlugins" empty-text="该分类下暂无可用插件">
+          <el-table-column prop="manifest.name" label="插件" min-width="200">
+            <template #default="{ row }">
+              <div class="plugin-name">
+                <span class="plugin-name__title">{{ row.manifest.name }}</span>
+                <span class="plugin-name__id">{{ row.manifest.id }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="分类" width="100">
+            <template #default="{ row }">{{ remoteCategoryName(row.category) }}</template>
+          </el-table-column>
+          <el-table-column prop="manifest.version" label="远程版本" width="100" />
+          <el-table-column prop="manifest.description" label="说明" min-width="220" show-overflow-tooltip />
+          <el-table-column label="状态" width="110">
+            <template #default="{ row }">
+              <el-tag v-if="!row.installed" size="small" effect="plain">未安装</el-tag>
+              <el-tag v-else-if="row.enabled" type="success" size="small">已启用</el-tag>
+              <el-tag v-else type="info" size="small">已停用</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="140" fixed="right">
+            <template #default="{ row }">
+              <el-button v-if="!row.installed" link type="primary" @click="onInstall(row.manifest.id)">
+                安装
+              </el-button>
+              <el-button v-else-if="row.hasUpdate" link type="warning" @click="onInstall(row.manifest.id)">
+                更新
+              </el-button>
+              <span v-else class="muted">已是最新</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
+
+      <!-- 市场：本地目录（未配置远程市场时） -->
       <el-table v-else v-loading="loading" :data="catalog" empty-text="市场中没有可用插件">
         <el-table-column prop="manifest.name" label="插件" min-width="200">
           <template #default="{ row }">
@@ -151,7 +310,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import {
@@ -159,6 +318,7 @@ import {
   type InstalledPlugin,
   type MarketPlugin,
   type PluginManifest,
+  type RemoteMarketCatalog,
 } from '@/api'
 
 const tab = ref<'installed' | 'market'>('installed')
@@ -166,6 +326,12 @@ const loading = ref(false)
 const installed = ref<InstalledPlugin[]>([])
 const catalog = ref<MarketPlugin[]>([])
 const restartRequired = ref(false)
+
+// 远程插件市场（boki-market 独立服务端）；未配置 PLUGIN_MARKET_URL 时回退本地目录
+const remoteEnabled = ref(false)
+const remoteCatalog = ref<RemoteMarketCatalog | null>(null)
+const remoteCategory = ref('all')
+const remoteSearch = ref('')
 
 function formatTime(value?: string): string {
   if (!value) return '-'
@@ -189,15 +355,54 @@ function hiddenDependents(id: string): string[] {
     .map((p) => p.manifest.name)
 }
 
+function remoteCategoryName(catId?: string): string {
+  if (!catId) return '其他'
+  const name = remoteCatalog.value?.categories?.find((c) => c.id === catId)?.name
+  return name ?? '其他'
+}
+
+/** 远程目录：分类叠加搜索后的可见插件（服务端已排序，客户端保持原序） */
+const remotePlugins = computed(() => {
+  if (!remoteCatalog.value) return []
+  const keyword = remoteSearch.value.trim().toLowerCase()
+  return remoteCatalog.value.plugins.filter((row) => {
+    if (remoteCategory.value !== 'all') {
+      const hit =
+        row.manifest.id &&
+        (remoteCategory.value === 'other'
+          ? !row.category || !remoteCatalog.value?.categories?.some((c) => c.id === row.category)
+          : row.category === remoteCategory.value ||
+            !!row.categories?.includes(remoteCategory.value))
+      if (!hit) return false
+    }
+    if (keyword) {
+      const hit =
+        row.manifest.name?.toLowerCase().includes(keyword) ||
+        row.manifest.id.toLowerCase().includes(keyword) ||
+        row.manifest.description?.toLowerCase().includes(keyword)
+      if (!hit) return false
+    }
+    return true
+  })
+})
+
 async function loadAll(): Promise<void> {
   loading.value = true
   try {
-    const [installedList, marketList] = await Promise.all([
-      pluginApi.installed(),
-      pluginApi.catalog(),
-    ])
-    installed.value = installedList ?? []
-    catalog.value = marketList ?? []
+    installed.value = (await pluginApi.installed()) ?? []
+    try {
+      const status = await pluginApi.remoteStatus()
+      if (status?.enabled) {
+        remoteCatalog.value = await pluginApi.remoteCatalog()
+        remoteEnabled.value = true
+        return
+      }
+    } catch {
+      // 远程市场不可用 → 回退本地目录
+    }
+    remoteEnabled.value = false
+    remoteCatalog.value = null
+    catalog.value = (await pluginApi.catalog()) ?? []
   } finally {
     loading.value = false
   }
@@ -210,6 +415,38 @@ function afterAction(message: string): void {
 }
 
 async function onInstall(id: string): Promise<void> {
+  const remoteRow = remoteEnabled.value
+    ? remoteCatalog.value?.plugins.find((p) => p.manifest.id === id)
+    : undefined
+
+  if (remoteEnabled.value) {
+    // 收费插件先弹授权码输入（授权码只作下载参数，不落盘）
+    if (remoteRow?.price && remoteRow.price > 0) {
+      const { value } = await ElMessageBox.prompt(
+        `插件「${remoteRow.manifest.name}」需要授权码后才能下载安装`,
+        '输入授权码',
+        { type: 'info', inputPlaceholder: 'v1.xxxx.yyyy' },
+      ).catch(() => ({ value: null as string | null }))
+      if (!value) return
+      const result = await pluginApi.remoteInstall(id, value)
+      const list = result.installed?.length ? `（含依赖：${result.installed.join(', ')}）` : ''
+      afterAction(`插件 ${id} 安装完成${list}`)
+      return
+    }
+
+    const deps = hardDeps(remoteRow?.manifest ?? ({} as PluginManifest))
+    const extra = deps.length ? `\n依赖：${deps.join(', ')}（缺失时自动安装）` : ''
+    await ElMessageBox.confirm(
+      `确定安装插件「${remoteRow?.manifest.name ?? id}」？${extra}\n安装后需重启后端生效。`,
+      '安装插件',
+      { type: 'info' },
+    )
+    const result = await pluginApi.remoteInstall(id)
+    const list = result.installed?.length ? `（含依赖：${result.installed.join(', ')}）` : ''
+    afterAction(`插件 ${id} 安装完成${list}`)
+    return
+  }
+
   const item = catalog.value.find((p) => p.manifest.id === id)
   const deps = hardDeps(item?.manifest ?? ({} as PluginManifest))
   const extra = deps.length ? `\n依赖：${deps.join(', ')}（缺失时自动安装）` : ''
@@ -309,5 +546,25 @@ onMounted(loadAll)
 
 .tip {
   margin: 12px 0;
+}
+
+.remote-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+
+  &__cats {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  &__search {
+    width: 220px;
+    margin-left: auto;
+  }
 }
 </style>

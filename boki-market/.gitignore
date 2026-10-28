@@ -1,0 +1,20 @@
+# 环境变量与密钥（.env.example 入库，.env 不入库）
+.env
+.env.*.local
+*.pem
+*.private
+
+# 运行时数据库（独立于财务库 financial.db；仅项目根 db/，不影响 server/src/db/）
+/db/
+
+# 制品：zip 由发布流程上传，不随源码入库
+/data/plugins/*
+!/data/plugins/.gitkeep
+
+# 备份、日志、依赖、测试产物
+/backups/
+/logs/
+/dist/
+node_modules/
+coverage/
+*.log

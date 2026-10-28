@@ -73,20 +73,24 @@ service.interceptors.response.use(
     // 统一拆包：仅返回 data
     return res as unknown as AxiosResponse
   }) as (response: AxiosResponse) => AxiosResponse,
-  (error) => {
+  async (error) => {
     const status = error?.response?.status
-    const body = error?.response?.data
-
-    // 数据锁定（闲置锁定/手动锁定）：派发全局事件，App.vue 以全屏遮罩响应
-    if (status === 423) {
-      window.dispatchEvent(new Event('vault:locked'))
-      return Promise.reject(new ApiError(body?.message || '数据已锁定，请先解锁', 423, body?.code))
-    }
+    let body = error?.response?.data
 
     if (status === 401) {
+      // 下载等 blob 响应的错误体也是 Blob，需要异步解出 JSON 才能拿到业务码
+      if (body && typeof body.text === 'function') {
+        try {
+          body = JSON.parse(await body.text())
+        } catch {
+          /* 非 JSON 错误体，按会话过期处理 */
+        }
+      }
       clearToken()
       unauthorizedHandler?.()
-      return Promise.reject(new ApiError(body?.message || '登录已过期，请重新登录', 401))
+      const message = body?.message || '登录已过期，请重新登录'
+      ElMessage.error(message)
+      return Promise.reject(new ApiError(message, 401, body?.code))
     }
 
     // 超时/断网等无响应错误：给出可读的中文提示，避免暴露 axios 原始英文
@@ -138,7 +142,11 @@ export async function del<T = any>(url: string, config?: AxiosRequestConfig): Pr
 }
 
 /** 下载文件（带 Token） */
-export async function download(url: string, params?: Record<string, any>, filename?: string) {
+export async function download(
+  url: string,
+  params?: Record<string, any>,
+  filename?: string,
+) {
   const res = await service.get(url, { params, responseType: 'blob' })
   const blob = new Blob([res.data])
   const link = document.createElement('a')

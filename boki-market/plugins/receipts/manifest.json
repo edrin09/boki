@@ -1,0 +1,56 @@
+{
+  "id": "receipts",
+  "name": "AI 智能记账",
+  "version": "1.0.0",
+  "apiVersion": "^1.0.0",
+  "engines": { "boki": ">=1.0.0" },
+  "kind": "domain",
+  "scopeMode": "scoped",
+  "trust": "official",
+  "author": "boki",
+  "license": "Apache-2.0",
+  "description": "票据上传、OCR 解析、智能归类、批量记账与归类规则",
+  "dependencies": { "ocr": "^1.0.0", "hr": "^1.0.0" },
+  "optionalDependencies": { "departments": "^1.0.0" },
+  "permissions": [
+    "receipts",
+    "receipts:workbench",
+    "receipts:rules",
+    "receipt:list",
+    "receipt:rule",
+    "receipt:confirm",
+    "receipt:delete"
+  ],
+  "contributes": {
+    "server": "server/index.js",
+    "client": "client/index.js",
+    "style": "client/style.css",
+    "routes": [
+      {
+        "path": "/receipts/workbench",
+        "name": "ReceiptWorkbench",
+        "component": "ReceiptWorkbenchPage",
+        "meta": { "title": "上传记账", "permission": "receipts:workbench" }
+      },
+      {
+        "path": "/receipts/list",
+        "name": "ReceiptList",
+        "component": "ReceiptListPage",
+        "meta": { "title": "票据列表", "permission": "receipt:list" }
+      },
+      {
+        "path": "/receipts/rules",
+        "name": "ReceiptRules",
+        "component": "ReceiptRulesPage",
+        "meta": { "title": "归类规则", "permission": "receipts:rules" }
+      }
+    ],
+    "menu": [
+      { "group": "receipts", "title": "上传记账", "path": "/receipts/workbench", "permission": "receipts:workbench" },
+      { "group": "receipts", "title": "票据列表", "path": "/receipts/list", "permission": "receipt:list" },
+      { "group": "receipts", "title": "归类规则", "path": "/receipts/rules", "permission": "receipts:rules" }
+    ],
+    "slots": []
+  },
+  "tables": ["fin_receipt", "fin_classify_rule"]
+}

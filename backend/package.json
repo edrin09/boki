@@ -2,7 +2,7 @@
   "name": "boki-backend",
   "version": "1.0.0",
   "description": "BOKI - 开源财务软件 · 后端 API (NestJS + TypeORM + SQLite)",
-  "author": "BOKI",
+  "author": "西安市未央区鹏云智码软件开发部（个体工商户）",
   "private": true,
   "license": "AGPL-3.0",
   "scripts": {
@@ -27,8 +27,7 @@
     "test:plugins": "node test/plugins.mjs",
     "models:fetch": "node scripts/fetch-ocr-models.mjs",
     "models:fetch-asr": "node scripts/fetch-asr-streaming-model.mjs",
-    "test:voice-stream": "node test/voice-stream-smoke.mjs",
-    "vault:recover": "ts-node -r tsconfig-paths/register scripts/vault-recover.ts"
+    "test:voice-stream": "node test/voice-stream-smoke.mjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.10",

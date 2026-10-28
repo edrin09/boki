@@ -5,7 +5,7 @@
  * 前置（本机）：
  *   - git 远程已配好（origin=GitHub, gitee=Gitee）且可推送
  *   - GitHub CLI `gh` 已登录：gh auth login
- *   - Gitee 令牌写入 desktop/.env 或仓库根 .env：GITEE_TOKEN=xxxx
+ *   - Gitee 令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：desktop/.env 或仓库根 .env，或全局共享 D:\wwwroot\.git-tokens.env：GITEE_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
  *   - 如需签名：设置 CSC_LINK / CSC_KEY_PASSWORD（或系统证书库已有匹配 publisherName 的证书）
  *
  * 用法：
@@ -28,9 +28,10 @@ const args = process.argv.slice(2)
 const skipBuild = args.includes('--skip-build')
 const dryRun = args.includes('--dry-run')
 
-// 读取 .env（desktop/.env、仓库根 .env），仅填充未设置的变量
+// 读取 .env（desktop/.env、仓库根 .env、全局共享 *.git-tokens.env），仅填充未设置的变量
 function loadEnv() {
-  for (const p of [path.join(desktopDir, '.env'), path.join(repoRoot, '.env')]) {
+  const sharedTokens = path.resolve(repoRoot, '..', '.git-tokens.env')
+  for (const p of [path.join(desktopDir, '.env'), path.join(repoRoot, '.env'), sharedTokens]) {
     if (!fs.existsSync(p)) continue
     for (const line of fs.readFileSync(p, 'utf8').split('\n')) {
       const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/)
@@ -124,7 +125,7 @@ if (dryRun) {
 // ---- 4. Gitee 发行版 ----
 log('创建 Gitee 发行版并上传安装包')
 if (!GITEE_TOKEN) {
-  log('未配置 GITEE_TOKEN，跳过 Gitee（在 desktop/.env 或仓库根 .env 写入 GITEE_TOKEN=xxx 后重试）')
+  log('未配置 GITEE_TOKEN，跳过 Gitee（在 D:\\wwwroot\\D:\\wwwroot\\.git-tokensgit-tokens.env 写入 GITEE_TOKEN=xxx 后重试）')
 } else if (dryRun) {
   log(`(dry-run) POST gitee releases + 上传 ${exePath}`)
 } else {

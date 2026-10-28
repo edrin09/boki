@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "declaration": false,
+    "sourceMap": false,
+    "removeComments": false,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "strictNullChecks": false,
+    "noImplicitAny": false,
+    "resolveJsonModule": true,
+    "rootDir": ".",
+    "outDir": ".",
+    "baseUrl": ".",
+    "typeRoots": ["../backend/node_modules/@types"],
+    "paths": {
+      "@core/*": ["../backend/dist/*"],
+      "@plugin/*": ["plugins/*"],
+      "*": ["../backend/node_modules/*"]
+    }
+  },
+  "include": ["plugins/*/server/**/*.ts"],
+  "exclude": ["node_modules", "plugins/*/client"]
+}

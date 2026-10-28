@@ -1,0 +1,63 @@
+{
+  "id": "iam",
+  "name": "用户与权限",
+  "version": "1.0.0",
+  "apiVersion": "^1.0.0",
+  "engines": { "boki": ">=1.0.0" },
+  "kind": "platform",
+  "scopeMode": "global",
+  "trust": "official",
+  "author": "boki",
+  "license": "Apache-2.0",
+  "description": "用户账号、角色与权限管理（登录与权限判定仍在内核）",
+  "dependencies": {},
+  "permissions": [
+    "system:user",
+    "user:create",
+    "user:update",
+    "user:delete",
+    "user:assign-role",
+    "user:reset-password",
+    "system:role",
+    "role:create",
+    "role:update",
+    "role:delete",
+    "role:assign-permission",
+    "system:permission",
+    "permission:create",
+    "permission:update",
+    "permission:delete"
+  ],
+  "contributes": {
+    "server": "server/index.js",
+    "client": "client/index.js",
+    "style": "client/style.css",
+    "routes": [
+      {
+        "path": "/system/users",
+        "name": "SystemUsers",
+        "component": "IamUsersPage",
+        "meta": { "title": "用户管理", "permission": "system:user" }
+      },
+      {
+        "path": "/system/roles",
+        "name": "SystemRoles",
+        "component": "IamRolesPage",
+        "meta": { "title": "角色管理", "permission": "system:role" }
+      },
+      {
+        "path": "/system/permissions",
+        "name": "SystemPermissions",
+        "component": "IamPermissionsPage",
+        "meta": { "title": "权限管理", "permission": "system:permission" }
+      }
+    ],
+    "menu": [
+      { "group": "system", "title": "用户管理", "path": "/system/users", "permission": "system:user" },
+      { "group": "system", "title": "角色管理", "path": "/system/roles", "permission": "system:role" },
+      { "group": "system", "title": "权限管理", "path": "/system/permissions", "permission": "system:permission" }
+    ],
+    "slots": []
+  },
+  "tables": []
+}

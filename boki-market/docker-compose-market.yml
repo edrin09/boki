@@ -1,0 +1,39 @@
+# 本文件只负责"运行"：直接使用已构建好的镜像 boki-market:latest。
+# 构建镜像请使用独立脚本：starts\生产环境-构建插件市场镜像.bat
+#   （等价于在 boki-market/ 目录执行：
+#     docker build -f docker/Dockerfile -t boki-market:latest .）
+#
+# 启动（在 boki-market/ 目录执行）：
+#   copy .env.example .env      # 按实际环境修改（首次）
+#   docker compose -f docker-compose-market.yml up -d
+#
+# 说明：
+# - 端口只发布到回环地址，由宿主机 nginx 反代并限制 /v1/admin/ 来源。
+# - 数据库与制品使用插件市场自己的命名卷（market-db / market-data），
+#   与客户端数据库是两套系统，互不读写；升级容器不丢数据，
+#   备份时必须两个卷成套备份。
+name: boki-market
+
+services:
+  market:
+    image: boki-market:latest
+    container_name: boki-market
+    restart: unless-stopped
+    ports:
+      - 8789:8789
+    env_file:
+      - ./.env
+    # 覆盖 .env 里面向本机进程的配置：容器内必须监听 0.0.0.0，
+    # 数据库强制指向插件市场自己的卷 /app/db/market.db（绝不使用客户端数据库）
+    environment:
+      MARKET_HOST: 0.0.0.0
+      MARKET_PORT: 8789
+      MARKET_DB_FILE: /app/db/market.db
+      MARKET_DATA_DIR: /app/data
+    volumes:
+      - market-db:/app/db
+      - market-data:/app/data
+
+volumes:
+  market-db:
+  market-data:

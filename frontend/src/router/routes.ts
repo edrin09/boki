@@ -159,7 +159,7 @@ export const businessRoutes: RouteRecordRaw[] = [
         path: 'plugins',
         name: 'SystemPlugins',
         component: () => import('@/views/system/plugins/index.vue'),
-        meta: { title: '插件管理', permission: 'system:plugin' },
+        meta: { title: '插件市场', permission: 'system:plugin' },
       },
       {
         path: 'profile',

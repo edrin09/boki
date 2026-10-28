@@ -56,7 +56,16 @@ export function readInstalledManifest(id: string): PluginManifest | null {
 /** 创建运行时模块解析链接：@core -> backend/dist，@plugin -> data/plugins */
 export function ensureRuntimeLinks(): void {
   const nodeModules = path.join(pluginsRootDir(), 'node_modules')
-  ensureDir(nodeModules)
+  try {
+    ensureDir(nodeModules)
+  } catch (err) {
+    // 典型触发：目录落在 Program Files 等只读位置（未注入 BOKI_PLUGINS_DIR 的桌面部署）。
+    // 裸 EPERM 栈对用户不可读，这里翻译成可操作的提示。
+    throw new Error(
+      `插件运行时目录不可写：${nodeModules}（${(err as NodeJS.ErrnoException).code ?? (err as Error).message}）。` +
+        `请设置环境变量 BOKI_PLUGINS_DIR 指向可写目录（桌面版默认应为 ProgramData 下路径）。`,
+    )
+  }
   const links: Array<[string, string]> = [
     [path.join(nodeModules, '@core'), coreDistDir()],
     [path.join(nodeModules, '@plugin'), pluginsRootDir()],

@@ -3,7 +3,6 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { LessThan, Repository } from 'typeorm'
@@ -25,7 +24,6 @@ import {
   createBackupSnapshot,
   exportPlainDatabase,
   isPlaintextDatabase,
-  verifyMasterPassword,
 } from '../../vault/vault-backup'
 import { requireCompanyId } from '../../common/company/company-context'
 import { DEFAULT_AUTO_POST_THRESHOLD } from '../../common/company/company.constants'
@@ -266,11 +264,10 @@ export class SystemService {
   /**
    * 备份文件下载流
    *
-   * @param filename    备份文件名
-   * @param format      `cipher`（默认，密文）/ `plain`（明文，需二次鉴权）
-   * @param reauthPassword 明文导出时重新输入的主密码
+   * @param filename 备份文件名
+   * @param format   `cipher`（默认，密文）/ `plain`（明文，前端须二次确认）
    */
-  openBackupStream(filename: string, format: 'cipher' | 'plain' = 'cipher', reauthPassword?: string) {
+  openBackupStream(filename: string, format: 'cipher' | 'plain' = 'cipher') {
     const safe = path.basename(filename)
     const full = path.join(this.backupDir, safe)
     if (!existsSync(full)) throw new NotFoundException('备份文件不存在')
@@ -278,12 +275,6 @@ export class SystemService {
 
     if (format !== 'plain') {
       return { stream: createReadStream(full), filename: safe }
-    }
-
-    // ---- 明文导出：必须重新验证主密码 ----
-    const check = verifyMasterPassword(reauthPassword ?? '')
-    if (!check.ok) {
-      throw new UnauthorizedException({ code: 40110, message: check.message })
     }
 
     // 已经是明文备份，直接给

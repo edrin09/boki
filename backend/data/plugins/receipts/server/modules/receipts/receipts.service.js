@@ -70,6 +70,7 @@ const expense_claims_service_1 = require("@plugin/hr/server/modules/expense-clai
 const filename_util_1 = require("@core/common/utils/filename.util");
 const folder_intent_util_1 = require("./folder-intent.util");
 const enums_1 = require("@core/common/enums");
+const attachment_cipher_1 = require("@core/vault/attachment-cipher");
 /** 上传根目录（相对 backend，与数据库同层） */
 function resolveUploadDir() {
     const raw = process.env.UPLOAD_DIR || './data/uploads';
@@ -391,7 +392,8 @@ let ReceiptsService = class ReceiptsService {
         fs.mkdirSync(dir, { recursive: true });
         const ext = path.extname(originalName) || extFromMime(mimeType);
         const fileName = `${(0, node_crypto_1.randomUUID)()}${ext}`;
-        await fs.promises.writeFile(path.join(dir, fileName), buffer);
+        const fullPath = path.join(dir, fileName);
+        await (0, attachment_cipher_1.writeAttachment)(fullPath, buffer);
         return `uploads/${month}/${fileName}`;
     }
     async list(query) {

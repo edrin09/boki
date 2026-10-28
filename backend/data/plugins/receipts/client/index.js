@@ -44,6 +44,10 @@
     (error) => {
       const status = error?.response?.status;
       const body = error?.response?.data;
+      if (status === 423) {
+        window.dispatchEvent(new Event("vault:locked"));
+        return Promise.reject(new ApiError(body?.message || "数据已锁定，请先解锁", 423, body?.code));
+      }
       if (status === 401) {
         clearToken();
         return Promise.reject(new ApiError(body?.message || "登录已过期，请重新登录", 401));
@@ -238,6 +242,7 @@
     class: "text-muted"
   };
   const _hoisted_23$1 = ["src"];
+  const MAX_UPLOAD$1 = 20;
   const _sfc_main$2 = /* @__PURE__ */ vue.defineComponent({
     __name: "list",
     setup(__props) {
@@ -297,23 +302,51 @@
         fileList.value = files;
         results.value = [];
       }
-      function onExceed() {
-        elementPlus.ElMessage.warning("一次最多上传 20 个文件");
-      }
       const UPLOAD_EXT = /\.(jpe?g|png|webp|bmp|tiff|pdf)$/i;
       async function onUpload() {
         const items = fileList.value.filter((f) => f.raw instanceof File);
         if (!items.length) return;
         const supported = items.filter((f) => UPLOAD_EXT.test(f.name));
-        const skipped = items.length - supported.length;
-        if (skipped > 0) elementPlus.ElMessage.info(`已跳过 ${skipped} 个不支持的文件（仅支持 jpg/png/webp/bmp/tiff/pdf）`);
-        if (!supported.length) return;
+        const skippedFiles = items.filter((f) => !UPLOAD_EXT.test(f.name));
+        const dirLike = items.filter((f) => !/\.[a-z0-9]{2,5}$/i.test(f.name));
+        if (!supported.length && dirLike.length) {
+          const names = dirLike.slice(0, 3).map((f) => f.name).join("、");
+          elementPlus.ElMessage.error(
+            `「${names}」看起来是个文件夹，不是发票文件：拖拽文件夹读不到里面的票，请点上传区里的「点击选择文件夹」按钮`
+          );
+          return;
+        }
+        if (!supported.length) {
+          const names = skippedFiles.slice(0, 5).map((f) => f.name).join("、");
+          elementPlus.ElMessage.error(
+            `所选文件夹里没有可记账的票据：共 ${items.length} 个文件，均不是 jpg/png/webp/bmp/tiff/pdf（${names}${skippedFiles.length > 5 ? " 等" : ""}）`
+          );
+          return;
+        }
+        if (skippedFiles.length > 0) {
+          elementPlus.ElMessage.info(
+            `已从文件夹中跳过 ${skippedFiles.length} 个非票据文件（xlsx/docx 等），本次上传 ${supported.length} 个票据`
+          );
+        }
         const raws = supported.map((f) => f.raw);
         const paths = supported.map((f) => f.raw.webkitRelativePath || null);
         uploading.value = true;
         try {
-          const res = await receiptApi.upload(raws, paths);
-          results.value = res ?? [];
+          const batches = Math.ceil(raws.length / MAX_UPLOAD$1);
+          const merged = [];
+          let failedCount = 0;
+          for (let i = 0; i < batches; i++) {
+            const start = i * MAX_UPLOAD$1;
+            const slice = raws.slice(start, start + MAX_UPLOAD$1);
+            const slicePaths = paths.slice(start, start + MAX_UPLOAD$1);
+            try {
+              const res = await receiptApi.upload(slice, slicePaths);
+              if (res?.length) merged.push(...res);
+            } catch {
+              failedCount += slice.length;
+            }
+          }
+          results.value = merged;
           const drafted = draftedResults.value.length;
           const pending = pendingResults.value.length;
           if (drafted > 0) {
@@ -326,6 +359,9 @@
             elementPlus.ElMessage.info("识别完成：没有新增可记账的单据");
           }
           await load();
+          if (failedCount > 0) {
+            elementPlus.ElMessage.error(`${failedCount} 个票据上传失败（分批重试一遍即可），已成功的 ${merged.length} 个结果见下方`);
+          }
         } finally {
           uploading.value = false;
         }
@@ -680,18 +716,15 @@
               vue.createVNode(_component_el_upload, {
                 drag: "",
                 multiple: "",
+                directory: "",
                 "auto-upload": false,
-                limit: 20,
-                webkitdirectory: "",
-                accept: "image/jpeg,image/png,image/webp,image/bmp,image/tiff,application/pdf",
                 "on-change": onFileChange,
                 "on-remove": onFileRemove,
-                "file-list": fileList.value,
-                "on-exceed": onExceed
+                "file-list": fileList.value
               }, {
                 tip: vue.withCtx(() => [..._cache[18] || (_cache[18] = [
                   vue.createElementVNode("div", { class: "el-upload__tip" }, [
-                    vue.createTextVNode(" 支持 jpg/png/webp/bmp/tiff/pdf，单文件 ≤ 20MB，一次最多 20 个。 "),
+                    vue.createTextVNode(" 支持 jpg/png/webp/bmp/tiff/pdf，单文件 ≤ 20MB，数量不限（超过 20 个自动分批）。 "),
                     vue.createElementVNode("strong", null, "可直接选整个文件夹"),
                     vue.createTextVNode("，系统递归读取并按文件夹名智能判断用途（采购/报销/工资/银行）与归属人； 识别结果进入「待确认」。 ")
                   ], -1)
@@ -1030,7 +1063,7 @@
     }
     return target;
   };
-  const ReceiptListPage = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-782c28e0"]]);
+  const ReceiptListPage = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-e89d1117"]]);
   const _hoisted_1$1 = { class: "page" };
   const _hoisted_2$1 = { class: "page-card" };
   const _hoisted_3$1 = { class: "ai-upload" };
@@ -1097,6 +1130,7 @@
   };
   const _hoisted_32 = { class: "page-pagination" };
   const _hoisted_33 = ["src"];
+  const MAX_UPLOAD = 20;
   const _sfc_main$1 = /* @__PURE__ */ vue.defineComponent({
     __name: "workbench",
     setup(__props) {
@@ -1114,6 +1148,7 @@
       });
       const fileList = vue.ref([]);
       const uploading = vue.ref(false);
+      const uploadProgress = vue.ref("");
       const results = vue.ref([]);
       const draftedResults = vue.computed(() => results.value.filter((r) => r.drafted));
       const pendingResults = vue.computed(() => results.value.filter((r) => r.status === "parsed" && !r.drafted));
@@ -1127,27 +1162,79 @@
         fileList.value = files;
         results.value = [];
       }
-      function onExceed() {
-        elementPlus.ElMessage.warning("一次最多上传 20 个文件");
-      }
       function clearResults() {
         results.value = [];
         fileList.value = [];
       }
       const UPLOAD_EXT = /\.(jpe?g|png|webp|bmp|tiff|pdf)$/i;
+      function normalizeUploadResult(r) {
+        const pick = (k) => {
+          const f = (r.fields || []).find((x) => x.key === k);
+          const v = f?.value;
+          return v === void 0 || v === null || v === "" ? null : v;
+        };
+        const total2 = pick("total_amount") ?? pick("amount");
+        return {
+          ...r,
+          id: r.receiptId ?? r.id,
+          amount: r.amount ?? (total2 === null ? null : Number(total2)),
+          issueDate: r.issueDate ?? pick("issue_date"),
+          // 表格的「归类建议」列读 suggestion；后端只给 suggestKind/suggestKindLabel/blockReason
+          suggestion: r.suggestKind || r.bookable === false ? {
+            kind: r.suggestKind ?? "unknown",
+            kindLabel: r.suggestKindLabel ?? (r.bookable === false ? "需人工" : "已归类"),
+            message: r.bookable === false ? r.blockReason || "需人工处理" : r.drafted ? "AI 已自动生成凭证" : "可一键生成凭证",
+            counterparty: pick("seller_name") ?? pick("buyer_name"),
+            hitChain: null
+          } : null
+        };
+      }
       async function onUpload() {
         const items = fileList.value.filter((f) => f.raw instanceof File);
         if (!items.length) return;
         const supported = items.filter((f) => UPLOAD_EXT.test(f.name));
-        const skipped = items.length - supported.length;
-        if (skipped > 0) elementPlus.ElMessage.info(`已跳过 ${skipped} 个不支持的文件（仅支持 jpg/png/webp/bmp/tiff/pdf）`);
-        if (!supported.length) return;
+        const skippedFiles = items.filter((f) => !UPLOAD_EXT.test(f.name));
+        const dirLike = items.filter((f) => !/\.[a-z0-9]{2,5}$/i.test(f.name));
+        if (!supported.length && dirLike.length) {
+          const names = dirLike.slice(0, 3).map((f) => f.name).join("、");
+          elementPlus.ElMessage.error(
+            `「${names}」看起来是个文件夹，不是发票文件：拖拽文件夹读不到里面的票，请点上传区里的「点击选择文件夹」按钮`
+          );
+          return;
+        }
+        if (!supported.length) {
+          const names = skippedFiles.slice(0, 5).map((f) => f.name).join("、");
+          elementPlus.ElMessage.error(
+            `所选文件夹里没有可记账的票据：共 ${items.length} 个文件，均不是 jpg/png/webp/bmp/tiff/pdf（${names}${skippedFiles.length > 5 ? " 等" : ""}）`
+          );
+          return;
+        }
+        if (skippedFiles.length > 0) {
+          elementPlus.ElMessage.info(
+            `已从文件夹中跳过 ${skippedFiles.length} 个非票据文件（xlsx/docx 等），本次上传 ${supported.length} 个票据`
+          );
+        }
         const raws = supported.map((f) => f.raw);
         const paths = supported.map((f) => f.raw.webkitRelativePath || null);
         uploading.value = true;
         try {
-          const res = await receiptApi.upload(raws, paths);
-          results.value = res ?? [];
+          const batches = Math.ceil(raws.length / MAX_UPLOAD);
+          const merged = [];
+          let failedCount = 0;
+          for (let i = 0; i < batches; i++) {
+            const start = i * MAX_UPLOAD;
+            const slice = raws.slice(start, start + MAX_UPLOAD);
+            const slicePaths = paths.slice(start, start + MAX_UPLOAD);
+            uploadProgress.value = batches > 1 ? `AI 识别中 ${i + 1}/${batches} 批（${start + 1}-${start + slice.length} / ${raws.length}）` : "";
+            try {
+              const res = await receiptApi.upload(slice, slicePaths);
+              if (res?.length) merged.push(...res);
+            } catch {
+              failedCount += slice.length;
+            }
+          }
+          uploadProgress.value = "";
+          results.value = merged.map(normalizeUploadResult);
           const drafted = draftedResults.value.length;
           const pending = pendingResults.value.length;
           const byFolder = folderResults.value.length;
@@ -1160,8 +1247,12 @@
             elementPlus.ElMessage.info("没有新增可记账的单据");
           }
           await load();
+          if (failedCount > 0) {
+            elementPlus.ElMessage.error(`${failedCount} 个票据上传失败（分批重试一遍即可），已成功的 ${merged.length} 个结果见下方`);
+          }
         } finally {
           uploading.value = false;
+          uploadProgress.value = "";
         }
       }
       const accountOptions = vue.ref([]);
@@ -1406,18 +1497,15 @@
               vue.createVNode(_component_el_upload, {
                 drag: "",
                 multiple: "",
+                directory: "",
                 "auto-upload": false,
-                limit: 20,
-                webkitdirectory: "",
-                accept: "image/jpeg,image/png,image/webp,image/bmp,image/tiff,application/pdf",
                 "on-change": onFileChange,
                 "on-remove": onFileRemove,
-                "file-list": fileList.value,
-                "on-exceed": onExceed
+                "file-list": fileList.value
               }, {
                 tip: vue.withCtx(() => [..._cache[13] || (_cache[13] = [
                   vue.createElementVNode("div", { class: "el-upload__tip" }, [
-                    vue.createTextVNode(" 支持 jpg/png/webp/bmp/tiff/pdf，单文件 ≤ 20MB，一次最多 20 个。 "),
+                    vue.createTextVNode(" 支持 jpg/png/webp/bmp/tiff/pdf，单文件 ≤ 20MB，数量不限（超过 20 个自动分批）。 "),
                     vue.createElementVNode("strong", null, "可直接选整个文件夹"),
                     vue.createTextVNode("，系统递归读取其中全部票据； 并按"),
                     vue.createElementVNode("strong", null, "文件夹名"),
@@ -1452,7 +1540,7 @@
                     ]),
                     _: 1
                   }),
-                  vue.createTextVNode(vue.toDisplayString(uploading.value ? "AI 识别中…" : `AI 识别并生成凭证（${fileList.value.length}）`), 1)
+                  vue.createTextVNode(vue.toDisplayString(uploading.value ? uploadProgress.value || "AI 识别中…" : `AI 识别并生成凭证（${fileList.value.length}）`), 1)
                 ]),
                 _: 1
               }, 8, ["loading"])) : vue.createCommentVNode("", true)
@@ -1847,7 +1935,7 @@
                       ])]),
                       _: 1
                     }, 8, ["onClick"])) : vue.createCommentVNode("", true),
-                    row.status === "parsed" && row.bookable !== false ? vue.withDirectives((vue.openBlock(), vue.createBlock(_component_el_button, {
+                    row.status === "parsed" && !row.drafted && row.bookable !== false ? vue.withDirectives((vue.openBlock(), vue.createBlock(_component_el_button, {
                       key: 2,
                       link: "",
                       type: "primary",
@@ -1861,7 +1949,7 @@
                     }, 8, ["loading", "onClick"])), [
                       [_directive_permission, "receipt:confirm"]
                     ]) : vue.createCommentVNode("", true),
-                    row.status === "drafted" ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, { key: 3 }, [
+                    row.drafted ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, { key: 3 }, [
                       vue.withDirectives((vue.openBlock(), vue.createBlock(_component_el_button, {
                         link: "",
                         type: "primary",
@@ -2300,7 +2388,7 @@
       };
     }
   });
-  const ReceiptWorkbenchPage = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-a3f0dcd8"]]);
+  const ReceiptWorkbenchPage = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-55d8225a"]]);
   const _hoisted_1 = { class: "page" };
   const _hoisted_2 = { class: "page-card" };
   const _hoisted_3 = { class: "page-toolbar" };
@@ -2826,7 +2914,7 @@
       };
     }
   });
-  const ReceiptRulesPage = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-6fc025d8"]]);
+  const ReceiptRulesPage = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-1bfdfd4a"]]);
   function registerPlugin(id, definition) {
     if (typeof window === "undefined") return;
     window.__BOKI_PLUGIN_DEFS__ = window.__BOKI_PLUGIN_DEFS__ || {};

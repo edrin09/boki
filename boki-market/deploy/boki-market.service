@@ -1,0 +1,20 @@
+[Unit]
+Description=BOKI Plugin Market
+After=network.target
+
+[Service]
+Type=simple
+User=boki-market
+Group=boki-market
+WorkingDirectory=/srv/boki-market/app
+EnvironmentFile=/srv/boki-market/.env
+ExecStart=/usr/bin/node /srv/boki-market/app/src/main.mjs
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/boki-market/db /srv/boki-market/data /srv/boki-market/logs
+
+[Install]
+WantedBy=multi-user.target

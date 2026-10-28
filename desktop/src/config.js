@@ -31,6 +31,14 @@ const paths = {
   dbFile: path.join(dataRoot(), 'data', 'financial.db'),
   /** vault 元数据（加密状态标记），与数据库同目录 */
   vaultFile: path.join(dataRoot(), 'data', 'vault.json'),
+  /**
+   * 主密钥文件（32 字节 hex）。
+   *
+   * 放在**程序根目录**（安装版 = ProgramData\BOKI 根目录，开发版 = 仓库根目录），
+   * 而不是安装目录：Program Files 对普通用户只读，转换旧库时无法原子写 key。
+   * 它不随卸载删除；重装后同一把钥匙仍能打开原有账套。
+   */
+  vaultKeyFile: path.join(dataRoot(), 'vault.key'),
   logFile: path.join(dataRoot(), 'logs', 'server.log'),
 }
 

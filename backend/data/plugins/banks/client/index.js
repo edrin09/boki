@@ -44,6 +44,10 @@
     (error) => {
       const status = error?.response?.status;
       const body = error?.response?.data;
+      if (status === 423) {
+        window.dispatchEvent(new Event("vault:locked"));
+        return Promise.reject(new ApiError(body?.message || "数据已锁定，请先解锁", 423, body?.code));
+      }
       if (status === 401) {
         clearToken();
         return Promise.reject(new ApiError(body?.message || "登录已过期，请重新登录", 401));

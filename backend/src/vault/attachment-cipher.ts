@@ -127,6 +127,7 @@ export async function writeAttachment(filePath: string, data: Buffer): Promise<v
   const key = getAttachmentKey()
   await fs.mkdir(path.dirname(filePath), { recursive: true })
   if (!key) {
+    console.warn(`[attachment] 未加密写附件（attachmentKey 为空）：${filePath}`)
     await fs.writeFile(filePath, data)
     return
   }

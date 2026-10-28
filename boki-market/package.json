@@ -1,0 +1,18 @@
+{
+  "name": "boki-market",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "BOKI 插件市场服务（独立项目）：已签名索引快照、插件下载、授权与发布管理",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node server/src/main.mjs",
+    "dev": "node --watch server/src/main.mjs",
+    "migrate": "node server/src/db/migrate-cli.mjs",
+    "marketctl": "node cli/marketctl.mjs",
+    "check": "node scripts/check-boundary.mjs"
+  },
+  "license": "AGPL-3.0-or-later"
+}

@@ -20,7 +20,7 @@
             <el-table-column label="备份时间" width="150">
               <template #default="{ row }">{{ formatDate(row.createdAt, 'YYYY-MM-DD HH:mm') }}</template>
             </el-table-column>
-            <el-table-column label="操作" width="160" fixed="right">
+            <el-table-column label="操作" width="240" fixed="right">
               <template #default="{ row }">
                 <el-button
                   v-permission="'system:backup:download'"
@@ -30,8 +30,23 @@
                 >
                   下载
                 </el-button>
-                <el-button link type="warning" @click="onRestore(row)">恢复</el-button>
-                <el-button link type="danger" @click="onRemove(row)">删除</el-button>
+                <el-button
+                  v-permission="'system:backup:download'"
+                  link
+                  type="success"
+                  @click="onDownloadPlain(row)"
+                >
+                  明文下载
+                </el-button>
+                <el-button
+                  v-permission="'system:backup:restore'"
+                  link
+                  type="warning"
+                  @click="onRestore(row)"
+                >
+                  恢复
+                </el-button>
+                <el-button v-role="'admin'" link type="danger" @click="onRemove(row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -116,6 +131,24 @@ async function onDownload(row: any) {
   }
 }
 
+async function onDownloadPlain(row: any) {
+  try {
+    await ElMessageBox.confirm(
+      `将把备份「${row.filename}」导出为明文数据库（不需要 vault.key 即可打开）。请妥善保管、用后即删，避免明文账套外泄。`,
+      '导出明文备份',
+      { type: 'warning', confirmButtonText: '确认导出', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  try {
+    await systemApi.downloadBackupPlain(row.filename)
+    ok('明文导出成功（无密钥即可打开，请妥善保管）')
+  } catch {
+    /* 错误已由拦截器提示 */
+  }
+}
+
 async function onRestore(row: any) {
   try {
     await ElMessageBox.confirm(
@@ -149,7 +182,7 @@ async function onRemove(row: any) {
   }
 }
 
-onMounted(async () => {
+onMounted(() => {
   load()
   loadInfo()
 })
