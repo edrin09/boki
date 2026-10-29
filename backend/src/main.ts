@@ -37,7 +37,8 @@ import { encryptLegacyAttachments } from './vault/vault-attachments'
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap')
 
-  // 插件运行时：先加载已启用插件，再把模块与实体交给 Nest / TypeORM
+  // 插件运行时：加载用户已安装的插件（新客户端为空，一律从插件市场自行安装），
+  // 再把模块与实体交给 Nest / TypeORM
   const runtime = loadPluginRuntime()
   for (const error of runtime.errors) {
     logger.warn(`插件 ${error.id} 未加载：${error.message}`)

@@ -111,7 +111,6 @@ export class SystemService {
   /** 工作台统计 */
   async getDashboard(): Promise<any> {
     const today = new Date().toISOString().slice(0, 10)
-    const year = today.slice(0, 4)
     const month = today.slice(0, 7)
 
     const [

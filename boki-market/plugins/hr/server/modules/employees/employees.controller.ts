@@ -11,11 +11,9 @@ import {
   Post,
   Put,
   Query,
-  Req,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common'
-import type { Request } from 'express'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
 import { EmployeesService } from './employees.service'

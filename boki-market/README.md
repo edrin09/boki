@@ -148,7 +148,7 @@ boki-market/
 │   ├── src/                    # main / routes / services / db / lib
 │   └── migrations/             # 001_init / 002_domain / 003_categories
 ├── cli/                        # marketctl 发布 CLI
-├── plugins/                    # 14 个官方插件源码
+├── plugins/                    # 14 个官方插件源码（.ts 入库，编译产物 .js 不入库）
 ├── scripts/                    # build-client / build-server / dev-sync / check-boundary
 ├── deploy/                     # systemd / nginx / backup 裸机模板
 ├── data/                       # 运行时 zip 制品（不入库）

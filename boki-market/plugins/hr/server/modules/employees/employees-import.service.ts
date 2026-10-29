@@ -15,7 +15,7 @@ import {
   round2,
   toNum,
 } from '@core/common/utils/sheet-import.util'
-import type { CommitEmployeesImportDto, ImportEmployeeRowDto } from './dto/employee-import.dto'
+import type { CommitEmployeesImportDto } from './dto/employee-import.dto'
 
 /** 花名册列规则（关键词按优先级排列） */
 const COLUMN_RULES = [

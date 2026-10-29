@@ -3,7 +3,6 @@ import {
   extractDate,
   extractMoney,
   field,
-  findLine,
   norm,
   takeLabelValue,
 } from './parser.utils'

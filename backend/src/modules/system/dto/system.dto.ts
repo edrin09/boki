@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer'
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator'
+import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator'
 
 /** 恢复数据库 DTO */
 export class RestoreBackupDto {

@@ -40,7 +40,6 @@ export function boxesFromProbMap(
   for (let seed = 0; seed < total; seed++) {
     if (visited[seed] || prob[seed] <= opts.thresh) continue
 
-    let top = seed
     let sp = 0
     stack[sp++] = seed
     visited[seed] = 1

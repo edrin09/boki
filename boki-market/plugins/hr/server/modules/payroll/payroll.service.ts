@@ -627,17 +627,6 @@ export class PayrollService {
     return account
   }
 
-  private async resolveBankAccount(bankAccountId: string | null): Promise<BankAccount> {
-    let bank: BankAccount | null = null
-    if (bankAccountId) {
-      bank = await this.bankRepo.findOne({ where: { id: bankAccountId } })
-    } else {
-      bank = await this.bankRepo.findOne({ where: { accountCode: DEFAULT_BANK_CODE, status: 1 } })
-    }
-    if (!bank) throw new BadRequestException('请选择发放账户，或先在「资金账户」中配置银行存款账户')
-    return bank
-  }
-
   /**
    * 解析发放账户对应的会计科目：
    * 1. 指定了资金账户档案 -> 用其关联科目
@@ -660,20 +649,6 @@ export class PayrollService {
       return account
     }
     return this.requireAccount(undefined, DEFAULT_BANK_CODE, '发放账户对应科目')
-  }
-
-  private async resolveAccountOfBank(bank: BankAccount): Promise<Account> {
-    if (!bank.accountCode) {
-      throw new BadRequestException(`资金账户「${bank.name}」未关联会计科目`)
-    }
-    const account = await this.accountRepo.findOne({ where: { code: bank.accountCode } })
-    if (!account) {
-      throw new BadRequestException(`资金账户「${bank.name}」关联的科目 ${bank.accountCode} 不存在`)
-    }
-    if (!account.isLeaf) {
-      throw new BadRequestException(`资金账户关联科目「${account.fullName}」不是明细科目`)
-    }
-    return account
   }
 
   private async loadDeptNames(): Promise<Map<string, string>> {

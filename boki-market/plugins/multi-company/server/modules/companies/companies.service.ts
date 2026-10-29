@@ -23,7 +23,6 @@ import {
 } from '@core/common/company/company.constants'
 import { ACCOUNT_SEED, CATEGORY_LABELS, inferCategory } from '@core/db/seeds/account.seed'
 import type {
-  AddCompanyMemberDto,
   CreateCompanyDto,
   SetCompanyMemberDto,
   UpdateCompanyDto,

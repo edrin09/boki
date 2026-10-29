@@ -178,7 +178,7 @@ export class ReceiptsService {
     }
 
     // 2. 解析（PDF 优先文本层，否则渲染后 OCR；图片直接 OCR）
-    const { result, rawText, pageCount, source } = await this.parser.parse(file.buffer, file.mimetype)
+    const { result, rawText, pageCount } = await this.parser.parse(file.buffer, file.mimetype)
 
     // 3. 发票代码+号码组合去重
     const dupInvoice = await this.findDuplicateInvoice(result)

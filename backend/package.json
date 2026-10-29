@@ -15,19 +15,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "db:reset": "ts-node -r tsconfig-paths/register scripts/reset-db.ts",
     "db:fix-filenames": "node scripts/fix-filename-mojibake.cjs",
-    "test:smoke": "node test/smoke.mjs",
-    "test:smoke2": "node test/smoke2.mjs",
-    "test:smoke3": "node test/smoke3.mjs",
-    "test:companies": "node test/multi-company.mjs",
-    "test:ocr": "node test/ocr-verify.mjs",
-    "test:receipts": "node test/receipts-verify.mjs http://127.0.0.1:3000/api",
-    "test:parsers": "node test/parsers-verify.mjs",
-    "test:extract": "node test/extract-verify.mjs",
-    "test:reports": "node test/reports-verify.mjs http://127.0.0.1:3000/api",
-    "test:plugins": "node test/plugins.mjs",
     "models:fetch": "node scripts/fetch-ocr-models.mjs",
-    "models:fetch-asr": "node scripts/fetch-asr-streaming-model.mjs",
-    "test:voice-stream": "node test/voice-stream-smoke.mjs"
+    "models:fetch-asr": "node scripts/fetch-asr-streaming-model.mjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.10",
@@ -49,7 +38,6 @@
     "onnxruntime-node": "^1.30.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
-    "passport-local": "^1.0.0",
     "pdfjs-dist": "^6.4.299",
     "pdfkit": "^0.20.2",
     "reflect-metadata": "^0.2.2",
@@ -69,30 +57,10 @@
     "@types/multer": "^2.3.0",
     "@types/node": "^22.10.2",
     "@types/passport-jwt": "^4.0.1",
-    "@types/passport-local": "^1.0.38",
     "@types/pdfkit": "^0.17.6",
     "prettier": "^3.4.2",
-    "source-map-support": "^0.5.21",
-    "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.2"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
   }
 }

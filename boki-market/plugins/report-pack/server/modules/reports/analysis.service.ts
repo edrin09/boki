@@ -16,7 +16,6 @@ import {
   currentPeriod,
   periodEndDate,
   periodStartDate,
-  periodToRange,
   periodToYear,
 } from '@core/common/utils/date.util'
 import { BooksService } from '@core/modules/books/books.service'
@@ -74,7 +73,6 @@ export class AnalysisService {
     if (startPeriod > endPeriod) {
       return this.throwPeriodError()
     }
-    const { startDate, endDate } = periodToRange(startPeriod)
     const endOfEnd = periodEndDate(endPeriod)
     const startOfStart = periodStartDate(startPeriod)
 
@@ -517,7 +515,6 @@ export class AnalysisService {
 
   async overview(query: ReportQueryDto): Promise<any> {
     const endPeriod = query.endPeriod ?? currentPeriod()
-    const startPeriod = query.startPeriod ?? endPeriod
     const fiscalYear = query.fiscalYear ?? periodToYear(endPeriod)
 
     const { balances, accounts } = await this.booksService.getClosingBalancesByCategory(endPeriod, fiscalYear, false)

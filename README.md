@@ -253,15 +253,20 @@ BOKI 的「插件仓库」是一套**版本化、支持在线获取更新**的�
 
 **接入在线插件仓库**
 
-插件目录来源由环境变量 `BOKI_MARKETPLACE_DIR` 指定（默认随安装包内置）。把它指向一份**与官方插件仓库保持同步**的目录，即可让「插件市场」展示最新目录、并对已装插件提示更新：
+插件只有一个来源：远程插件市场（boki-market 服务端）。客户端**不随包任何插件**，新装机器插件目录是空的，需要什么就自己装——这样「市场地址没配 / 市场挂了」会当场暴露，而不是被随包目录掩盖。
+
+| 环境变量 | 说明 |
+|:--|:--|
+| `PLUGIN_MARKET_URL` | 市场地址，例如 `http://your-market:8789`。**必填**，缺失时插件市场接口直接报错 |
+| `PLUGIN_MARKET_PUBLIC_KEYS` | 索引验签公钥，格式 `keyId:<base64>`，多个用逗号分隔。**必填**，缺失时拒绝加载未验签索引 |
 
 ```bash
-# 指向同步后的官方插件仓库副本
-export BOKI_MARKETPLACE_DIR=/path/to/boki-market/plugins
-# 重启后端 → 插件市场刷新目录 → 有更新的插件出现「更新」按钮
+export PLUGIN_MARKET_URL=http://your-market:8789
+export PLUGIN_MARKET_PUBLIC_KEYS=key-1:<32字节 raw Ed25519 公钥 base64>
+# 重启后端 → 插件市场拉取索引（Ed25519 验签）→ 安装的插件落在 data/plugins
 ```
 
-> 桌面安装包（`BOKI-Setup-<版本>.exe`，见 [📥 下载](#-下载)）已内置官方插件仓库，开箱即用；升级插件时拉取最新插件仓库并点击「更新」即可，无需重装整个应用。
+> 桌面安装包（`BOKI-Setup-<版本>.exe`，见 [📥 下载](#-下载)）在打包时把根目录 `.env` 里的市场地址与公钥写进安装包，装完打开「插件市场」即可安装；包里不带任何插件。市场不可达时页面直接显示后端返回的错误原因，不做任何本地降级。
 
 ---
 
@@ -302,28 +307,6 @@ export BOKI_MARKETPLACE_DIR=/path/to/boki-market/plugins
 
 ---
 
-## 🧪 测试
-
-自研端到端验证脚本（250+ 项断言），全部通过：
-
-```bash
-cd backend
-npm run test:smoke       # 认证 / 凭证 / 账簿 / RBAC（需全新数据库）
-npm run test:smoke2      # 期初 / 报表 / 资金往来 / 系统（需全新数据库）
-npm run test:smoke3      # 员工 / 报销 / 工资表 / 红冲（需全新数据库）
-npm run test:companies   # 多公司隔离：切换 / 隔离 / 越权 / 授权
-npm run test:plugins     # 插件生命周期 109 项断言：安装 / 停用 / 卸载 / 依赖保护
-npm run test:ocr         # 离线 OCR 识别（需模型已下载）
-npm run test:parsers     # 票据解析（PDF 文本层 / OCR 双路径）
-npm run test:receipts    # 票据上传 / 去重 / 字段抽取
-npm run test:extract     # 证件一键录入端到端
-npm run test:reports     # 报表接口（台账 / 现金流 / 费用分析 / 月结 / 看板）
-```
-
-> `smoke / smoke2 / smoke3` 依赖凭证号从 0001 起算，必须各自在全新数据库上执行（之间跑 `npm run db:reset -- --yes` 并重启后端）。回归测试可用 `DB_CIPHER=plain` 跳过库加密（仅限测试环境）。
-
----
-
 ## 🛠 技术栈
 
 | 层 | 技术 |
@@ -335,7 +318,6 @@ npm run test:reports     # 报表接口（台账 / 现金流 / 费用分析 / �
 | 离线识别 | onnxruntime-node + PP-OCRv4（det/cls/rec）、pdfjs-dist（PDF 文本层）、sharp / @napi-rs/canvas（图像处理） |
 | 桌面壳 | Electron + electron-builder（NSIS 安装包） |
 | 插件系统 | manifest 驱动的运行时（后端动态 AppModule + 前端路由/菜单/插槽），`.finplugin` 分发格式 |
-| 测试 | 自研端到端验证脚本（冒烟 + OCR + 解析 + 上传 + 建档 + 报表 + 多公司隔离 + 插件生命周期） |
 
 ---
 
