@@ -1,4 +1,3 @@
-const fs = require('node:fs')
 const path = require('node:path')
 const { app, BrowserWindow, Menu, Tray, dialog, shell, clipboard, nativeImage, powerSaveBlocker } =
   require('electron')
@@ -77,55 +76,9 @@ async function handleCrash(reason, err) {
   }
 }
 
-/**
- * 写一行到 server.log。
- *
- * packaged 模式下 console 输出无处可看（无附着终端），而插件铺载失败恰恰是
- * 「装完才崩」类问题，必须落盘才能远程排查。
- */
-function logToFile(line) {
-  try {
-    fs.appendFileSync(paths.logFile, `[${new Date().toISOString()}] ${line}\n`)
-  } catch {
-    // 日志失败不能影响主流程
-  }
-}
-
-/**
- * 首次启动的插件 provision。
- *
- * 官方插件种子随包放在 resources/server/data/plugins（只读），而 server.js 把
- * BOKI_PLUGINS_DIR 指向 ProgramData 下可写目录。新装机器上该目录为空，后端会
- * 零插件启动——多公司/OCR/票据等接口全部 404（端到端验证 0/24 的根因）。
- * 这里在拉起后端前把种子铺过去：经 .seeding 临时目录整体 rename，避免复制
- * 中途失败留下半套插件；state.json 已存在则直接跳过，用户此后的安装/停用
- * 决策（升级不覆盖）保持不变。
- */
-function ensurePluginsSeed() {
-  if (!app.isPackaged) return
-  const target = path.join(paths.root, 'plugins')
-  const seed = path.join(process.resourcesPath, 'server', 'data', 'plugins')
-  if (!fs.existsSync(path.join(seed, 'state.json'))) {
-    const msg = `[plugins] 随包插件种子缺失：${seed}，插件功能将不可用`
-    console.warn(msg)
-    logToFile(msg)
-    return
-  }
-  if (fs.existsSync(path.join(target, 'state.json'))) return
-  const staging = `${target}.seeding`
-  try {
-    fs.rmSync(staging, { recursive: true, force: true })
-    fs.cpSync(seed, staging, { recursive: true })
-    fs.renameSync(staging, target)
-    const msg = `[plugins] 已初始化插件目录：${target}`
-    console.log(msg)
-    logToFile(msg)
-  } catch (err) {
-    const msg = `[plugins] 插件种子铺载失败：${err.message}`
-    console.error(msg)
-    logToFile(msg)
-  }
-}
+// 插件不随包：新装客户端插件目录为空，插件一律由用户在「插件市场」里自行安装。
+// 旧的 ensurePluginsSeed()（把 resources/server/data/plugins 种子铺到 ProgramData）
+// 已连同随包插件一起删除——种子只会掩盖「市场地址没预置」这类配置问题。
 
 /** 「关于」对话框：开发者与联系方式（值来自根 .env，构建时生成 contact.js） */
 function showAbout() {
@@ -268,9 +221,6 @@ async function bootstrap() {
 
   server = new ServerProcess(app.isPackaged)
   server.onCrash = handleCrash
-
-  // 先铺插件种子，再拉后端：后端启动时一次性加载已启用插件
-  ensurePluginsSeed()
 
   createWindow()
   createTray()

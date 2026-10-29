@@ -8,29 +8,26 @@ import { InjectDataSource } from '@nestjs/typeorm'
 import { DataSource, getMetadataArgsStorage } from 'typeorm'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { pluginsRootDir } from './plugin.paths'
 import {
-  marketplaceDir,
-  pluginsRootDir,
-  readJson,
-} from './plugin.paths'
-import {
-  markSyncRequired,
   readState,
   removeEntry,
   setEntry,
 } from './plugin.state'
-import {
-  listCatalogManifests,
-  readInstalledManifest,
-} from './plugin.loader'
+import { readInstalledManifest } from './plugin.loader'
 import type {
-  CatalogPluginInfo,
   InstalledPluginInfo,
   PluginManifest,
 } from './plugin.types'
 
 const PLUGIN_ID_RE = /^[a-z0-9][a-z0-9-]*$/
 
+/**
+ * 已安装插件的运行时管理（启停 / 卸载 / 清单）。
+ *
+ * 安装只走远程插件市场（RemoteMarketService）——内核与客户端都不再携带
+ * 任何本地插件目录，所以这里没有「市场目录」概念，也没有从本地目录复制安装的路径。
+ */
 @Injectable()
 export class PluginsService {
   private readonly logger = new Logger(PluginsService.name)
@@ -39,38 +36,19 @@ export class PluginsService {
 
   // ==================== 查询 ====================
 
-  catalog(): CatalogPluginInfo[] {
-    const state = readState()
-    const manifests = listCatalogManifests()
-    return manifests.map((manifest) => {
-      const entry = state.plugins[manifest.id]
-      const installedManifest = entry ? readInstalledManifest(manifest.id) : null
-      return {
-        manifest,
-        installed: !!entry,
-        enabled: !!entry?.enabled,
-        installedVersion: installedManifest?.version,
-        hasUpdate: !!entry && !!installedManifest && installedManifest.version !== manifest.version,
-      }
-    })
-  }
-
   installed(): InstalledPluginInfo[] {
     const state = readState()
     const result: InstalledPluginInfo[] = []
     for (const [id, entry] of Object.entries(state.plugins)) {
       const manifest = readInstalledManifest(id)
       if (!manifest) continue
-      const catalog = readJson<PluginManifest>(
-        path.join(marketplaceDir(), 'plugins', id, 'manifest.json'),
-      )
       result.push({
         manifest,
         enabled: entry.enabled,
         installedAt: entry.installedAt,
         dir: path.join(pluginsRootDir(), id),
-        catalogVersion: catalog?.version,
-        hasUpdate: !!catalog && catalog.version !== manifest.version,
+        /** 是否有更新由前端拿远程市场索引比对（catalogVersion 已随本地目录一并移除） */
+        hasUpdate: false,
         missingDependencies: Object.keys(manifest.dependencies ?? {}).filter(
           (dep) => !state.plugins[dep]?.enabled,
         ),
@@ -120,66 +98,13 @@ export class PluginsService {
 
   detail(id: string): { manifest: PluginManifest; installed: boolean; enabled: boolean } {
     this.assertId(id)
-    const manifest =
-      readInstalledManifest(id) ??
-      readJson<PluginManifest>(path.join(marketplaceDir(), 'plugins', id, 'manifest.json'))
-    if (!manifest) throw new NotFoundException(`插件 ${id} 不存在`)
+    const manifest = readInstalledManifest(id)
+    if (!manifest) throw new NotFoundException(`插件 ${id} 未安装`)
     const entry = readState().plugins[id]
     return { manifest, installed: !!entry, enabled: !!entry?.enabled }
   }
 
-  // ==================== 安装 / 启停 / 卸载 ====================
-
-  install(id: string): { id: string; installed: string[]; restartRequired: true } {
-    this.assertId(id)
-    const installed: string[] = []
-    this.installRecursive(id, installed, new Set())
-    markSyncRequired()
-    return { id, installed, restartRequired: true }
-  }
-
-  private installRecursive(id: string, installed: string[], visiting: Set<string>): void {
-    if (visiting.has(id)) throw new BadRequestException(`插件依赖存在循环：${id}`)
-
-    const sourceDir = path.join(marketplaceDir(), 'plugins', id)
-    const manifest = readJson<PluginManifest>(path.join(sourceDir, 'manifest.json'))
-    if (!manifest) throw new NotFoundException(`市场中没有插件 ${id}`)
-    this.validateManifest(manifest)
-
-    visiting.add(id)
-
-    // 依赖先装（已安装但版本较旧时同步更新）
-    for (const dep of Object.keys(manifest.dependencies ?? {})) {
-      const entry = readState().plugins[dep]
-      if (!entry) {
-        this.installRecursive(dep, installed, visiting)
-        continue
-      }
-      const depManifest = readJson<PluginManifest>(path.join(marketplaceDir(), 'plugins', dep, 'manifest.json'))
-      if (depManifest && depManifest.version !== entry.version) {
-        this.installRecursive(dep, installed, visiting)
-      }
-    }
-
-    const existing = readState().plugins[id]
-    if (existing && existing.version === manifest.version) {
-      if (!existing.enabled) setEntry(id, { ...existing, enabled: true })
-      if (!installed.includes(id)) installed.push(id)
-      visiting.delete(id)
-      return
-    }
-
-    const targetDir = path.join(pluginsRootDir(), id)
-    this.copyPlugin(sourceDir, targetDir)
-    setEntry(id, {
-      enabled: existing?.enabled ?? true,
-      version: manifest.version,
-      installedAt: existing?.installedAt ?? new Date().toISOString(),
-    })
-    if (!installed.includes(id)) installed.push(id)
-    this.logger.log(`${existing ? '已更新' : '已安装'}插件 ${id}@${manifest.version}`)
-    visiting.delete(id)
-  }
+  // ==================== 启停 / 卸载 ====================
 
   /**
    * 启用插件。
@@ -238,47 +163,6 @@ export class PluginsService {
   private assertInstalled(id: string): void {
     this.assertId(id)
     if (!readState().plugins[id]) throw new NotFoundException(`插件 ${id} 未安装`)
-  }
-
-  private validateManifest(manifest: PluginManifest): void {
-    if (!manifest.id || !PLUGIN_ID_RE.test(manifest.id)) {
-      throw new BadRequestException('manifest.id 非法')
-    }
-    if (!manifest.version) throw new BadRequestException('manifest.version 缺失')
-    if (!manifest.apiVersion || !/^\^?1(\.|$)/.test(manifest.apiVersion)) {
-      throw new BadRequestException(`插件 apiVersion 与内核不兼容：${manifest.apiVersion}`)
-    }
-    if (manifest.scopeMode === 'global' && manifest.trust !== 'official') {
-      throw new BadRequestException('scopeMode=global 仅允许 official 插件')
-    }
-  }
-
-  /** 复制插件目录，排除源码与本地开发文件 */
-  private copyPlugin(source: string, target: string): void {
-    if (!fs.existsSync(source)) throw new NotFoundException(`插件源目录不存在：${source}`)
-    if (fs.existsSync(target)) fs.rmSync(target, { recursive: true, force: true })
-    fs.mkdirSync(target, { recursive: true })
-
-    const skipDir = new Set(['node_modules', '.git', '.turbo', 'coverage'])
-    const skipExt = new Set(['.ts', '.map', '.tsbuildinfo', '.vue'])
-
-    const walk = (from: string, to: string) => {
-      for (const dirent of fs.readdirSync(from, { withFileTypes: true })) {
-        if (dirent.name.startsWith('.') && dirent.name !== '.env.example') continue
-        const src = path.join(from, dirent.name)
-        const dest = path.join(to, dirent.name)
-        if (dirent.isDirectory()) {
-          if (skipDir.has(dirent.name)) continue
-          fs.mkdirSync(dest, { recursive: true })
-          walk(src, dest)
-        } else {
-          if (skipExt.has(path.extname(dirent.name))) continue
-          if (dirent.name === 'tsconfig.json') continue
-          fs.copyFileSync(src, dest)
-        }
-      }
-    }
-    walk(source, target)
   }
 
   /** 卸载且删除数据：按实体元数据找到表名并 DROP */

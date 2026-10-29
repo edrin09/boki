@@ -4,7 +4,6 @@ import { Logger } from '@nestjs/common'
 import {
   coreDistDir,
   ensureDir,
-  marketplaceDir,
   pluginsRootDir,
   readJson,
 } from './plugin.paths'
@@ -17,36 +16,6 @@ import type {
 } from './plugin.types'
 
 const logger = new Logger('PluginLoader')
-
-/** 列出市场目录中的全部插件（按 index.json 顺序优先） */
-export function listCatalogManifests(): PluginManifest[] {
-  const root = path.join(marketplaceDir(), 'plugins')
-  const result: PluginManifest[] = []
-  if (!fs.existsSync(root)) return result
-
-  const order = readJson<{ plugins?: Array<{ id: string }> }>(path.join(marketplaceDir(), 'index.json'))
-  const orderIds = (order?.plugins ?? []).map((p) => p.id)
-  const dirs = fs
-    .readdirSync(root, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name)
-
-  dirs.sort((a, b) => {
-    const ia = orderIds.indexOf(a)
-    const ib = orderIds.indexOf(b)
-    if (ia === -1 && ib === -1) return a.localeCompare(b)
-    if (ia === -1) return 1
-    if (ib === -1) return -1
-    return ia - ib
-  })
-
-  for (const dir of dirs) {
-    const manifest = readJson<PluginManifest>(path.join(root, dir, 'manifest.json'))
-    if (manifest?.id) result.push(manifest)
-    else logger.warn(`市场插件 ${dir} 缺少有效 manifest.json，已跳过`)
-  }
-  return result
-}
 
 /** 读取已安装目录中的 manifest */
 export function readInstalledManifest(id: string): PluginManifest | null {

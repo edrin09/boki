@@ -525,7 +525,7 @@ export interface InstalledPlugin {
   enabled: boolean
   installedAt: string
   dir: string
-  catalogVersion?: string
+  /** 是否有更新：前端用远程市场目录比对（内核不持有目录版本） */
   hasUpdate?: boolean
   /** 硬依赖中缺失（未安装/未启用）的项；此时插件会从菜单隐藏 */
   missingDependencies?: string[]
@@ -561,10 +561,6 @@ export interface RemoteMarketPlugin extends MarketPlugin {
 }
 
 export interface RemoteMarketCatalog {
-  source: 'remote' | 'cache'
-  verified: boolean
-  degraded?: boolean
-  error?: string
   market?: string
   publishedAt?: string
   version?: number
@@ -579,15 +575,15 @@ export interface RemoteMarketStatus {
   snapshotVersion?: number
   publishedAt?: string
   snapshotStale?: boolean
-  publicKeysConfigured?: boolean
+  publicKeysConfigured: boolean
+  /** 不可用原因（未配置地址 / 健康检查失败），原样展示给管理员 */
+  error?: string
 }
 
 export const pluginApi = {
   installed: () => get<InstalledPlugin[]>('/plugins'),
   manifests: () => get<PluginManifest[]>('/plugins/manifests'),
   detail: (id: string) => get<{ manifest: PluginManifest; installed: boolean; enabled: boolean }>(`/plugins/${id}`),
-  catalog: () => get<MarketPlugin[]>('/market/catalog'),
-  install: (id: string) => post<PluginActionResult>(`/market/plugins/${id}/install`),
   remoteStatus: () => get<RemoteMarketStatus>('/market/remote/status'),
   remoteCatalog: () => get<RemoteMarketCatalog>('/market/remote/catalog'),
   remoteInstall: (id: string, licenseKey?: string) =>

@@ -26,6 +26,7 @@ const GROUP_TITLES: Record<string, string> = {
   reports: '财务报表',
   settings: '基础资料',
   system: '系统管理',
+  // 兼容旧版 ai 插件（<=1.0.1，菜单独立分组）；1.0.2 起挂入系统管理
   ai: 'AI模型设置',
 }
 
@@ -109,22 +110,10 @@ export const MENUS: MenuNode[] = [
     group: 'system',
     permission: 'system',
     children: [
+      { title: '插件市场', path: '/system/plugins', permission: 'system:plugin' },
       { title: '操作日志', path: '/system/logs', permission: 'system:log' },
       { title: '数据备份', path: '/system/backup', permission: 'system:backup' },
     ],
-  },
-  {
-    // 单页入口由 ai 插件贡献（AI模型设置不是内核页面），独立于系统管理展示
-    title: 'AI模型设置',
-    icon: 'Cpu',
-    group: 'ai',
-    single: true,
-  },
-  {
-    title: '插件市场',
-    icon: 'Shop',
-    path: '/system/plugins',
-    permission: 'system:plugin',
   },
 ]
 

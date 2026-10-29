@@ -6,9 +6,11 @@ import * as path from 'node:path'
  *
  * 约定：
  * - 工作目录默认是 backend/（npm scripts 均在此执行）
- * - 本地插件源目录：<repo>/boki-market/plugins（P6 已把插件源码迁入 boki-market）
- * - 安装目录：backend/data/plugins
+ * - 安装目录：pluginsRootDir()（桌面端指向 ProgramData 下可写目录）
  * - 内核编译产物：backend/dist（插件通过 @core 引用）
+ *
+ * 只有「已安装插件目录」一个路径。插件包一律由远程插件市场下载安装，
+ * 客户端不带任何随包插件或本地插件目录，因此这里也不再有任何目录回退。
  */
 export function resolveBackendRoot(): string {
   const fromEnv = process.env.BOKI_BACKEND_ROOT
@@ -24,23 +26,10 @@ export function resolveBackendRoot(): string {
   return cwd
 }
 
-export function marketplaceDir(): string {
-  const raw = process.env.BOKI_MARKETPLACE_DIR
-  if (raw) return path.resolve(raw)
-  return path.resolve(resolveBackendRoot(), '../boki-market')
-}
-
 export function pluginsRootDir(): string {
   const raw = process.env.BOKI_PLUGINS_DIR
   if (raw) return path.resolve(raw)
   return path.resolve(resolveBackendRoot(), 'data/plugins')
-}
-
-/** 远程插件市场缓存目录（断源降级用：最近一次成功拉取的索引原文） */
-export function marketCacheDir(): string {
-  const raw = process.env.BOKI_MARKET_CACHE_DIR
-  if (raw) return path.resolve(raw)
-  return path.resolve(resolveBackendRoot(), 'data/market-cache')
 }
 
 export function coreDistDir(): string {

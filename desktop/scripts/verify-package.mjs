@@ -2,11 +2,12 @@
  * 打包产物端到端验证
  *
  * 直接以打包后的 node.exe + dist 启动后端（与 Electron 壳的拉起方式一致），
- * 在临时数据目录上复刻全新安装（含随包插件种子铺载），跑通
- * 「静态托管 → 登录 → OCR 就绪 → 票据上传识别」链路。
+ * 在临时数据目录上复刻**全新安装**：插件目录为空 → 从远程插件市场安装 →
+ * 重启后端 → 跑通「静态托管 → 登录 → 建账 → OCR 就绪 → 票据上传识别」。
  *
  * 这一步能拦住「装完才崩」的问题：原生模块缺失、模型未打进包、
- * 前端产物漏拷、JWT/环境变量注入不对。
+ * 前端产物漏拷、JWT/市场地址注入不对。也顺带验证「客户端零插件 +
+ * 全靠远程市场」这条新链路是通的。
  *
  * 用法：node scripts/verify-package.mjs
  */
@@ -15,14 +16,14 @@ import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
+const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const desktopDir = path.resolve(__dirname, '..')
 const repoRoot = path.resolve(desktopDir, '..')
 
-// 默认验证 desktop/release；build-package.mjs 在 release/ 被占用时会降级到
-// release-<时间戳>/，用 RELEASE_DIR 显式指向本次产物，避免验证错验旧包。
 const releaseDir = process.env.RELEASE_DIR
   ? path.resolve(desktopDir, process.env.RELEASE_DIR)
   : path.join(desktopDir, 'release')
@@ -30,6 +31,9 @@ const resources = path.join(releaseDir, 'win-unpacked', 'resources')
 const serverDir = path.join(resources, 'server')
 const PORT = Number(process.env.VERIFY_PORT || 19300)
 const BASE = `http://127.0.0.1:${PORT}/api`
+
+/** 出厂必装插件：多公司（建账入口）+ 票据（自动带出 ocr / hr 依赖） */
+const MARKET_INSTALL = ['multi-company', 'receipts']
 
 let passed = 0
 let failed = 0
@@ -104,7 +108,7 @@ const unwrap = (b) => (b && typeof b === 'object' && 'data' in b ? b.data : b)
 /**
  * 首次启动的空库还没有记账公司，业务接口会因缺少公司上下文而拒绝。
  * 这里按前端「创建记账公司」引导补齐：无公司则新建一家并切换令牌；
- * 已有公司则直接切换。保证脚本在空库与存量库上都能跑通、且可重复运行。
+ * 已有公司则直接切换。
  */
 async function ensureCompanyContext(token) {
   const mine = unwrap((await request('/companies', { token })).json)
@@ -129,26 +133,27 @@ async function ensureCompanyContext(token) {
 
 async function main() {
   if (!fs.existsSync(path.join(serverDir, 'node.exe'))) {
-    console.error(`未找到打包产物：${serverDir}\n请先执行 npm run pack（产物被占用时会降级到 release-<时间戳>/，用 RELEASE_DIR 指定）`)
+    console.error(`未找到打包产物：${serverDir}\n请先执行 npm run pack（用 RELEASE_DIR 指定其它产物目录）`)
     process.exit(1)
   }
+
+  // 出厂包必须是零插件：带着种子目录就等于把「自己的包」当市场，配置问题永远暴露不出来
+  const leaked = [
+    path.join(serverDir, 'data', 'plugins'),
+    path.join(serverDir, 'marketplace'),
+  ].filter((dir) => fs.existsSync(dir))
+  check('打包产物不含随包插件/本地市场目录', leaked.length === 0, leaked.join(', '))
+
+  const marketConfig = require(path.join(desktopDir, 'src', 'marketplace.js'))
+  check('出厂已预置远程插件市场地址', Boolean(marketConfig.url), marketConfig.url || '未配置')
+  check('出厂已预置插件市场验签公钥', Boolean(marketConfig.publicKeys))
 
   const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'financial-verify-'))
+  // 全新安装 = 插件目录为空（不铺任何种子）
+  const pluginsDir = path.join(dataRoot, 'plugins')
+  fs.mkdirSync(pluginsDir, { recursive: true })
   console.log(`临时数据目录: ${dataRoot}`)
   console.log(`验证端口: ${PORT}\n`)
-
-  // 模拟全新安装：Electron 壳首次启动会把随包插件种子
-  // （resources/server/data/plugins）铺到 ProgramData 下的 BOKI_PLUGINS_DIR。
-  // 这里在临时数据目录复刻同一布局，确保验证走的是真实 provision 路径，
-  // 而不是绕过插件直接起后端（那正是历史上 0/24 失败的盲区）。
-  const pluginsDir = path.join(dataRoot, 'plugins')
-  const pluginsSeed = path.join(serverDir, 'data', 'plugins')
-  if (!fs.existsSync(path.join(pluginsSeed, 'state.json'))) {
-    console.error(`未找到随包插件种子：${pluginsSeed}\n打包产物不完整，请重新执行 npm run pack`)
-    process.exit(1)
-  }
-  fs.cpSync(pluginsSeed, pluginsDir, { recursive: true })
-  console.log(`插件种子已铺载: ${pluginsDir}\n`)
 
   const env = {
     ...process.env,
@@ -163,80 +168,119 @@ async function main() {
     JWT_SECRET: 'verify-only-secret-not-for-production',
     JWT_EXPIRES_IN: '8h',
     CORS_ORIGIN: '*',
-    // 与 desktop/src/server.js buildEnv 保持一致：可写插件目录 + 依赖解析链
+    // 与 desktop/src/server.js buildEnv 保持一致：可写插件目录 + 依赖解析链 + 远程市场
     BOKI_PLUGINS_DIR: pluginsDir,
     NODE_PATH: path.join(serverDir, 'node_modules'),
+    PLUGIN_MARKET_URL: marketConfig.url,
+    PLUGIN_MARKET_PUBLIC_KEYS: marketConfig.publicKeys,
   }
 
-  console.log('[1/5] 启动打包后的后端（node.exe + dist/main.js）')
-  const child = spawn(path.join(serverDir, 'node.exe'), [path.join(serverDir, 'dist', 'main.js')], {
-    cwd: serverDir,
-    env,
-    windowsHide: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-  const logs = []
-  child.stdout.on('data', (d) => logs.push(d.toString()))
-  child.stderr.on('data', (d) => logs.push(d.toString()))
+  let child = null
+  let logs = []
 
   const stop = () =>
     new Promise((resolve) => {
-      if (child.exitCode !== null || child.signalCode !== null) return resolve()
+      if (!child || child.exitCode !== null || child.signalCode !== null) return resolve()
+      const target = child
       const timer = setTimeout(() => {
         try {
-          child.kill('SIGKILL')
+          target.kill('SIGKILL')
         } catch {
           // 已退出
         }
         resolve()
       }, 5000)
-      child.once('exit', () => {
+      target.once('exit', () => {
         clearTimeout(timer)
         resolve()
       })
       try {
-        child.kill()
+        target.kill()
       } catch {
         clearTimeout(timer)
         resolve()
       }
     })
 
-  try {
+  async function start(label) {
+    logs = []
+    child = spawn(path.join(serverDir, 'node.exe'), [path.join(serverDir, 'dist', 'main.js')], {
+      cwd: serverDir,
+      env,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    child.stdout.on('data', (d) => logs.push(d.toString()))
+    child.stderr.on('data', (d) => logs.push(d.toString()))
     const ready = await waitReady(120000)
-    check('后端启动并就绪', ready, ready ? `端口 ${PORT}` : '120 秒内未就绪')
+    check(`后端启动并就绪（${label}）`, ready, ready ? `端口 ${PORT}` : '120 秒内未就绪')
     if (!ready) {
       console.log('\n--- 后端日志 ---\n' + logs.join('').slice(-4000))
       await stop()
       process.exit(1)
     }
+  }
 
-    console.log('\n[2/5] 静态托管与 SPA')
+  try {
+    console.log('[1/6] 启动打包后的后端（node.exe + dist/main.js，零插件）')
+    await start('首次启动')
+
+    console.log('\n[2/6] 静态托管与 SPA')
     const root = await requestRoot()
     check('根路径返回前端页面', root.status === 200 && root.text.includes('<div id="app">'), `status=${root.status}`)
 
-    console.log('\n[3/5] 认证与种子数据')
+    console.log('\n[3/6] 认证与种子数据（零插件）')
     const login = await request('/auth/login', { method: 'POST', body: { username: 'admin', password: '123456' } })
     const loginToken = login.status === 200 || login.status === 201 ? unwrap(login.json)?.accessToken : null
     check('管理员可登录（种子数据已初始化）', Boolean(loginToken), `status=${login.status}`)
 
-    // 空库首启没有记账公司：按前端引导建一家并切换到公司上下文，业务接口才能用
-    const ctx = loginToken ? await ensureCompanyContext(loginToken) : { token: null, companyId: null }
+    const plugins0 = loginToken ? await request('/plugins', { token: loginToken }) : { status: 0, json: null }
+    check('新客户端插件为空', plugins0.status === 200 && (unwrap(plugins0.json) ?? []).length === 0,
+      `已安装 ${(unwrap(plugins0.json) ?? []).length} 个`)
+
+    console.log('\n[4/6] 远程插件市场（唯一插件来源）')
+    const status = loginToken ? await request('/market/remote/status', { token: loginToken }) : { status: 0, json: null }
+    const statusData = unwrap(status.json)
+    check('市场地址已注入后端', status.status === 200 && statusData?.enabled === true, statusData?.url || statusData?.error || '-')
+    check('验签公钥已注入后端', statusData?.publicKeysConfigured === true)
+
+    const catalogRes = loginToken ? await request('/market/remote/catalog', { token: loginToken }) : { status: 0, json: null }
+    const catalog = unwrap(catalogRes.json)
+    check('插件目录可拉取且验签通过', catalogRes.status === 200 && Array.isArray(catalog?.plugins) && catalog.plugins.length > 0,
+      `${catalog?.plugins?.length ?? 0} 个插件`)
+
+    console.log('\n[5/6] 从市场安装插件并重启生效')
+    for (const id of MARKET_INSTALL) {
+      const res = loginToken
+        ? await request(`/market/remote/plugins/${id}/install`, { method: 'POST', token: loginToken, body: {} })
+        : { status: 0, json: null }
+      const installed = unwrap(res.json)?.installed ?? []
+      check(`安装 ${id}（含硬依赖）`, res.status === 200 && installed.includes(id), installed.join(', ') || `status=${res.status}`)
+    }
+
+    await stop()
+    await start('安装插件后')
+    const relogin = await request('/auth/login', { method: 'POST', body: { username: 'admin', password: '123456' } })
+    const token0 = relogin.status === 200 ? unwrap(relogin.json)?.accessToken : null
+    const installedNow = token0 ? unwrap((await request('/plugins', { token: token0 })).json) ?? [] : []
+    check('重启后插件已加载', new Set(installedNow.map((p) => p.manifest.id)).size >= MARKET_INSTALL.length,
+      installedNow.map((p) => p.manifest.id).join(', '))
+
+    const ctx = token0 ? await ensureCompanyContext(token0) : { token: null, companyId: null }
     const token = ctx.token
-    check('记账公司上下文就绪（首启自动建账）', Boolean(ctx.companyId), ctx.companyId ? `companyId=${ctx.companyId}` : '未取到公司')
+    check('记账公司上下文就绪（建账入口可用）', Boolean(ctx.companyId), ctx.companyId ? `companyId=${ctx.companyId}` : '未取到公司')
 
     const accounts = token ? await request('/accounts/tree', { token }) : { status: 0 }
     const accountTree = unwrap(accounts.json)
     check('会计科目种子已就绪', accounts.status === 200 && Array.isArray(accountTree) && accountTree.length > 0,
       `一级科目 ${Array.isArray(accountTree) ? accountTree.length : '-'} 个`)
 
-    console.log('\n[4/5] 离线 OCR 引擎（验证 onnxruntime 与模型裁剪后仍可用）')
+    console.log('\n[6/6] 离线 OCR 与票据识别（验证 onnxruntime 与模型裁剪后仍可用）')
     const ocr = token ? await request('/ocr/status', { token }) : { status: 0 }
     const ocrData = unwrap(ocr.json)
     check('OCR 状态就绪', ocr.status === 200 && ocrData?.ready === true,
       `ready=${ocrData?.ready} missing=${JSON.stringify(ocrData?.missing ?? [])}`)
 
-    console.log('\n[5/5] 票据上传 → 识别 → 解析（真实推理链路）')
     const receiptsTest = path.join(repoRoot, 'backend', 'test', 'receipts-verify.mjs')
     if (fs.existsSync(receiptsTest)) {
       const result = spawnSync(process.execPath, [receiptsTest, BASE], { encoding: 'utf8' })

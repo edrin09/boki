@@ -42,18 +42,7 @@ export interface RemoteIndex {
   plugins: RemoteIndexPlugin[]
 }
 
-/** 索引缓存元数据（backend/data/market-cache/index.meta.json） */
-export interface RemoteIndexMeta {
-  url: string
-  etag?: string
-  keyId?: string
-  signature?: string
-  /** 见过的最新 publishedAt（防回滚；更旧不采纳） */
-  seenPublishedAt?: string
-  fetchedAt?: string
-}
-
-/** 目录行：与前端 MarketPlugin 同形，manifest 为索引元数据的投影 */
+/** 目录行：与前端 RemoteMarketPlugin 同形，manifest 为索引元数据的投影 */
 export interface RemoteCatalogRow {
   manifest: {
     id: string
@@ -87,10 +76,6 @@ export interface RemoteCatalogRow {
 }
 
 export interface RemoteCatalogResponse {
-  source: 'remote' | 'cache'
-  verified: boolean
-  degraded?: boolean
-  error?: string
   market?: string
   publishedAt?: string
   version?: number

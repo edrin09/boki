@@ -2,7 +2,8 @@
  * 插件打包：源码目录 → zip + sha256 + 发布元数据。
  *
  * 打包规则（接入说明 7）：
- *   - 排除 .ts / .tsx / .map / node_modules（源码与调试产物不上服务器）；
+ *   - 排除 .ts / .tsx / .vue / .scss / .less / .map / node_modules
+ *     （源码、样式源文件与调试产物不上服务器；客户端只加载构建好的 index.js / style.css）；
  *   - 排除 .git / dist / 隐藏文件、.env、私钥、备份与日志；
  *   - 条目按路径排序，输出稳定；
  *   - manifest.json 必须在根目录，id 必须与目录名一致。
@@ -18,7 +19,22 @@ const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
 
 const EXCLUDED_DIRS = new Set(['node_modules', '.git', '.svn', '.hg', 'dist', '__pycache__', '.idea', '.vscode', 'coverage'])
 const EXCLUDED_FILE_NAMES = new Set(['.DS_Store', 'Thumbs.db', '.env'])
-const EXCLUDED_SUFFIXES = ['.ts', '.tsx', '.map', '.zip', '.bak', '.log', '.private', '.pem', '.tmp', '.swp']
+const EXCLUDED_SUFFIXES = [
+  '.ts',
+  '.tsx',
+  '.vue',
+  '.scss',
+  '.sass',
+  '.less',
+  '.map',
+  '.zip',
+  '.bak',
+  '.log',
+  '.private',
+  '.pem',
+  '.tmp',
+  '.swp',
+]
 
 export function sha256Hex(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex')

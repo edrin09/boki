@@ -1,14 +1,15 @@
 /**
  * 远程插件市场接口（对接 boki-market 独立服务端）。
  *
- * 查询类接口与本地 catalog 保持一致的全局 JWT 保护；
- * 安装动作需要 system:plugin 权限，与本地安装一致。
- * PLUGIN_MARKET_URL 未配置时整个 Controller 报 503，前端按「本地目录」模式降级。
+ * 查询类接口与本地已装插件保持一致，走全局 JWT 保护；
+ * 安装动作需要 system:plugin 权限。
+ *
+ * 这是唯一的插件市场接口：未配置 PLUGIN_MARKET_URL / 公钥、市场不可达、
+ * 验签失败都由服务层抛错（503/400），前端原样展示，不再回退任何本地目录。
  */
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -28,12 +29,6 @@ interface InstallRemoteBody {
 export class RemoteMarketController {
   constructor(private readonly remote: RemoteMarketService) {}
 
-  private assertEnabled(): void {
-    if (!this.remote.isEnabled()) {
-      throw new ForbiddenException('未配置 PLUGIN_MARKET_URL，远程插件市场不可用')
-    }
-  }
-
   @Get('status')
   @Operation('查询远程插件市场状态')
   status() {
@@ -43,7 +38,6 @@ export class RemoteMarketController {
   @Get('catalog')
   @Operation('查询远程插件市场目录（验签索引 + 已安装状态合并）')
   async catalog() {
-    this.assertEnabled()
     return this.remote.remoteCatalog()
   }
 
@@ -52,7 +46,6 @@ export class RemoteMarketController {
   @RequirePermissions('system:plugin')
   @Operation('从远程市场安装/更新插件')
   async install(@Param('id') id: string, @Body() body?: InstallRemoteBody) {
-    this.assertEnabled()
     return this.remote.install(id, body?.licenseKey)
   }
 }

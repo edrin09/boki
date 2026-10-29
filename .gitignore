@@ -40,8 +40,10 @@ backend/models/ocr/*.onnx
 backend/models/ocr/*.txt
 backend/models/asr/
 
-# 测试产物
-backend/test/output/
+# 插件编译产物（boki-market: npm run build:server / build:client 生成）
+boki-market/plugins/*/server/**/*.js
+boki-market/plugins/*/client/index.js
+boki-market/plugins/*/client/style.css
 
 # =====================================================================
 # 编辑器 / 系统
@@ -83,6 +85,8 @@ desktop/*
 !desktop/package-lock.json
 !desktop/electron-builder.yml
 !desktop/installer-hooks.nsh
+# 出厂市场配置：由 scripts/build-package.mjs 依据仓库根 .env 生成，不入库
+desktop/src/marketplace.js
 
 # 内部文档
 docs/
@@ -91,6 +95,7 @@ docs/
 !boki-market/docs/
 !boki-market/docs/**
 
-# 远程插件市场索引缓存（运行时自动生成）
-backend/data/market-cache/
+# 本机已安装的插件（运行时由「插件市场」装入，不属于源码）
+# 客户端不随包任何插件：新克隆的仓库插件目录为空，需要什么自己从市场装
+backend/data/plugins/
 /.dsh-acl-recovery

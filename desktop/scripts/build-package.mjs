@@ -235,6 +235,21 @@ const CONTACT = {
   wechat: contactEnv.CONTACT_WECHAT,
 }
 
+// 插件市场地址与验签公钥：出厂安装包必须预置，否则新装客户端看不到插件市场。
+// 客户端不再随包任何插件，全部从远程市场安装，所以这三项属于「必填」而非可选。
+const MARKET_KEYS = ['PLUGIN_MARKET_URL', 'PLUGIN_MARKET_PUBLIC_KEYS']
+const missingMarketKeys = MARKET_KEYS.filter((k) => !contactEnv[k])
+if (missingMarketKeys.length > 0) {
+  fail(
+    `根目录 .env 缺少：${missingMarketKeys.join(', ')}\n` +
+      '  客户端不随包任何插件，出厂安装包必须预置远程插件市场地址与验签公钥，否则插件市场不可用。',
+  )
+}
+const MARKET = {
+  url: contactEnv.PLUGIN_MARKET_URL.trim().replace(/\/+$/, ''),
+  publicKeys: contactEnv.PLUGIN_MARKET_PUBLIC_KEYS.trim(),
+}
+
 // installer-hooks.nsh / electron-builder.yml 的展示行由本脚本以 .env 值重写，
 // 从机制上杜绝两处漂移（旧机制是"校验不一致就报错"，改成"以 .env 为准直接写入"）。
 const hooksPath = path.join(desktopDir, 'installer-hooks.nsh')
@@ -303,6 +318,22 @@ const contactJs = [
   '',
 ].join('\n')
 fs.writeFileSync(path.join(desktopDir, 'src', 'contact.js'), contactJs)
+
+// 远程插件市场配置：同样每次打包从 .env 重新生成，随包带到用户机器上
+const marketplaceJs = [
+  '/**',
+  ' * 远程插件市场配置（由 scripts/build-package.mjs 依据仓库根 .env 自动生成，请勿手改）',
+  ' * 客户端不随包任何插件：出厂即指向远程市场，插件由用户自行安装。',
+  ' * 改配置：编辑仓库根 .env → 重新执行 node scripts/build-package.mjs',
+  ' */',
+  'module.exports = {',
+  `  url: ${JSON.stringify(MARKET.url)},`,
+  `  publicKeys: ${JSON.stringify(MARKET.publicKeys)},`,
+  '}',
+  '',
+].join('\n')
+fs.writeFileSync(path.join(desktopDir, 'src', 'marketplace.js'), marketplaceJs)
+log(`插件市场配置已从根 .env 分发（src/marketplace.js → ${MARKET.url}）`)
 log(`身份与联系方式已从根 .env 分发（installer-hooks.nsh / electron-builder.yml / src/contact.js）`)
 
 // ---------- 0. 前置检查 ----------
@@ -382,30 +413,15 @@ rmrf(path.join(stageServer, 'models'))
 copyDir(modelsDir, path.join(stageServer, 'models', 'ocr'))
 copyDir(asrModelsDir, path.join(stageServer, 'models', 'asr', 'zipformer-zh-streaming-int8'))
 
-// 4.1.5 官方插件种子：backend/data/plugins → stage/server/data/plugins。
-// 多公司、OCR、票据等能力全是插件而非内核，包内不带种子时，全新安装的后端
-// 零插件启动，/companies、/ocr/status、/receipts 等接口全部 404
-// （端到端验证 3/4 失败、0/24 子项通过的根因）。
-// 种子随包落在 resources/server/data/plugins（只读）；首次启动由 Electron 壳
-// 复制到 ProgramData 下可写的 BOKI_PLUGINS_DIR（安装目录标准用户只读）。
-// node_modules 下只有 @core/@plugin 两个 junction，dereference 会把整个
-// backend/dist 复制两遍；后端启动时 ensureRuntimeLinks() 自行重建，故剔除。
-const pluginsSeedSrc = path.join(backendDir, 'data', 'plugins')
-if (!fs.existsSync(path.join(pluginsSeedSrc, 'state.json'))) {
-  fail(`缺少官方插件种子：${pluginsSeedSrc}（backend/data/plugins 为参考安装目录，含 state.json）`)
-}
-const pluginsSeedDst = path.join(stageServer, 'data', 'plugins')
-rmrf(pluginsSeedDst)
-fs.cpSync(pluginsSeedSrc, pluginsSeedDst, {
-  recursive: true,
-  dereference: true,
-  filter: (src) => path.basename(src) !== 'node_modules',
-})
-const seededPluginIds = fs
-  .readdirSync(pluginsSeedDst, { withFileTypes: true })
-  .filter((d) => d.isDirectory())
-  .map((d) => d.name)
-console.log(`  插件种子 ${seededPluginIds.length} 个 → stage/server/data/plugins`)
+// 4.1.5 不随包任何插件与本地市场目录。
+// 新装客户端插件目录为空，插件一律由用户在「插件市场」里从远程市场自行安装；
+// 装好后落在 BOKI_PLUGINS_DIR（桌面端 = ProgramData\BOKI\plugins）。
+// 旧实现曾把 backend/data/plugins 种子和 boki-market/plugins 目录打进包里，
+// 结果是「没配远程地址也能看到自己的包」，问题被掩盖——这里连同兜底一起删除。
+const staleSeed = path.join(stageServer, 'data', 'plugins')
+rmrf(staleSeed)
+const staleMarket = path.join(stageServer, 'marketplace')
+rmrf(staleMarket)
 
 fs.copyFileSync(path.join(backendDir, 'package.json'), path.join(stageServer, 'package.json'))
 fs.copyFileSync(
@@ -548,12 +564,31 @@ log('electron-builder 出安装包')
 // release 被其他程序占用（杀毒扫描 / 索引器 / 资源管理器预览）时降级：
 // 换用备用输出目录继续构建，不让整个打包卡死在清理步骤。
 // 旧 release/ 留给用户重启或关闭占用程序后手动清理。
-let outputDir = releaseDir
-if (!rmrf(releaseDir, true)) {
-  const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')
-  outputDir = path.join(desktopDir, `release-${stamp}`)
-  log(`  ⚠ release/ 被占用，本次产物改到 ${path.basename(outputDir)}/`)
+// 每轮打包先把 release/ 彻底清空（旧安装包、旧 win-unpacked 全部不留，全量重建）。
+// 被杀软/索引器等瞬时锁定时自动重试 3 轮（间隔 2 秒）；仍清不掉就直接失败——
+// 不再降级到 release-<时间戳>/：降级会让验证与交付路径分叉、问题后移
+//（实测 2026-10-29：降级目录搬回 release 时 EPERM，verify 找不到产物）。
+let cleaned = false
+for (let attempt = 1; attempt <= 3; attempt++) {
+  if (rmrf(releaseDir, true)) {
+    cleaned = true
+    break
+  }
+  if (attempt < 3) {
+    log(`  release/ 被占用，2 秒后重试（第 ${attempt}/2 次）...`)
+    await new Promise((r) => setTimeout(r, 2000))
+  }
 }
+if (!cleaned) {
+  const stale = fs.existsSync(releaseDir) ? fs.readdirSync(releaseDir).join(', ') : ''
+  fail(
+    `release/ 清理失败，已停止打包（残留：${stale || '未知'}）。\n` +
+      `  常见原因：杀毒软件正在扫描旧产物，或某程序打开了其中的文件（旧 asar 最典型）。\n` +
+      `  处理：关闭占用程序后重试（资源监视器 → CPU → 关联的句柄，搜 win-unpacked 可定位占用进程）；\n` +
+      `  仍不行则重启电脑后再打包。`,
+  )
+}
+const outputDir = releaseDir
 const ebBin = JSON.parse(fs.readFileSync(electronBuilderPkg, 'utf8')).bin
 const ebCli = path.join(
   desktopDir,
@@ -580,10 +615,6 @@ const requiredInPackage = [
   'server/node_modules/better-sqlite3/build/Release/better_sqlite3.node',
   'server/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime.dll',
   'server/node_modules/sharp/package.json',
-  'server/data/plugins/state.json',
-  'server/data/plugins/ocr/manifest.json',
-  'server/data/plugins/receipts/manifest.json',
-  'server/data/plugins/multi-company/manifest.json',
   'web/index.html',
   'icon.ico',
 ]
@@ -591,26 +622,23 @@ const missing = requiredInPackage.filter((rel) => !fs.existsSync(path.join(unpac
 if (missing.length) {
   fail(`打包产物缺少以下文件，安装后无法运行：\n  ${missing.join('\n  ')}`)
 }
-console.log(`  产物完整（校验 ${requiredInPackage.length} 项）`)
-
-// ---------- 7.5 降级目录回收 ----------
-
-// 曾降级到 release-<时间戳>/ 时，把全部产物（含 win-unpacked，供 verify-package.mjs
-// 校验端到端流程）整体 rename 回 release/ 并清掉降级目录——rename 同卷瞬间完成，
-// 用户面前永远只有一个 release/ 输出目录。
-if (outputDir !== releaseDir) {
-  try {
-    fs.mkdirSync(releaseDir, { recursive: true })
-    for (const entry of fs.readdirSync(outputDir)) {
-      fs.renameSync(path.join(outputDir, entry), path.join(releaseDir, entry))
-    }
-    rmrf(outputDir)
-    outputDir = releaseDir
-    log('已把降级目录产物搬回 release/ 并清理 release-<时间戳>/')
-  } catch (err) {
-    log(`  ⚠ 产物仍在 ${path.basename(outputDir)}/（搬回 release/ 失败：${err.message}）`)
-  }
+// 出厂包必须是零插件：残留种子目录会让新装机器带上「自己的包」，掩盖市场问题
+const bundledPluginDirs = [
+  path.join(unpacked, 'server', 'data', 'plugins'),
+  path.join(unpacked, 'server', 'marketplace'),
+]
+const leaked = bundledPluginDirs.filter((dir) => fs.existsSync(dir))
+if (leaked.length) {
+  fail(
+    `打包产物里仍有随包插件/市场目录（新客户端必须是空插件）：\n  ${leaked.join('\n  ')}`,
+  )
 }
+// 远程市场地址必须已烘进安装包，否则用户打开插件市场只会看到空列表
+const marketplaceModule = path.join(desktopDir, 'src', 'marketplace.js')
+if (!fs.existsSync(marketplaceModule)) {
+  fail(`缺少 ${marketplaceModule}（出厂必须预置远程插件市场地址）`)
+}
+console.log(`  产物完整（校验 ${requiredInPackage.length} 项，零随包插件）`)
 
 // ---------- 8. 汇总 ----------
 

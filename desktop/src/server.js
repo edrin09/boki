@@ -5,6 +5,7 @@ const path = require('node:path')
 const { spawn } = require('node:child_process')
 const { paths } = require('./config')
 const contact = require('./contact')
+const marketplace = require('./marketplace')
 
 /** 日志单文件上限，超出后轮转为 server.log.1 */
 const LOG_MAX_BYTES = 5 * 1024 * 1024
@@ -14,6 +15,7 @@ const LOG_MAX_BYTES = 5 * 1024 * 1024
  *
  * 打包后由 extraResources 落在 resources/server 与 resources/web；
  * 开发期直接指向仓库内的 backend 与 frontend/dist。
+ * 客户端不携带插件与本地市场目录：插件只从远程市场装到用户数据目录。
  */
 function resolveLayout(isPackaged) {
   if (isPackaged) {
@@ -114,6 +116,11 @@ class ServerProcess {
       // 对标准用户只读，mkdir 直接 EPERM 让后端连环崩溃（实测 3 次重启全挂）。
       // 必须显式指到 ProgramData 下可写位置，与数据库同根。
       BOKI_PLUGINS_DIR: path.join(paths.root, 'plugins'),
+      // 远程插件市场：唯一插件来源。地址与验签公钥由 build-package.mjs 从根 .env
+      // 写进 src/marketplace.js 随包出厂——不预置的话新装客户端打开「插件市场」
+      // 只会看到空列表（历史上就是这样暴露不出问题）。缺失时后端接口直接报错。
+      PLUGIN_MARKET_URL: marketplace.url,
+      PLUGIN_MARKET_PUBLIC_KEYS: marketplace.publicKeys,
       // 插件代码含裸依赖（onnxruntime-node / sharp / @nestjs/* / typeorm …）。
       // Node 从插件文件位置逐级向上找 node_modules，而插件在 ProgramData 下，
       // 这条链够不到 resources/server/node_modules（开发期能向上找到
@@ -151,6 +158,11 @@ class ServerProcess {
     const { layout } = this
     this.stopping = false
     this.log(`--- 启动后端: ${layout.nodeExe} ${layout.entry} (port=${port}) ---`)
+    this.log(
+      marketplace.url
+        ? `--- 插件市场: ${marketplace.url}（验签公钥 ${marketplace.publicKeys ? '已配置' : '缺失'}）---`
+        : '--- 插件市场: 未配置 PLUGIN_MARKET_URL，插件市场不可用 ---',
+    )
 
     this.child = spawn(layout.nodeExe, [layout.entry], {
       cwd: layout.serverDir,

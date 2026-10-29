@@ -66,31 +66,6 @@ export class PluginsController {
   }
 }
 
-@Controller('market')
-export class MarketController {
-  constructor(private readonly service: PluginsService) {}
-
-  @Get('catalog')
-  @Operation('查询插件市场')
-  catalog() {
-    return this.service.catalog()
-  }
-
-  @Get('plugins/:id')
-  @Operation('查询市场插件详情')
-  detail(@Param('id') id: string) {
-    return this.service.detail(id)
-  }
-
-  @Post('plugins/:id/install')
-  @HttpCode(HttpStatus.OK)
-  @RequirePermissions('system:plugin')
-  @Operation('安装插件')
-  install(@Param('id') id: string) {
-    return this.service.install(id)
-  }
-}
-
 @Controller('plugin-assets')
 export class PluginAssetsController {
   @Get(':id/*path')

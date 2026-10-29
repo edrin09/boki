@@ -1,40 +1,39 @@
 /**
  * 远程插件市场客户端（对接独立服务端 boki-market）。
  *
- * 职责（接入说明 8：安装时序落地）：
- *   拉索引（ETag + 本地缓存）→ 验签 → 防回滚 → 目录合并安装状态
- *   → 下载 → sha256 校验 → 安全解包 → 依赖优先安装 → 原子落目录 → 写 state
+ * 这是**唯一**的插件来源：客户端不随包任何插件，也不再有「本地插件目录」。
  *
- * 失败降级：市场不可达时用 backend/data/market-cache 里最近一次成功拉取的索引；
- * 缓存也没有才报错。插件读取 / 菜单 / 资源托管仍由 PluginsService 负责，本服务不碰运行时。
+ * 职责（接入说明 8：安装时序落地）：
+ *   拉索引（强制 Ed25519 验签）→ 目录合并安装状态 → 下载 → sha256 校验
+ *   → 安全解包 → 依赖优先安装 → 原子落目录 → 写 state
+ *
+ * 没有任何降级/兜底：地址没配、公钥没配、市场不可达、签名不对、依赖缺失，
+ * 一律抛出明确错误并由接口原样返回前端，让问题当场暴露。
  */
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+  ServiceUnavailableException,
+} from '@nestjs/common'
 import * as crypto from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import {
-  ensureDir,
-  marketCacheDir,
-  pluginsRootDir,
-  readJson,
-  writeJson,
-} from '../plugin.paths'
+import { ensureDir, pluginsRootDir } from '../plugin.paths'
 import { markSyncRequired, readState, setEntry } from '../plugin.state'
 import { readInstalledManifest } from '../plugin.loader'
 import { PluginManifest } from '../plugin.types'
-import { PluginsService } from '../plugins.service'
 import { assertSafeEntryName, readZip } from './zip-buffer'
 import type {
   RemoteCatalogResponse,
   RemoteCatalogRow,
   RemoteIndex,
-  RemoteIndexMeta,
   RemoteIndexPlugin,
 } from './remote-market.types'
 
 const PLUGIN_ID_RE = /^[a-z0-9][a-z0-9-]*$/
-const INDEX_RAW_FILE = 'index.raw.json'
-const INDEX_META_FILE = 'index.meta.json'
 const FETCH_TIMEOUT_MS = 15_000
 
 /** Ed25519 raw 32 字节公钥 → SPKI DER 包装 */
@@ -42,22 +41,39 @@ const SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex')
 
 export interface FetchIndexResult {
   index: RemoteIndex
-  source: 'remote' | 'cache'
-  verified: boolean
-  degraded?: boolean
-  error?: string
 }
 
 @Injectable()
-export class RemoteMarketService {
+export class RemoteMarketService implements OnModuleInit {
   private readonly logger = new Logger(RemoteMarketService.name)
 
-  /** keyId → Node KeyObject（Ed25519 公钥）；模块加载时解析，配置错误直接启动失败 */
+  /** keyId → Node KeyObject（Ed25519 公钥）；配置格式错误直接启动失败 */
   private readonly publicKeys = parsePublicKeys(process.env.PLUGIN_MARKET_PUBLIC_KEYS)
 
   private readonly baseUrl = normalizeBaseUrl(process.env.PLUGIN_MARKET_URL)
 
-  constructor(private readonly localPlugins: PluginsService) {}
+  /**
+   * 启动时把市场配置打到日志里。
+   *
+   * 客户端不随包任何插件，市场地址/公钥是「能不能装插件」的唯一前提；
+   * 缺了就是插件市场空着，此前没有任何日志可看，只能靠翻代码猜。
+   */
+  onModuleInit(): void {
+    const keys = this.publicKeys.size
+    if (!this.baseUrl) {
+      this.logger.error(
+        '未配置 PLUGIN_MARKET_URL：插件市场不可用（客户端不随包插件，没有第二个来源）',
+      )
+      return
+    }
+    if (!keys) {
+      this.logger.error(
+        `插件市场地址 ${this.baseUrl}，但未配置 PLUGIN_MARKET_PUBLIC_KEYS：拒绝加载未验签的索引`,
+      )
+      return
+    }
+    this.logger.log(`插件市场 ${this.baseUrl}（验签公钥 ${keys} 个）`)
+  }
 
   // ==================== 状态 ====================
 
@@ -65,152 +81,94 @@ export class RemoteMarketService {
     return !!this.baseUrl
   }
 
-  async status(): Promise<{
+  status(): Promise<{
     enabled: boolean
     url?: string
     market?: string
     snapshotVersion?: number
     publishedAt?: string
     snapshotStale?: boolean
-    publicKeysConfigured?: boolean
+    publicKeysConfigured: boolean
+    error?: string
   }> {
-    if (!this.isEnabled()) return { enabled: false }
-    const info: Awaited<ReturnType<RemoteMarketService['status']>> = {
-      enabled: true,
-      url: this.baseUrl!,
-      publicKeysConfigured: this.publicKeys.size > 0,
+    const publicKeysConfigured = this.publicKeys.size > 0
+    if (!this.baseUrl) {
+      return Promise.resolve({
+        enabled: false,
+        publicKeysConfigured,
+        error: '未配置 PLUGIN_MARKET_URL：后端没有远程插件市场地址，插件市场不可用',
+      })
     }
-    try {
-      const res = await request(`${this.baseUrl}/v1/health`)
-      const body = (await res.json()) as {
-        ok?: boolean
-        market?: string
-        snapshot?: {
-          active?: boolean
-          version?: number
-          publishedAt?: string | null
-          stale?: boolean
-        }
-      }
-      info.market = body.market
-      info.snapshotVersion = body.snapshot?.version ?? undefined
-      info.publishedAt = body.snapshot?.publishedAt ?? undefined
-      info.snapshotStale = body.snapshot?.stale
-    } catch (error) {
-      // health 失败不代表客户端不可用；目录请求还有本地缓存兜底
-      this.logger.warn(`市场健康检查失败：${asMessage(error)}`)
+    if (!publicKeysConfigured) {
+      return Promise.resolve({
+        enabled: true,
+        url: this.baseUrl,
+        publicKeysConfigured,
+        error: '未配置 PLUGIN_MARKET_PUBLIC_KEYS：拒绝加载未验签的插件市场索引',
+      })
     }
-    return info
+    return this.readHealth(this.baseUrl).then(
+      (info) => ({ enabled: true, url: this.baseUrl!, publicKeysConfigured, ...info }),
+      (error) => ({
+        enabled: true,
+        url: this.baseUrl!,
+        publicKeysConfigured,
+        error: `插件市场健康检查失败：${asMessage(error)}`,
+      }),
+    )
+  }
+
+  private async readHealth(baseUrl: string): Promise<{
+    market?: string
+    snapshotVersion?: number
+    publishedAt?: string
+    snapshotStale?: boolean
+  }> {
+    const res = await request(`${baseUrl}/v1/health`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const body = (await res.json()) as {
+      market?: string
+      snapshot?: { version?: number; publishedAt?: string | null; stale?: boolean }
+    }
+    return {
+      market: body.market,
+      snapshotVersion: body.snapshot?.version ?? undefined,
+      publishedAt: body.snapshot?.publishedAt ?? undefined,
+      snapshotStale: body.snapshot?.stale,
+    }
   }
 
   // ==================== 索引 ====================
 
-  /** 拉取并验签索引；市场不可达时回退本地缓存（degraded） */
+  /** 拉取并验签索引；缺地址 / 缺公钥 / 网络失败 / 验签失败都直接抛错 */
   async fetchIndex(): Promise<FetchIndexResult> {
     if (!this.baseUrl) {
-      throw new BadRequestException('未配置 PLUGIN_MARKET_URL，远程插件市场不可用')
+      throw new ServiceUnavailableException(
+        '未配置 PLUGIN_MARKET_URL：后端没有远程插件市场地址，无法拉取插件目录',
+      )
+    }
+    if (this.publicKeys.size === 0) {
+      throw new ServiceUnavailableException(
+        '未配置 PLUGIN_MARKET_PUBLIC_KEYS：拒绝加载未验签的插件市场索引',
+      )
     }
 
-    const meta = this.readCacheMeta()
-    try {
-      const res = await request(`${this.baseUrl}/v1/index`, {
-        headers: meta?.etag ? { 'if-none-match': meta.etag } : undefined,
-      })
-
-      if (res.status === 304 && meta?.signature) {
-        const cache = this.readCache()
-        if (cache) {
-          const { index, verified } = this.verifyIndex(cache.raw, cache.meta.keyId, cache.meta.signature)
-          return { index, source: 'cache', verified }
-        }
-      }
-
-      if (res.status !== 200) {
-        const cache = this.readCache()
-        if (cache) {
-          const { index, verified } = this.verifyIndex(cache.raw, cache.meta.keyId, cache.meta.signature)
-          return {
-            index,
-            source: 'cache',
-            verified,
-            degraded: true,
-            error: `市场返回 ${res.status}，使用本地缓存`,
-          }
-        }
-        throw new BadRequestException(`拉取插件市场索引失败：HTTP ${res.status}`)
-      }
-
-      const raw = Buffer.from(await res.arrayBuffer())
-      const keyId = header(res, 'x-boki-key-id')
-      const signature = header(res, 'x-boki-signature')
-      const { index, verified } = this.verifyIndex(raw, keyId, signature)
-
-      // 防回滚：publishedAt 更旧不采纳
-      const seen = meta?.seenPublishedAt
-      if (seen && index.publishedAt && index.publishedAt < seen) {
-        const cache = this.readCache()
-        if (cache) {
-          const cachedIndex = this.verifyIndex(cache.raw, cache.meta.keyId, cache.meta.signature)
-          return {
-            index: cachedIndex.index,
-            source: 'cache',
-            verified: cachedIndex.verified,
-            degraded: true,
-            error: '检测到更旧的索引快照，已拒绝并使用本地缓存',
-          }
-        }
-        throw new BadRequestException('检测到更旧的索引快照，已拒绝（防回滚）')
-      }
-
-      this.writeCache(raw, {
-        ...meta,
-        url: this.baseUrl,
-        etag: header(res, 'etag') ?? meta?.etag,
-        keyId: keyId ?? meta?.keyId,
-        signature: signature ?? meta?.signature,
-        seenPublishedAt: latestTimestamp(seen, index.publishedAt),
-        fetchedAt: new Date().toISOString(),
-      })
-      return { index, source: 'remote', verified }
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error
-
-      // 网络层 / 数据层失败 → 本地缓存兜底
-      const message = asMessage(error)
-      const cache = this.readCache()
-      if (cache) {
-        const { index, verified } = this.verifyIndex(cache.raw, cache.meta.keyId, cache.meta.signature)
-        return {
-          index,
-          source: 'cache',
-          verified,
-          degraded: true,
-          error: `市场暂不可达（${message}），使用本地缓存`,
-        }
-      }
-      throw new BadRequestException(`无法访问插件市场且没有本地缓存：${message}`)
+    const res = await request(`${this.baseUrl}/v1/index`)
+    if (res.status !== 200) {
+      throw new ServiceUnavailableException(`拉取插件市场索引失败：HTTP ${res.status}`)
     }
+
+    const raw = Buffer.from(await res.arrayBuffer())
+    const keyId = header(res, 'x-boki-key-id')
+    const signature = header(res, 'x-boki-signature')
+    const index = this.verifyIndex(raw, keyId, signature)
+    return { index }
   }
 
-  /**
-   * 统一的「验签 + 解析」：
-   * - 配置了 PLUGIN_MARKET_PUBLIC_KEYS：必须携带有效签名，否则拒绝（防伪造市场）
-   * - 未配置：只做传输层保护并告警（verified=false），不阻塞 P4 联调；生产必须配置
-   */
-  private verifyIndex(
-    raw: Buffer,
-    keyId?: string,
-    signature?: string,
-  ): { index: RemoteIndex; verified: boolean } {
-    // 未配置公钥：不验签，只告警（留空 = 仅传输层保护，见 .env 说明）
-    if (this.publicKeys.size === 0) {
-      this.logger.warn(
-        `未配置 PLUGIN_MARKET_PUBLIC_KEYS，跳过索引验签（服务端 keyId=${keyId ?? '无'}）`,
-      )
-      return { index: this.parseIndex(raw), verified: false }
-    }
+  /** 强制验签：必须携带有效签名，否则拒绝处理（防伪造市场） */
+  private verifyIndex(raw: Buffer, keyId?: string, signature?: string): RemoteIndex {
     if (!keyId || !signature) {
-      throw new BadRequestException('插件市场未返回签名，拒绝处理（已配置验签公钥）')
+      throw new BadRequestException('插件市场未返回签名，拒绝处理')
     }
     const publicKey = this.publicKeys.get(keyId)
     if (!publicKey) {
@@ -221,7 +179,7 @@ export class RemoteMarketService {
       throw new BadRequestException('插件市场索引签名校验失败，已拒绝处理')
     }
     this.logger.log(`插件市场索引验签通过 keyId=${keyId}`)
-    return { index: this.parseIndex(raw), verified: true }
+    return this.parseIndex(raw)
   }
 
   private parseIndex(raw: Buffer): RemoteIndex {
@@ -237,14 +195,10 @@ export class RemoteMarketService {
   // ==================== 目录 ====================
 
   async remoteCatalog(): Promise<RemoteCatalogResponse> {
-    const { index, source, verified, degraded, error } = await this.fetchIndex()
+    const { index } = await this.fetchIndex()
     const state = readState()
     const plugins = index.plugins.map((item) => this.toRow(item, state.plugins[item.id]))
     return {
-      source,
-      verified,
-      degraded,
-      error,
       market: index.market,
       publishedAt: index.publishedAt,
       version: index.version,
@@ -291,17 +245,14 @@ export class RemoteMarketService {
 
   /**
    * 从远程市场安装 / 更新插件（依赖优先，走索引白名单）。
-   * 文件落在与本地安装同一份 data/plugins 里，启停/卸载/菜单逻辑全部复用。
+   * 文件落在 data/plugins（桌面端为 ProgramData 下可写目录），
+   * 启停/卸载/菜单逻辑全部复用 PluginsService。
    */
   async install(
     id: string,
     licenseKey?: string,
   ): Promise<{ id: string; installed: string[]; restartRequired: true }> {
     this.assertId(id)
-    if (!this.baseUrl) {
-      throw new BadRequestException('未配置 PLUGIN_MARKET_URL，远程插件市场不可用')
-    }
-
     const { index } = await this.fetchIndex()
     const installed: string[] = []
     await this.installRecursive(index, id, installed, new Set(), licenseKey)
@@ -340,16 +291,17 @@ export class RemoteMarketService {
         const manifest = this.readUnpackedManifest(tmpDir, id)
         this.validateManifest(manifest)
 
-        // 硬依赖先装：远程市场没有 → 退回本地插件源（boki-market/plugins）
+        // 硬依赖先装：市场索引里没有该依赖就直接报错，绝不去本地目录找替代品
         for (const dep of Object.keys(manifest.dependencies ?? {})) {
           const depEntry = readState().plugins[dep]
           const depItem = index.plugins.find((candidate) => candidate.id === dep)
           if (depEntry?.version && depEntry.version === depItem?.version) continue
-          if (depItem?.version) {
-            await this.installRecursive(index, dep, installed, visiting, licenseKey)
-          } else {
-            await this.installLocalFallback(dep, installed)
+          if (!depItem) {
+            throw new BadRequestException(
+              `插件 ${id} 的硬依赖 ${dep} 不在远程市场索引中，安装中止`,
+            )
           }
+          await this.installRecursive(index, dep, installed, visiting, licenseKey)
         }
 
         // 原子提交：旧版先改名备份 → 新目录就位 → 成功后删除备份
@@ -381,13 +333,6 @@ export class RemoteMarketService {
     }
   }
 
-  /** 远程没有该依赖时的本地降级：退回本地插件源安装 */
-  private async installLocalFallback(dep: string, installed: string[]): Promise<void> {
-    this.logger.warn(`远程市场缺少插件 ${dep}，退回本地插件目录安装`)
-    await this.localPlugins.install(dep)
-    if (!installed.includes(dep)) installed.push(dep)
-  }
-
   // ==================== 下载与解包 ====================
 
   private async downloadZip(item: RemoteIndexPlugin, licenseKey?: string): Promise<Buffer> {
@@ -406,12 +351,13 @@ export class RemoteMarketService {
     if (res.status !== 200) throw new BadRequestException(`下载插件包失败：HTTP ${res.status}`)
 
     const buffer = Buffer.from(await res.arrayBuffer())
-    if (item.sha256) {
-      const hash = crypto.createHash('sha256').update(buffer).digest('hex')
-      if (hash !== item.sha256.toLowerCase()) {
-        this.logger.error(`下载完整性校验失败 ${item.id}：sha256 ${hash} != ${item.sha256}`)
-        throw new BadRequestException('插件包完整性校验失败（sha256 不匹配），已中止安装')
-      }
+    if (!item.sha256) {
+      throw new BadRequestException(`市场索引未登记 ${item.id} 的 sha256，拒绝安装`)
+    }
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex')
+    if (hash !== item.sha256.toLowerCase()) {
+      this.logger.error(`下载完整性校验失败 ${item.id}：sha256 ${hash} != ${item.sha256}`)
+      throw new BadRequestException('插件包完整性校验失败（sha256 不匹配），已中止安装')
     }
     return buffer
   }
@@ -440,7 +386,13 @@ export class RemoteMarketService {
   }
 
   private readUnpackedManifest(dir: string, id: string): PluginManifest {
-    const manifest = readJson<PluginManifest>(path.join(dir, 'manifest.json'))
+    const file = path.join(dir, 'manifest.json')
+    let manifest: PluginManifest | null = null
+    try {
+      manifest = JSON.parse(fs.readFileSync(file, 'utf8')) as PluginManifest
+    } catch {
+      manifest = null
+    }
     if (!manifest?.id) throw new BadRequestException(`插件 ${id} 的包内缺少有效 manifest.json`)
     if (manifest.id !== id) {
       throw new BadRequestException(
@@ -459,37 +411,6 @@ export class RemoteMarketService {
     if (manifest.scopeMode === 'global' && manifest.trust !== 'official') {
       throw new BadRequestException('scopeMode=global 仅允许 official 插件')
     }
-  }
-
-  // ==================== 缓存 ====================
-
-  private readCacheMeta(): RemoteIndexMeta | null {
-    return readJson<RemoteIndexMeta>(path.join(marketCacheDir(), INDEX_META_FILE))
-  }
-
-  private readCacheRaw(): string | null {
-    const file = path.join(marketCacheDir(), INDEX_RAW_FILE)
-    if (!fs.existsSync(file)) return null
-    try {
-      return fs.readFileSync(file, 'utf8')
-    } catch {
-      return null
-    }
-  }
-
-  /** 读缓存：任一文件缺失或损坏 → null（不降级到空） */
-  private readCache(): { raw: Buffer; meta: RemoteIndexMeta } | null {
-    const cache = this.readCacheRaw()
-    const meta = this.readCacheMeta()
-    if (!cache || !meta) return null
-    return { raw: Buffer.from(cache, 'utf8'), meta }
-  }
-
-  private writeCache(raw: Buffer, meta: RemoteIndexMeta): void {
-    const dir = marketCacheDir()
-    ensureDir(dir)
-    writeJson(path.join(dir, INDEX_META_FILE), meta)
-    fs.writeFileSync(path.join(dir, INDEX_RAW_FILE), raw)
   }
 
   private assertId(id: string): void {
@@ -550,12 +471,6 @@ export function compareVersion(a: string, b: string): number {
     if (diff !== 0) return diff
   }
   return 0
-}
-
-function latestTimestamp(a?: string, b?: string): string | undefined {
-  if (!a) return b
-  if (!b) return a
-  return a >= b ? a : b
 }
 
 function asMessage(error: unknown): string {

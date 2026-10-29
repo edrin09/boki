@@ -98,18 +98,10 @@ export interface InstalledPluginInfo {
   enabled: boolean
   installedAt: string
   dir: string
-  catalogVersion?: string
+  /** 是否有更新由远程市场索引比对（前端计算），内核不再持有目录版本 */
   hasUpdate?: boolean
   /** 硬依赖中当前未安装或未启用的项（插件仍可启用，但会从菜单隐藏） */
   missingDependencies?: string[]
-}
-
-export interface CatalogPluginInfo {
-  manifest: PluginManifest
-  installed: boolean
-  enabled: boolean
-  installedVersion?: string
-  hasUpdate: boolean
 }
 
 export type DatabaseOptions = TypeOrmModuleOptions
