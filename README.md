@@ -22,12 +22,17 @@
 <p align="center">
   <a href="https://edrin09.github.io/boki/">官网站点</a> ·
   <a href="https://gitee.com/edrin/boki">码云镜像</a> ·
+  <a href="#-界面预览">界面预览</a> ·
   <a href="#-安全与加密">安全与加密</a> ·
   <a href="#-ai-记账">AI 记账</a> ·
   <a href="#-快速开始">快速开始</a> ·
   <a href="#-插件仓库在线获取更新">插件仓库</a> ·
   <a href="#-商业支持与企业级服务">商业支持</a> ·
   <a href="#️-赞助">赞助</a>
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/workbench.jpg" alt="BOKI 工作台：凭证总数、经营看板与快捷入口" width="100%" />
 </p>
 
 ---
@@ -51,6 +56,24 @@ BOKI 是一套**离线优先**的开源财务软件：前端 Vue 3 + 后端 Nest
 - 安全：**SQLCipher 全库加密** + 附件 AES-256-GCM + JWT + RBAC + 审计日志
 - 多公司：一个账号可管理多家记账公司，数据完全隔离，顶部一键切换
 - 数据库：SQLCipher 加密 SQLite 单文件，零配置，支持一键备份/恢复
+
+---
+
+## 📸 界面预览
+
+> 以下截图取自真实运行实例（本地部署、真实账套数据），不是设计稿。
+
+**科目余额表** — 按期初、本期借贷、期末余额列示，余额方向与红蓝字由复式记账规则自动判定
+
+![科目余额表](assets/screenshots/subject-balance.jpg)
+
+**会计科目** — 75 个中文会计科目预置为多级树，声明辅助核算后分录必须指定往来单位 / 部门 / 项目
+
+![会计科目](assets/screenshots/chart-of-accounts.jpg)
+
+**插件市场** — 14 个官方插件按「已安装 / 市场」分区，一键安装会自动补齐硬依赖，停用只影响自身
+
+![插件市场](assets/screenshots/plugin-market.jpg)
 
 ---
 
