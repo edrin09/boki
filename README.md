@@ -41,7 +41,7 @@
 
 > 打字或说话都行。AI 解析成凭证草稿，你确认后才入账 —— 本演示由真实运行实例录制。
 
-![AI 一句话记账演示](assets/demo/ai-bookkeeping-demo.gif)
+<video src="assets/demo/ai-bookkeeping-demo.mp4" autoplay muted loop playsinline></video>
 
 🔍 [下载高清版 MP4（1440p，15 秒）](assets/demo/ai-bookkeeping-demo.mp4)
 
