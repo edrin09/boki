@@ -70,9 +70,12 @@ npm-shrinkwrap.json
 # =====================================================================
 # 项目内部资产（本地仅存，不进公开仓库）
 # =====================================================================
-# 营销 / 分发：插件市场、启动脚本
-# 注：官网 website/ 已改为公开托管（GitHub Pages，见 .github/workflows/pages.yml），不在此列
+# 营销 / 分发：插件市场、启动脚本（boki-market 为独立项目，仅本地维护）
 starts/
+boki-market/
+
+# 官网（仅本地维护，不随仓库分发）
+website/
 
 # 品牌 / 商标资产（含内部知识产权方案）
 brand/
@@ -91,14 +94,8 @@ desktop/src/marketplace.js
 desktop/scripts/receipts-verify.mjs
 desktop/scripts/output/
 
-# 内部文档：默认不入库（docs/* 只忽略顶层内容，目录本身不排除，便于单独放行文件）
-docs/*
-# 对外可公开的需求/设计文档：随仓库走，便于贡献者与用户查阅
-!docs/AI语音记账插件-需求与开发文档.md
-
-# boki-market 是独立项目，其 docs/ 必须入库（上面的 docs/ 规则会按目录名匹配任意层级）
-!boki-market/docs/
-!boki-market/docs/**
+# 内部文档：整目录不入库
+docs/
 
 # 本机已安装的插件（运行时由「插件市场」装入，不属于源码）
 # 客户端不随包任何插件：新克隆的仓库插件目录为空，需要什么自己从市场装
