@@ -4,20 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BOKI — 离线优先的开源财务软件 | 数据主权在你自己手里</title>
-  <meta name="description" content="BOKI 是离线优先的开源财务软件：复式记账内核 + 插件化架构，数据 / 语音识别 / 大模型三层全离线，SQLite 单文件、无云端依赖、无埋点，账本永远只属于你。" />
+  <meta name="description" content="BOKI 是离线优先的开源财务软件：AI 一句话记账 + 复式记账内核 + 插件化架构，数据 / 语音识别 / 大模型三层全离线，数据库整库加密、无云端依赖、无埋点，账本永远只属于你。" />
   <!-- Open Graph / 社交分享卡片 -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="BOKI" />
   <meta property="og:locale" content="zh_CN" />
   <meta property="og:url" content="https://edrin09.github.io/boki/" />
   <meta property="og:title" content="BOKI — 离线优先的开源财务软件" />
-  <meta property="og:description" content="复式记账内核 + 插件化架构，数据 / 语音识别 / 大模型三层全离线，SQLite 单文件、无云端依赖、无埋点，账本永远只属于你。" />
+  <meta property="og:description" content="AI 一句话记账 + 复式记账内核 + 插件化架构，数据 / 语音识别 / 大模型三层全离线，数据库整库加密、无云端依赖、无埋点，账本永远只属于你。" />
   <meta property="og:image" content="https://edrin09.github.io/boki/assets/boki-social-preview.png" />
   <meta property="og:image:width" content="1536" />
   <meta property="og:image:height" content="768" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="BOKI — 离线优先的开源财务软件" />
-  <meta name="twitter:description" content="复式记账内核 + 插件化架构，三层全离线，SQLite 单文件、无云端依赖、无埋点。" />
+  <meta name="twitter:description" content="AI 一句话记账 + 复式记账内核，三层全离线，数据库整库加密、无云端依赖、无埋点。" />
   <meta name="twitter:image" content="https://edrin09.github.io/boki/assets/boki-social-preview.png" />
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
   <style>
@@ -214,6 +214,18 @@
     }
     .section-head h2 { font-size: clamp(26px, 3.2vw, 36px); font-weight: 800; letter-spacing: -.6px; margin-bottom: 14px; }
     .section-head p { color: var(--slate); font-size: 16px; }
+
+    /* ---- AI 一句话记账演示 ---- */
+    .demo-section { background: var(--bg-soft); }
+    .demo-figure {
+      max-width: 1080px; margin: 0 auto; background: #fff; border: 1px solid var(--border);
+      border-radius: 14px; padding: 14px; box-shadow: var(--shadow-md);
+    }
+    .demo-figure img { display: block; width: 100%; border-radius: 8px; }
+    .demo-figure figcaption { padding: 14px 8px 4px; font-size: 14px; color: var(--slate); text-align: center; }
+    .demo-figure figcaption b { color: var(--ink); font-weight: 600; }
+    .demo-figure figcaption a { color: var(--indigo); font-weight: 600; text-decoration: none; white-space: nowrap; }
+    .demo-figure figcaption a:hover { text-decoration: underline; }
 
     /* ---- 特性 ---- */
     .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
@@ -525,6 +537,7 @@
         <span>boki</span>
       </a>
       <ul class="nav-links">
+        <li><a href="#demo">演示</a></li>
         <li><a href="#features">特性</a></li>
         <li><a href="#offline">离线</a></li>
         <li><a href="#security">安全</a></li>
@@ -550,6 +563,7 @@
       </div>
     </div>
     <nav class="mobile-menu" id="mobileMenu">
+      <a href="#demo">演示</a>
       <a href="#features">特性</a>
       <a href="#offline">离线</a>
       <a href="#security">安全</a>
@@ -574,8 +588,9 @@
           <img class="hero-lockup" src="assets/boki-lockup.svg" alt="BOKI — 开源财务软件" />
           <h1>你的账本<br /><span class="grad">只属于你</span></h1>
           <p class="hero-sub">
-            BOKI 是<strong>离线优先</strong>的开源财务软件：复式记账内核 + 插件化架构。<strong>数据、语音识别、大模型三层全离线</strong>——
-            SQLite 单文件、本地 OCR、本地流式 ASR，<strong>断网能用，数据不出机器</strong>，没有云端、没有埋点、不接受任何回传。
+            BOKI 是<strong>离线优先</strong>的开源财务软件：<strong>AI 一句话记账</strong> + 复式记账内核 + 插件化架构，
+            <strong>数据、语音识别、大模型三层全离线</strong>——数据库整库加密、断网能用、数据不出机器，
+            没有云端、没有埋点、不接受任何回传。
           </p>
           <div class="cta-row">
             <a class="btn btn-primary" href="https://github.com/edrin09/boki/releases/latest" target="_blank" rel="noopener">
@@ -645,6 +660,24 @@
       </div>
     </section>
 
+    <!-- ================= AI 一句话记账演示 ================= -->
+    <section class="section demo-section" id="demo">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Live Demo</span>
+          <h2>30 秒看懂：AI 一句话记账</h2>
+          <p>按住 Alt 说话或直接打字都行——AI 解析成凭证草稿，你确认后才入账。以下画面录制自真实运行实例。</p>
+        </div>
+        <figure class="demo-figure">
+          <img src="assets/ai-bookkeeping-demo.gif" alt="AI 一句话记账演示：输入「记一笔 800 的水电费，银行付的」→ AI 生成确认卡片 → 确认执行 → 草稿凭证进入凭证列表" loading="lazy" />
+          <figcaption>
+            <b>一句话记账 · 发工资 · 加人员 · 改凭证 · 审凭证</b>——五类操作全部先预演、人工确认才生效，且一律只落草稿待复核。
+            <a href="assets/ai-bookkeeping-demo.mp4" target="_blank" rel="noopener">下载高清版 MP4 →</a>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
     <!-- ================= 全离线 ================= -->
     <section class="section offline-section" id="offline">
       <div class="container">
@@ -658,8 +691,8 @@
             <span class="oicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
             <h3>数据离线</h3>
             <span class="oflag">100% 本地</span>
-            <p>SQLite 单文件（WAL 模式）承载全部账务数据，一键备份 / 恢复；无任何外部服务依赖，财务数据不出机器。</p>
-            <span class="ocode">financial.db · 单文件 · 零配置</span>
+            <p>SQLite 单文件（WAL 模式 + SQLCipher 整库加密）承载全部账务数据，一键备份 / 恢复；无任何外部服务依赖，财务数据不出机器。</p>
+            <span class="ocode">financial.db · 单文件 · 整库加密 · 零配置</span>
           </div>
           <div class="offline-card">
             <span class="oicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 18v4"/></svg></span>
@@ -692,24 +725,25 @@
             <h3 class="sec-title"><span class="sec-dot ok"></span>已经做到的</h3>
             <ul class="sec-list">
               <li><b>部署边界在你手里</b><span>单机 / 内网自部署，前后端同源单端口；无云端依赖、无第三方 SDK 回传，代码中不含埋点与遥测。</span></li>
+              <li><b>数据库整库加密</b><span>SQLCipher 兼容整库加密默认开启、零配置；密钥文件 <code>vault.key</code> 丢失则库无法打开——拿到 <code>.db</code> 文件没有密钥就是一串密文。</span></li>
+              <li><b>附件与备份加密</b><span>上传的发票 PDF / 图片单独 AES-256-GCM 流式加密；备份与恢复强制校验密钥一致性，密钥不符的备份拒绝恢复。</span></li>
               <li><b>口令不落明文</b><span>口令以 <code>bcrypt</code> 加盐散列存储；JWT 短期令牌由本机签发，不经过第三方。</span></li>
               <li><b>授权双层校验</b><span>RBAC 覆盖菜单级 + 操作级权限，前端指令与后端守卫同时校验，改前端绕不过去。</span></li>
               <li><b>多公司硬隔离</b><span>业务表全部带 <code>company_id</code>，仓储层强制追加过滤；令牌内 <code>companyId</code> 由服务端签名，无法伪造。</span></li>
-              <li><b>操作留痕</b><span>登录、增删改、审核等动作本地留存操作日志，可查询、可清理。</span></li>
-              <li><b>数据随时能带走</b><span>全部数据就是一个 <code>financial.db</code>，可整目录拷走、一键备份、离线搬到另一台机器。</span></li>
+              <li><b>操作留痕</b><span>登录、增删改、审核、AI 指令等动作本地留存操作日志，可查询、可清理。</span></li>
+              <li><b>数据随时能带走</b><span>全部数据就是一个加密的 <code>financial.db</code> + <code>vault.key</code>，可一键备份、离线搬到另一台机器。</span></li>
             </ul>
           </div>
           <div class="sec-col gap">
             <h3 class="sec-title"><span class="sec-dot warn"></span>还没做到的（如实标注）</h3>
             <ul class="sec-list">
-              <li class="bad"><b>数据库加密</b><span><code>financial.db</code> 当前是明文文件——拿到文件就能用任意 SQLite 工具直读。</span></li>
               <li class="bad"><b>密钥 / 主密码登录</b><span>尚无「免用户名口令、单 Key 解锁」与零知识主密码体系。</span></li>
-              <li class="bad"><b>敏感字段加密</b><span>金额、往来单位等字段未做列级加密。</span></li>
-              <li class="bad"><b>MFA 与备份加密</b><span>当前仅单因子口令；备份出的 <code>.db</code> 文件本身未加密。</span></li>
+              <li class="bad"><b>敏感字段列级加密</b><span>金额、往来单位等字段依赖整库加密保护，未再做列级加密。</span></li>
+              <li class="bad"><b>MFA 二次验证</b><span>当前仅单因子口令。</span></li>
             </ul>
             <div class="sec-plan">
               <span class="plan-chip">规划中 · 以插件形式交付</span>
-              <p><b>加密路线</b>：主密码 / 恢复密钥解锁 → SQLCipher 库级加密 → 敏感字段列级加密。装不装由你决定，不装就保持现在的零配置体验。</p>
+              <p><b>加密路线</b>：主密码 / 恢复密钥解锁（插件 <code>vault</code>）→ 敏感字段列级加密 → MFA。装不装由你决定，不装就保持现在的零配置体验。</p>
             </div>
           </div>
         </div>
@@ -758,13 +792,13 @@
           </div>
           <div class="feature-card">
             <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h4"/></svg></div>
-            <h3>票据智能记账</h3>
-            <p>上传电子发票 PDF / 扫描件，自动解析类型、金额、税额、购销方；sha256 去重、归类规则，确认后一键生成凭证。</p>
+            <h3>AI 智能记账</h3>
+            <p>上传电子发票 PDF / 扫描件自动解析生成凭证；也可以直接说一句话——记账、发工资、加人员、审凭证，AI 生成确认卡片、人工确认后才入账。</p>
           </div>
           <div class="feature-card">
             <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3z"/></svg></div>
             <h3>AI 会计员</h3>
-            <p>AI 插件提供模型配置（本地 / 云端可选），语音插件支持自然语言查账记账，悬浮入口即问即答。</p>
+            <p>AI 插件提供模型配置（本地 / 云端可选），语音助手按住 Alt 即问即答：查账出表、语音记账、一句话办五类事，操作全程留审计记录。</p>
           </div>
         </div>
       </div>
@@ -788,11 +822,11 @@
           <div class="plugin-card"><span class="pid">income-expense</span><h4>其他收支</h4><p>其他收入 / 支出单据</p></div>
           <div class="plugin-card"><span class="pid">fixed-expense</span><h4>固定费用</h4><p>房租等周期性费用计划</p></div>
           <div class="plugin-card"><span class="pid">hr</span><h4>薪酬报销</h4><p>员工 / 报销 / 借款 / 工资表</p></div>
-          <div class="plugin-card"><span class="pid">receipts</span><h4>票据智能记账</h4><p>上传 / 解析 / 去重 / 待确认工作台</p></div>
+          <div class="plugin-card"><span class="pid">receipts</span><h4>AI 智能记账</h4><p>一句话记账 / 发工资 / 票据上传识别，人工确认才入账</p></div>
           <div class="plugin-card"><span class="pid">ocr</span><h4>离线 OCR</h4><p>PP-OCRv4 本地推理与票据解析器</p></div>
           <div class="plugin-card"><span class="pid">report-pack</span><h4>报表包</h4><p>资产负债 / 利润 / 台账 / 现金流 / 月结 / 看板</p></div>
-          <div class="plugin-card"><span class="pid">ai</span><h4>AI 模型</h4><p>本地 / 云端模型配置</p></div>
-          <div class="plugin-card"><span class="pid">voice</span><h4>语音助手</h4><p>自然语言记账查询</p></div>
+          <div class="plugin-card"><span class="pid">ai</span><h4>AI 模型接入</h4><p>本地 / 云端模型配置与连接测试</p></div>
+          <div class="plugin-card"><span class="pid">voice</span><h4>语音助手</h4><p>按住 Alt 说话：查账导出 + 一句话记账入口</p></div>
           <div class="plugin-card"><span class="pid">iam</span><h4>用户权限</h4><p>用户 / 角色 / 权限管理面</p></div>
           <div class="plugin-card"><span class="pid">multi-company</span><h4>多公司</h4><p>记账公司管理与成员授权</p></div>
         </div>
