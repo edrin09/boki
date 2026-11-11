@@ -41,9 +41,9 @@
 
 > 打字或说话都行。AI 解析成凭证草稿，你确认后才入账 —— 本演示由真实运行实例录制。
 
-<video src="assets/demo/ai-bookkeeping-demo.mp4" autoplay muted loop playsinline></video>
+<video src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/assets/ai-bookkeeping-demo.mp4" autoplay muted loop playsinline></video>
 
-🔍 [下载高清版 MP4（1440p，15 秒）](assets/demo/ai-bookkeeping-demo.mp4)
+🔍 [下载高清版 MP4（1440p，15 秒）](https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/assets/ai-bookkeeping-demo.mp4)
 
 流程只有三步：
 
@@ -72,11 +72,11 @@
 
 **科目余额表** — 期初、本期借贷、期末余额，余额方向由复式记账规则自动判定
 
-![科目余额表](assets/screenshots/subject-balance.jpg)
+![科目余额表](https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/screenshots/subject-balance.jpg)
 
 **插件市场** — 官方插件一键安装，自动补齐依赖，有更新直接显示「更新」按钮
 
-![插件市场](assets/screenshots/plugin-market.jpg)
+![插件市场](https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/screenshots/plugin-market.jpg)
 
 </details>
 
