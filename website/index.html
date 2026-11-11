@@ -98,6 +98,73 @@
     .mobile-menu a:last-of-type { border-bottom: none; }
     .mobile-menu .btn { width: 100%; margin-top: 12px; }
 
+    /* ============ 第一屏 · AI 一句话记账 ============ */
+    .showcase {
+      position: relative;
+      padding: 118px 0 72px;
+      background:
+        radial-gradient(760px 380px at 50% -12%, rgba(79, 70, 229, .42), transparent 62%),
+        radial-gradient(620px 340px at 8% 108%, rgba(14, 165, 233, .20), transparent 60%),
+        radial-gradient(480px 300px at 94% 96%, rgba(79, 70, 229, .16), transparent 62%),
+        #0B1220;
+      color: #fff;
+      overflow: hidden;
+    }
+    .showcase-inner { text-align: center; }
+    .show-badge {
+      display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+      color: rgba(224, 231, 255, .92); background: rgba(255, 255, 255, .08);
+      border: 1px solid rgba(255, 255, 255, .16); border-radius: 999px; padding: 6px 16px; margin-bottom: 22px;
+    }
+    .show-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: #34D399; box-shadow: 0 0 8px rgba(52, 211, 153, .9); }
+    .show-title {
+      font-size: clamp(36px, 5.4vw, 62px); line-height: 1.18; font-weight: 800; letter-spacing: -1.5px;
+      color: #fff; margin-bottom: 16px;
+    }
+    .show-title .grad {
+      background: linear-gradient(115deg, #818CF8 8%, #38BDF8 55%, #34D399 95%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .show-sub { font-size: clamp(15px, 1.6vw, 17.5px); color: rgba(226, 232, 240, .82); max-width: 720px; margin: 0 auto; }
+    .show-sub b { color: #fff; font-weight: 600; }
+    .show-video {
+      max-width: 1060px; margin: 42px auto 0; border-radius: 14px; overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .14);
+      box-shadow: 0 30px 90px rgba(79, 70, 229, .42), 0 8px 28px rgba(2, 6, 23, .6);
+      background: #0D1526;
+    }
+    .show-chrome {
+      display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+      background: rgba(255, 255, 255, .06); border-bottom: 1px solid rgba(255, 255, 255, .08);
+    }
+    .show-chrome .dots { display: inline-flex; gap: 6px; }
+    .show-chrome .dots i { width: 10px; height: 10px; border-radius: 50%; background: rgba(255, 255, 255, .22); }
+    .show-chrome .dots i:first-child { background: #F87171; }
+    .show-chrome .dots i:nth-child(2) { background: #FBBF24; }
+    .show-chrome .dots i:last-child { background: #34D399; }
+    .show-chrome .url { font-size: 12.5px; color: rgba(226, 232, 240, .6); font-family: var(--mono); }
+    .show-video video { display: block; width: 100%; max-height: calc(100vh - 380px); min-height: 320px; object-fit: contain; background: #0D1526; }
+    .show-note { margin-top: 18px; font-size: 13px; color: rgba(148, 163, 184, .9); }
+    .show-note a { color: #93C5FD; font-weight: 600; }
+    .show-note a:hover { text-decoration: underline; }
+    .show-cta { display: flex; justify-content: center; flex-wrap: wrap; gap: 14px; margin-top: 26px; }
+    .show-cta .btn { padding: 13px 30px; font-size: 15.5px; border-radius: 12px; }
+    .show-cta .btn-primary { box-shadow: 0 10px 34px rgba(79, 70, 229, .55); }
+    .show-cta .btn-ghost {
+      background: rgba(255, 255, 255, .08); color: #fff; border: 1px solid rgba(255, 255, 255, .22);
+    }
+    .show-cta .btn-ghost:hover { background: rgba(255, 255, 255, .16); }
+
+    /* 导航深色态（覆盖第一屏时） */
+    .site-nav.on-dark { background: rgba(10, 16, 30, .55); border-bottom-color: rgba(255, 255, 255, .08); }
+    .site-nav.on-dark.scrolled { box-shadow: none; }
+    .site-nav.on-dark .nav-brand span { color: #fff; }
+    .site-nav.on-dark .nav-links a { color: rgba(226, 232, 240, .8); }
+    .site-nav.on-dark .nav-links a:hover, .site-nav.on-dark .nav-links a.active { color: #A5B4FC; }
+    .site-nav.on-dark .btn-outline { background: transparent; border-color: rgba(255, 255, 255, .3); color: #fff; }
+    .site-nav.on-dark .btn-outline:hover { border-color: rgba(255, 255, 255, .6); color: #fff; }
+    .site-nav.on-dark .nav-toggle { border-color: rgba(255, 255, 255, .3); color: #fff; }
+
     /* ============ Hero ============ */
     .hero {
       padding: 148px 0 88px;
@@ -214,18 +281,6 @@
     }
     .section-head h2 { font-size: clamp(26px, 3.2vw, 36px); font-weight: 800; letter-spacing: -.6px; margin-bottom: 14px; }
     .section-head p { color: var(--slate); font-size: 16px; }
-
-    /* ---- AI 一句话记账演示 ---- */
-    .demo-section { background: var(--bg-soft); }
-    .demo-figure {
-      max-width: 1080px; margin: 0 auto; background: #fff; border: 1px solid var(--border);
-      border-radius: 14px; padding: 14px; box-shadow: var(--shadow-md);
-    }
-    .demo-figure img, .demo-figure video { display: block; width: 100%; border-radius: 8px; background: #0d1117; }
-    .demo-figure figcaption { padding: 14px 8px 4px; font-size: 14px; color: var(--slate); text-align: center; }
-    .demo-figure figcaption b { color: var(--ink); font-weight: 600; }
-    .demo-figure figcaption a { color: var(--indigo); font-weight: 600; text-decoration: none; white-space: nowrap; }
-    .demo-figure figcaption a:hover { text-decoration: underline; }
 
     /* ---- 特性 ---- */
     .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
@@ -453,6 +508,9 @@
       .nav-links, .nav-cta .btn { display: none; }
       .nav-toggle { display: inline-flex; }
       .section { padding: 64px 0; }
+      .showcase { padding: 104px 0 56px; }
+      .show-video video { max-height: 52vh; min-height: 220px; }
+      .show-cta .btn { flex: 1 1 46%; }
       .plugins-grid { grid-template-columns: repeat(2, 1fr); }
       .mockup-body { grid-template-columns: 104px 1fr; }
       .mockup-table .tr { grid-template-columns: 1fr .8fr 1.2fr .7fr .7fr; font-size: 9.5px; padding: 6px 8px; }
@@ -580,6 +638,30 @@
 
   <main id="top">
 
+    <!-- ================= 第一屏 · AI 一句话记账 ================= -->
+    <section class="showcase" id="demo">
+      <div class="container showcase-inner">
+        <span class="show-badge"><span class="dot"></span>真实运行实例录制 · 非概念视频</span>
+        <h2 class="show-title">说一句话，<span class="grad">账就记好了</span></h2>
+        <p class="show-sub">
+          「记一笔 800 的水电费，银行付的」——AI 解析成凭证草稿，<b>你确认后才入账</b>。
+          记账 · 发工资 · 加人员 · 改凭证 · 审凭证，五类操作一句话搞定。
+        </p>
+        <div class="show-video">
+          <div class="show-chrome">
+            <span class="dots"><i></i><i></i><i></i></span>
+            <span class="url">boki · AI 智能记账 — 一句话到凭证</span>
+          </div>
+          <video src="assets/ai-bookkeeping-demo.mp4" poster="assets/ai-bookkeeping-demo-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="AI 一句话记账演示：输入「记一笔 800 的水电费，银行付的」→ AI 生成确认卡片 → 确认执行 → 草稿凭证进入凭证列表"></video>
+        </div>
+        <p class="show-note">按住 Alt 说话或直接打字都行 · 全程无剪辑 · <a href="assets/ai-bookkeeping-demo.mp4" target="_blank" rel="noopener">下载高清版 MP4</a></p>
+        <div class="show-cta">
+          <a class="btn btn-primary" href="#download">免费下载 BOKI →</a>
+          <a class="btn btn-ghost" href="#features">看看它还能做什么 ↓</a>
+        </div>
+      </div>
+    </section>
+
     <!-- ================= Hero ================= -->
     <section class="hero">
       <div class="container hero-grid">
@@ -657,24 +739,6 @@
             </div>
           </div>
         </div>
-      </div>
-    </section>
-
-    <!-- ================= AI 一句话记账演示 ================= -->
-    <section class="section demo-section" id="demo">
-      <div class="container">
-        <div class="section-head">
-          <span class="eyebrow">Live Demo</span>
-          <h2>30 秒看懂：AI 一句话记账</h2>
-          <p>按住 Alt 说话或直接打字都行——AI 解析成凭证草稿，你确认后才入账。以下画面录制自真实运行实例。</p>
-        </div>
-        <figure class="demo-figure">
-          <video src="assets/ai-bookkeeping-demo.mp4" poster="assets/ai-bookkeeping-demo-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="AI 一句话记账演示：输入「记一笔 800 的水电费，银行付的」→ AI 生成确认卡片 → 确认执行 → 草稿凭证进入凭证列表"></video>
-          <figcaption>
-            <b>一句话记账 · 发工资 · 加人员 · 改凭证 · 审凭证</b>——五类操作全部先预演、人工确认才生效，且一律只落草稿待复核。
-            <a href="assets/ai-bookkeeping-demo.mp4" target="_blank" rel="noopener">下载高清版 MP4 →</a>
-          </figcaption>
-        </figure>
       </div>
     </section>
 
@@ -1145,6 +1209,10 @@
 
       function onScroll() {
         nav.classList.toggle('scrolled', window.scrollY > 8);
+        // 第一屏（AI 演示）是深色背景：只要它的底边还压在导航下方，导航就保持深色态
+        var show = document.getElementById('demo');
+        var overDark = show ? show.getBoundingClientRect().bottom > 76 : false;
+        nav.classList.toggle('on-dark', overDark);
       }
       window.addEventListener('scroll', onScroll, { passive: true });
       onScroll();
