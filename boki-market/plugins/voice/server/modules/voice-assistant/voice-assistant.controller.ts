@@ -39,11 +39,11 @@ export class VoiceAssistantController {
   ) {}
 
   @Get('status')
-  @Operation('查询语音助手状态（ASR / AI 增强就绪情况/ AI 增强就绪情况）')
+  @Operation('查询语音助手状态（ASR / AI 模型就绪情况）')
   async status() {
     return {
       ...this.asr.status(),
-      /** AI 增强：已接入大模型时自由说法走语义理解，未接入走关键词匹配 */
+      /** AI 模型接入：已接入大模型时自由说法走语义理解，未接入走关键词匹配 */
       ai: await this.ai.getConfig().then((c) => ({
         ready: Boolean(c.enabled && c.baseURL && c.model),
         provider: c.provider,

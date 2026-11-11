@@ -186,7 +186,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Download, Paperclip } from '@element-plus/icons-vue'
 import { voucherApi, receiptApi } from '@/api'
@@ -197,13 +197,36 @@ import { currentPeriod, formatAmount, formatDate, voucherStatusMeta } from '@/ut
 import PeriodPicker from '@/components/common/PeriodPicker.vue'
 
 const router = useRouter()
+const route = useRoute()
 
-const period = ref<number>(currentPeriod())
+/**
+ * 支持外部带筛选跳进来（如语音助手执行完「查看草稿凭证」）：
+ * `/voucher/list?status=draft&period=202611`
+ */
+function queryPeriod(): number | undefined {
+  const raw = route.query.period
+  if (!raw) return undefined
+  const n = Number(raw)
+  return Number.isInteger(n) && n >= 190001 && n <= 999912 ? n : undefined
+}
+
+function queryStatus(): string {
+  const raw = String(route.query.status ?? '')
+  return ['draft', 'approved', 'cancelled'].includes(raw) ? raw : ''
+}
+
+const period = ref<number>(queryPeriod() ?? currentPeriod())
 
 const { list, total, loading, query, load, search, handleSize, reset } = usePagedList({
-  fetcher: (params) =>
-    voucherApi.list({ ...params, period: period.value, word: params.keyword || undefined }),
-  defaultParams: { page: 1, pageSize: 20, status: '', keyword: '' },
+  // 注意：keyword 走后端 keyword（摘要/科目/备注模糊匹配），不要映射成 word，
+  // word 是「凭证字」（记/收/付）精确等值，映射过去会让搜索永远查不到数据
+  fetcher: (params) => voucherApi.list({ ...params, period: period.value }),
+  defaultParams: {
+    page: 1,
+    pageSize: 20,
+    status: queryStatus(),
+    keyword: String(route.query.keyword ?? ''),
+  },
 })
 
 function pad(n: number): string {
@@ -220,6 +243,21 @@ watch(period, () => {
   query.value.page = 1
   load()
 })
+
+/** 已经在凭证列表页时再次带参数跳进来（只改 query），同步筛选条件 */
+watch(
+  () => route.fullPath,
+  () => {
+    const nextPeriod = queryPeriod()
+    if (nextPeriod && nextPeriod !== period.value) {
+      period.value = nextPeriod
+      return
+    }
+    query.value.status = queryStatus()
+    query.value.page = 1
+    load()
+  },
+)
 
 async function onApprove(voucher: any) {
   try {

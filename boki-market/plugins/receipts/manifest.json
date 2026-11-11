@@ -1,17 +1,27 @@
 {
   "id": "receipts",
   "name": "AI 智能记账",
-  "version": "1.0.0",
+  "version": "1.3.1",
   "apiVersion": "^1.0.0",
-  "engines": { "boki": ">=1.0.0" },
+  "engines": {
+    "boki": ">=1.0.0"
+  },
   "kind": "domain",
   "scopeMode": "scoped",
   "trust": "official",
   "author": "boki",
   "license": "Apache-2.0",
-  "description": "票据上传、OCR 解析、智能归类、批量记账与归类规则",
-  "dependencies": { "ocr": "^1.0.0", "hr": "^1.0.0" },
-  "optionalDependencies": { "departments": "^1.0.0" },
+  "description": "票据上传识别与语音一句话记账：AI 解析、校验、生成草稿，人工确认后才入账",
+  "dependencies": {
+    "ocr": "^1.0.0",
+    "hr": "^1.0.0",
+    "ai": "^1.0.0"
+  },
+  "optionalDependencies": {
+    "voice": "^1.0.2",
+    "departments": "^1.0.0",
+    "banks": "^1.0.0"
+  },
   "permissions": [
     "receipts",
     "receipts:workbench",
@@ -19,7 +29,9 @@
     "receipt:list",
     "receipt:rule",
     "receipt:confirm",
-    "receipt:delete"
+    "receipt:delete",
+    "receipts:voice:use",
+    "receipts:voice:commit"
   ],
   "contributes": {
     "server": "server/index.js",
@@ -30,27 +42,60 @@
         "path": "/receipts/workbench",
         "name": "ReceiptWorkbench",
         "component": "ReceiptWorkbenchPage",
-        "meta": { "title": "上传记账", "permission": "receipts:workbench" }
+        "meta": {
+          "title": "上传记账",
+          "permission": "receipts:workbench"
+        }
       },
       {
         "path": "/receipts/list",
         "name": "ReceiptList",
         "component": "ReceiptListPage",
-        "meta": { "title": "票据列表", "permission": "receipt:list" }
+        "meta": {
+          "title": "票据列表",
+          "permission": "receipt:list"
+        }
       },
       {
         "path": "/receipts/rules",
         "name": "ReceiptRules",
         "component": "ReceiptRulesPage",
-        "meta": { "title": "归类规则", "permission": "receipts:rules" }
+        "meta": {
+          "title": "归类规则",
+          "permission": "receipts:rules"
+        }
       }
     ],
     "menu": [
-      { "group": "receipts", "title": "上传记账", "path": "/receipts/workbench", "permission": "receipts:workbench" },
-      { "group": "receipts", "title": "票据列表", "path": "/receipts/list", "permission": "receipt:list" },
-      { "group": "receipts", "title": "归类规则", "path": "/receipts/rules", "permission": "receipts:rules" }
+      {
+        "group": "receipts",
+        "title": "上传记账",
+        "path": "/receipts/workbench",
+        "permission": "receipts:workbench"
+      },
+      {
+        "group": "receipts",
+        "title": "票据列表",
+        "path": "/receipts/list",
+        "permission": "receipt:list"
+      },
+      {
+        "group": "receipts",
+        "title": "归类规则",
+        "path": "/receipts/rules",
+        "permission": "receipts:rules"
+      }
     ],
-    "slots": []
+    "slots": [
+      {
+        "name": "voice.assistant.panel",
+        "component": "AiVoicePanel"
+      }
+    ]
   },
-  "tables": ["fin_receipt", "fin_classify_rule"]
+  "tables": [
+    "fin_receipt",
+    "fin_classify_rule",
+    "fin_ai_voice_audit"
+  ]
 }

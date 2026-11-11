@@ -87,9 +87,14 @@ desktop/*
 !desktop/installer-hooks.nsh
 # 出厂市场配置：由 scripts/build-package.mjs 依据仓库根 .env 生成，不入库
 desktop/src/marketplace.js
+# 打包机上的本地验证脚本与它生成的样本（不是产品代码，不入库）
+desktop/scripts/receipts-verify.mjs
+desktop/scripts/output/
 
-# 内部文档
-docs/
+# 内部文档：默认不入库（docs/* 只忽略顶层内容，目录本身不排除，便于单独放行文件）
+docs/*
+# 对外可公开的需求/设计文档：随仓库走，便于贡献者与用户查阅
+!docs/AI语音记账插件-需求与开发文档.md
 
 # boki-market 是独立项目，其 docs/ 必须入库（上面的 docs/ 规则会按目录名匹配任意层级）
 !boki-market/docs/

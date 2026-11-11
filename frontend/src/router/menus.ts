@@ -27,7 +27,7 @@ const GROUP_TITLES: Record<string, string> = {
   settings: '基础资料',
   system: '系统管理',
   // 兼容旧版 ai 插件（<=1.0.1，菜单独立分组）；1.0.2 起挂入系统管理
-  ai: 'AI模型设置',
+  ai: 'AI 模型接入',
 }
 
 /**

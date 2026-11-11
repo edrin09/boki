@@ -281,14 +281,23 @@ async function main() {
     check('OCR 状态就绪', ocr.status === 200 && ocrData?.ready === true,
       `ready=${ocrData?.ready} missing=${JSON.stringify(ocrData?.missing ?? [])}`)
 
-    const receiptsTest = path.join(repoRoot, 'backend', 'test', 'receipts-verify.mjs')
+    // 票据冒烟测试原在 backend/test（源码瘦身 307b3f8 时移出仓库），
+    // 现仅存于打包机的 desktop/scripts/receipts-verify.mjs（desktop/ 不进库）；
+    // 旧路径保留兜底，两处都没有时该项降级为警告而非失败。
+    const receiptsTest = path.join(desktopDir, 'scripts', 'receipts-verify.mjs')
+    const receiptsTestLegacy = path.join(repoRoot, 'backend', 'test', 'receipts-verify.mjs')
     if (fs.existsSync(receiptsTest)) {
       const result = spawnSync(process.execPath, [receiptsTest, BASE], { encoding: 'utf8' })
       const output = `${result.stdout || ''}${result.stderr || ''}`
       const tail = output.split('\n').filter((l) => /通过|失败|PASS|FAIL|✓|✗/.test(l)).slice(-6).join('\n')
       check('票据上传识别端到端', result.status === 0, tail || `退出码 ${result.status}`)
+    } else if (fs.existsSync(receiptsTestLegacy)) {
+      const result = spawnSync(process.execPath, [receiptsTestLegacy, BASE], { encoding: 'utf8' })
+      const output = `${result.stdout || ''}${result.stderr || ''}`
+      const tail = output.split('\n').filter((l) => /通过|失败|PASS|FAIL|✓|✗/.test(l)).slice(-6).join('\n')
+      check('票据上传识别端到端', result.status === 0, tail || `退出码 ${result.status}`)
     } else {
-      check('票据上传识别端到端', false, `未找到 ${receiptsTest}`)
+      check('票据上传识别端到端', false, `未找到 ${receiptsTest}（也未找到旧路径 ${receiptsTestLegacy}）`)
     }
   } finally {
     await stop()

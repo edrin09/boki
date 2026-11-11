@@ -14,6 +14,7 @@ import '@/styles/index.css'
 
 import App from './App.vue'
 import VaultConvert from './views/VaultConvert.vue'
+import PluginSlot from '@/components/PluginSlot.vue'
 import router, { resetBusinessRoutes } from './router'
 import { setupDirectives } from './directives/permission'
 import { setUnauthorizedHandler } from '@/api'
@@ -100,6 +101,10 @@ async function boot(): Promise<void> {
   }
 
   app.use(ElementPlus, { locale: zhCn })
+
+  // 插件插槽渲染器全局注册：插件包不引用内核组件（避免把布局整条依赖拖进插件产物），
+  // 在插件模板里直接写 <PluginSlot name="xxx" /> 即可，运行时从宿主应用上下文解析。
+  app.component('PluginSlot', PluginSlot)
 
   setupDirectives(app)
   app.use(router)

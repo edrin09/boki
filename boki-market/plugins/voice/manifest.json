@@ -1,9 +1,11 @@
 {
   "id": "voice",
   "name": "语音助手",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "apiVersion": "^1.0.0",
-  "engines": { "boki": ">=1.0.0" },
+  "engines": {
+    "boki": ">=1.0.0"
+  },
   "kind": "ai",
   "scopeMode": "scoped",
   "trust": "official",
@@ -18,7 +20,10 @@
     "ar-ap": "^1.0.0",
     "hr": "^1.0.0"
   },
-  "permissions": ["voice", "voice:use"],
+  "permissions": [
+    "voice",
+    "voice:use"
+  ],
   "contributes": {
     "server": "server/index.js",
     "client": "client/index.js",
@@ -26,7 +31,10 @@
     "routes": [],
     "menu": [],
     "slots": [
-      { "name": "layout.floating", "component": "VoiceAssistant" }
+      {
+        "name": "layout.floating",
+        "component": "VoiceAssistant"
+      }
     ]
   },
   "tables": []

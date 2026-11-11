@@ -19,6 +19,7 @@ import { ClassifyService } from './classify.service'
 import { ClassifyRulesService } from './classify-rules.service'
 import { ReceiptWorkbenchService } from './workbench.service'
 import { PartySyncService } from './party-sync.service'
+import { AiVoiceModule } from '../voice-ops/ai-voice.module'
 
 @Module({
   imports: [
@@ -37,6 +38,9 @@ import { PartySyncService } from './party-sync.service'
     VouchersModule,
     LoansModule,
     ExpenseClaimsModule,
+    // 语音一句话记账（凭证增改审 / 员工建档 / 发工资）也归本插件：
+    // 和票据上传共用同一套「AI 解析 → 草稿 → 人工确认」链路。
+    AiVoiceModule,
   ],
   controllers: [ReceiptsController],
   providers: [

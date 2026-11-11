@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { In, Repository } from 'typeorm'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { Account } from '../entities/account.entity'
@@ -12,6 +12,7 @@ import { UserCompany } from '../entities/user-company.entity'
 import { hashPassword } from '../common/utils/crypto.util'
 import { ACCOUNT_SEED, CATEGORY_LABELS, inferCategory } from './seeds/account.seed'
 import {
+  OBSOLETE_PERMISSION_CODES,
   PERMISSION_SEED,
   ROLE_SEED,
   SeedPermissionNode,
@@ -38,6 +39,7 @@ export class SeedService {
     await this.seedPermissions()
     await this.seedRoles()
     await this.syncPermissions()
+    await this.cleanupObsoletePermissions()
     await this.syncRolePermissions()
 
     await this.seedUsers()
@@ -146,6 +148,34 @@ export class SeedService {
 
     await walk(PERMISSION_SEED, null)
     if (added > 0) this.logger.log(`增量补齐权限 ${added} 条`)
+  }
+
+  /**
+   * 清理已废弃的权限码（老库升级用）。
+   *
+   * 典型场景：插件合并后旧权限码（如 ai-voice:use）仍留在库里，
+   * 权限树会显示指向不存在菜单的死节点。这里先解绑角色关联再删权限，
+   * 避免 join 表留下悬空行。
+   */
+  private async cleanupObsoletePermissions(): Promise<void> {
+    if (!OBSOLETE_PERMISSION_CODES.length) return
+
+    const rows = await this.permissionRepo.find({
+      where: { code: In(OBSOLETE_PERMISSION_CODES) },
+    })
+    if (!rows.length) return
+
+    const ids = rows.map((r) => r.id)
+
+    await this.permissionRepo
+      .createQueryBuilder()
+      .delete()
+      .from('sys_role_permission')
+      .where('permission_id IN (:...ids)', { ids })
+      .execute()
+
+    await this.permissionRepo.delete(ids)
+    this.logger.log(`清理废弃权限 ${ids.length} 条：${rows.map((r) => r.code).join(', ')}`)
   }
 
   /** 增量补齐角色权限：把种子中新增的权限补发给系统角色（只增不减） */

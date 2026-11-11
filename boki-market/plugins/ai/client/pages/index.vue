@@ -1,16 +1,16 @@
 <template>
   <div class="page">
     <div class="page-card page-card--narrow">
-      <div class="page-title">AI模型设置</div>
+      <div class="page-title">AI 模型接入</div>
       <el-alert type="info" :closable="false" show-icon class="mb12"
-        title="接入任意 OpenAI 兼容大模型接口后，语音助手与人工智能能力自动增强：自由说法的指令由模型理解，未接入或模型不可用时自动回退现有规则引擎，功能不受影响。" />
+        title="这里是模型接入底座，本身不提供业务功能：接入任意 OpenAI 兼容大模型接口后，语音助手与智能记账的模型能力自动生效。未接入或模型不可用时，各插件自动回退规则引擎，功能不受影响。" />
       <el-alert :type="ready ? 'success' : 'warning'" :closable="false" show-icon class="mb12"
         :title="ready
           ? `已接入：${providerName} · ${form.model}。说话更自由，回复更自然。`
           : '未接入大模型，语音助手按关键词匹配工作（现状）。可获取/自部署模型后在此开启。'" />
 
       <el-form ref="formRef" :model="form" label-width="110px">
-        <el-form-item label="启用AI增强">
+        <el-form-item label="启用模型能力">
           <el-switch v-model="form.enabled" />
           <span class="form-hint">{{ form.enabled ? '已开启：接入后自动启用' : '已关闭：保持现状' }}</span>
         </el-form-item>
@@ -142,7 +142,7 @@ async function onSave() {
     })
     form.apiKey = ''
     await load()
-    ok('AI模型设置已保存')
+    ok('模型接入设置已保存')
   } finally {
     saving.value = false
   }

@@ -507,6 +507,22 @@ export const PERMISSION_SEED: SeedPermissionNode[] = [
         type: PermissionType.ACTION,
         sort: 13,
       },
+      {
+        // 语音通道：原独立插件 ai-voice 已并入本插件，权限码随之收口到 receipts 下。
+        // use 只能预演，commit 才允许把指令变成业务单据。
+        code: 'receipts:voice:use',
+        name: '使用 AI 一句话指令',
+        module: 'receipts',
+        type: PermissionType.ACTION,
+        sort: 14,
+      },
+      {
+        code: 'receipts:voice:commit',
+        name: 'AI 指令确认入账',
+        module: 'receipts',
+        type: PermissionType.ACTION,
+        sort: 15,
+      },
     ],
   },
   {
@@ -984,7 +1000,7 @@ export const PERMISSION_SEED: SeedPermissionNode[] = [
   },
   {
     code: 'system:ai-config',
-    name: 'AI模型设置',
+    name: 'AI 模型接入',
     module: 'ai',
     type: PermissionType.MENU,
     path: '/system/ai',
@@ -1010,7 +1026,16 @@ export const PERMISSION_SEED: SeedPermissionNode[] = [
       },
     ],
   },
+  // 说明：语音助手（voice）只负责只读查询与播报。
+  // 一句话记账/发工资/加人/改凭证/审凭证已并入「AI 智能记账」(receipts)，
+  // 对应权限码 receipts:voice:use / receipts:voice:commit 挂在 receipts 节点下。
 ]
+
+/**
+ * 已废弃的权限码：仍留在老库里但种子已不再定义，启动时清理。
+ * 清理时必须先解绑角色关联，避免权限树出现指向不存在菜单的死节点。
+ */
+export const OBSOLETE_PERMISSION_CODES = ['ai-voice', 'ai-voice:use', 'ai-voice:commit']
 
 /**
  * 角色种子定义：权限 code 精确匹配；admin 使用通配 *（实际分配全部权限）
@@ -1137,6 +1162,9 @@ export const ROLE_SEED: Array<{
       'company:view',
       'voice',
       'voice:use',
+      // AI 智能记账的语音通道：会计默认可用（写入仍受 voucher:create / voucher:audit / hr:* 二次校验）
+      'receipts:voice:use',
+      'receipts:voice:commit',
     ],
   },
   {

@@ -90,9 +90,13 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="目标科目" prop="targetAccountCode">
-          <el-select v-model="form.targetAccountCode" filterable style="width: 100%" placeholder="选择明细科目（叶子科目）">
-            <el-option v-for="acc in accountOptions" :key="acc.code" :label="`${acc.code} ${acc.fullName}`" :value="acc.code" />
-          </el-select>
+          <AccountSelect
+            v-model="form.targetAccountCode"
+            value-key="code"
+            :clearable="false"
+            :size="'default'"
+            placeholder="选择明细科目（叶子科目）"
+          />
         </el-form-item>
         <el-form-item label="优先级">
           <el-input-number v-model="form.priority" :min="0" :max="999" />
@@ -113,13 +117,13 @@ import { type FormInstance, type FormRules } from 'element-plus'
 import { Search, Plus } from '@element-plus/icons-vue'
 import { accountApi, classifyRuleApi } from '@/api'
 import { usePagedList, ok, confirmDelete } from '@/composables/useList'
+import AccountSelect from '../components/AccountSelect.vue'
 
 const { list, total, loading, query, load, search, handleSize, reset: onReset } = usePagedList({
   fetcher: (params) => classifyRuleApi.list(params),
   defaultParams: { page: 1, pageSize: 20 },
 })
 
-const accountOptions = ref<any[]>([])
 const accountNameMap = ref<Record<string, string>>({})
 
 function accountName(code: string): string {
@@ -128,10 +132,10 @@ function accountName(code: string): string {
 
 async function loadAccounts() {
   try {
-    accountOptions.value = await accountApi.options()
-    accountNameMap.value = Object.fromEntries(accountOptions.value.map((a) => [a.code, a.name ?? '']))
+    const rows = await accountApi.options()
+    accountNameMap.value = Object.fromEntries(rows.map((a) => [a.code, a.name ?? '']))
   } catch {
-    accountOptions.value = []
+    accountNameMap.value = {}
   }
 }
 

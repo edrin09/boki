@@ -218,10 +218,7 @@
           </el-table-column>
           <el-table-column label="会计科目" min-width="230">
             <template #default="{ row }">
-              <el-select v-model="row.accountId" filterable size="small" style="width: 100%">
-                <el-option v-for="acc in accountOptions" :key="acc.id"
-                  :label="`${acc.code} ${acc.fullName}`" :value="acc.id" />
-              </el-select>
+              <AccountSelect v-model="row.accountId" value-key="id" :clearable="false" />
             </template>
           </el-table-column>
           <el-table-column label="借方金额" width="150">
@@ -301,14 +298,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type UploadFile, type UploadFiles } from 'element-plus'
 import { Select, Refresh, Delete, UploadFilled, MagicStick } from '@element-plus/icons-vue'
 import { receiptApi } from '@/api'
 import service from '@/api/http'
 import { usePagedList, ok } from '@/composables/useList'
-import { accountApi } from '@/api'
 import { formatAmount } from '@/utils/format'
+import AccountSelect from '../components/AccountSelect.vue'
 
 const SUGGEST_TAG: Record<string, 'success' | 'danger' | 'warning' | 'info'> = {
   input_vat: 'danger',
@@ -468,15 +465,6 @@ async function onUpload() {
   } finally {
     uploading.value = false
     uploadProgress.value = ''
-  }
-}
-
-const accountOptions = ref<any[]>([])
-async function loadAccounts() {
-  try {
-    accountOptions.value = await accountApi.options()
-  } catch {
-    accountOptions.value = []
   }
 }
 
@@ -717,7 +705,6 @@ async function openImage(row: any) {
   }
 }
 
-onMounted(loadAccounts)
 </script>
 
 <style scoped>

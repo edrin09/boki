@@ -1,7 +1,10 @@
 <template>
   <!-- 悬浮 FAB（登录后布局内显示；无 voice:use 权限时整个组件不渲染） -->
   <div v-if="allowed" class="voice-fab" :class="{ 'is-recording': state.phase === 'recording' }">
-    <el-tooltip content="语音助手：按住 Alt 说话，松开自动查询，一句话出统计+Excel" placement="left">
+    <el-tooltip
+      content="语音助手：按住 Alt 说一句话 —— 查账、导出 Excel、记账、发工资都能办"
+      placement="left"
+    >
       <button class="voice-fab__btn" :disabled="dialog.loading" @click="onFabClick">
         <span v-if="state.phase !== 'recording'" class="voice-fab__icon">🎙️</span>
         <span v-else class="voice-fab__wave">
@@ -22,16 +25,22 @@
     width="760px"
     append-to-body
     destroy-on-close
+    :close-on-click-modal="false"
     @closed="onDialogClosed"
   >
     <div class="voice-dialog">
-      <el-alert
-        v-if="!chat.items.length"
-        title="按住【Alt】键说话，松开自动查询；回答和思考过程会逐字显示，不方便说话也可直接打字"
-        type="info"
-        :closable="false"
-        class="voice-dialog__hint"
-      />
+      <div v-if="!chat.items.length" class="voice-hero">
+        <div class="voice-hero__title">
+          按住 <kbd>Alt</kbd> 说一句话，松开自动执行
+        </div>
+        <div class="voice-hero__chips">
+          <span v-for="chip in CAPABILITIES" :key="chip" class="voice-hero__chip">{{ chip }}</span>
+        </div>
+        <div class="voice-hero__tip">
+          查账 / 统计 / 导出 直接出结果；记账、发工资、加人员、审凭证会先出确认卡片，
+          点「确认执行」才入账，且一律只生成草稿待复核。
+        </div>
+      </div>
 
       <!-- 对话区：用户问题 + 思考过程 + 回答，全部打字机效果 -->
       <div ref="chatRef" class="voice-dialog__chat">
@@ -60,6 +69,7 @@
 
       <!-- 查询结果：回答打完后展示表格 -->
       <template v-if="dialog.revealed && dialog.card?.columns?.length">
+        <div v-if="dialog.card.title" class="voice-dialog__cardtitle">{{ dialog.card.title }}</div>
         <el-table
           :data="dialog.card.rows"
           :show-summary="!!dialog.card.totals"
@@ -91,23 +101,47 @@
         </div>
       </template>
 
+      <!-- 扩展插槽：其他插件（如 receipts 的智能记账面板）在这里挂载一句话写操作卡片。
+           未安装任何扩展时为空，voice 单独运行的行为完全不变。 -->
+      <PluginSlot
+        name="voice.assistant.panel"
+        :transcript="dialog.transcript"
+        :visible="dialog.visible"
+        :close="closeVoiceDialog"
+        @takeover="onPanelTakeover"
+        @settled="onPanelSettled"
+      />
+
       <div class="voice-dialog__text">
         <el-input
           ref="textInputRef"
           v-model="dialog.textContent"
-          placeholder="不方便说话可直接打字，回车查询，比如“看看这个月的收支”"
+          placeholder="不方便说话就直接打字，回车发送 —— 例：记一笔 800 的水电费，银行付的"
           :clearable="true"
           @keyup.enter="onSubmitText"
         />
-        <el-button type="primary" plain :loading="dialog.loading" @click="onSubmitText">查询</el-button>
+        <el-button type="primary" plain :loading="dialog.loading" @click="onSubmitText">发送</el-button>
       </div>
       <div class="voice-dialog__cmds">
-        <el-tag
-          v-for="cmd in SAMPLE_CMDS"
-          :key="cmd"
-          class="voice-dialog__cmd"
-          @click="onSampleCmd(cmd)"
-        >{{ cmd }}</el-tag>
+        <div class="voice-dialog__cmdgroup">
+          <span class="voice-dialog__cmdlabel">查账</span>
+          <el-tag
+            v-for="cmd in QUERY_CMDS"
+            :key="cmd"
+            class="voice-dialog__cmd"
+            @click="onSampleCmd(cmd)"
+          >{{ cmd }}</el-tag>
+        </div>
+        <div class="voice-dialog__cmdgroup">
+          <span class="voice-dialog__cmdlabel">办事</span>
+          <el-tag
+            v-for="cmd in ACTION_CMDS"
+            :key="cmd"
+            type="success"
+            class="voice-dialog__cmd"
+            @click="onSampleCmd(cmd)"
+          >{{ cmd }}</el-tag>
+        </div>
       </div>
     </div>
   </el-dialog>
@@ -127,17 +161,24 @@ import { useUserStore } from '@/stores/user'
 const userStore = useUserStore()
 const allowed = computed(() => userStore.hasPermission('voice:use'))
 
-const SAMPLE_CMDS = [
+/** 能力标签：只做介绍，不代表真实调用顺序 */
+const CAPABILITIES = ['查账 / 统计', '导出 Excel', '一句话记账', '发工资 · 加人员', '审核凭证']
+
+/** 查询类示例：走 voice 自己的统计与导出 */
+const QUERY_CMDS = [
   '看看这个月的收支',
   '今年盈亏怎么样',
   '谁还欠我钱',
-  '我欠供应商多少',
-  '员工还有哪笔借款没还',
   '账上还剩多少钱',
-  '这个月费用花在哪',
-  '这个月记了几笔凭证',
   '导出这个月的凭证',
-  '导出上个月的报销单',
+]
+
+/** 办事类示例：由扩展面板（智能记账）接管，确认后才入账 */
+const ACTION_CMDS = [
+  '记一笔 800 的水电费，银行付的',
+  '收了客户 12000 还没开票',
+  '发一下 10 月工资',
+  '把记-0015 审了',
 ]
 
 /** 思考过程文案：与真实流水线一致（理解问题 → 查数据 → 汇总 → 生成回答） */
@@ -252,10 +293,37 @@ function onFabClick(): void {
   openVoiceDialog()
 }
 
+/**
+ * 扩展面板（智能记账）是否接管了当前这句话。
+ *
+ * 接管后本插件不再输出查询结论：否则同一句话会先查出「没有听明白」，
+ * 下面又冒出记账卡片，看起来像两个插件各说各话。
+ */
+let panelTakeover = false
+/** 轮次序号：接管后用户可能马上问下一句，上一轮的迟到结果必须丢掉 */
+let turnSeq = 0
+
+/**
+ * 面板在识别到写操作意图时通知：停掉本插件的思考动画（面板自己会显示
+ * 「正在理解这句话」，两个加载提示叠着反而更乱），但保持 loading 状态，
+ * 避免用户在模型解析期间又发一句。
+ */
+function onPanelTakeover(): void {
+  panelTakeover = true
+  finishThinking()
+  dialog.loading = true
+}
+
+/** 面板处理完了（出了卡片 / 没听懂 / 失败）：恢复发送按钮 */
+function onPanelSettled(): void {
+  dialog.loading = false
+}
+
 /** 打开弹窗并回到待录音状态（提示按住 Alt 说话） */
 function openVoiceDialog(): void {
   stopSpeaking()
   clearTypeTimers()
+  panelTakeover = false
   state.phase = 'idle'
   state.elapsedMs = 0
   chat.items = []
@@ -267,6 +335,14 @@ function openVoiceDialog(): void {
   dialog.exportId = undefined
   dialog.revealed = false
   dialog.loading = false
+}
+
+/** 供扩展面板主动关闭弹窗：跳转到其他页面前先收起来，避免页面被弹窗盖住 */
+function closeVoiceDialog(): void {
+  stopSpeaking()
+  clearTypeTimers()
+  state.phase = 'idle'
+  dialog.visible = false
 }
 
 /** 按下 Alt：开始录音逐字上屏（按住说话，松开自动查询） */
@@ -330,6 +406,7 @@ function autoSubmit(text: string): void {
 }
 
 async function submit(run: () => Promise<VoiceQueryResult>): Promise<void> {
+  const turn = ++turnSeq
   dialog.loading = true
   dialog.revealed = false
   dialog.card = null
@@ -342,10 +419,22 @@ async function submit(run: () => Promise<VoiceQueryResult>): Promise<void> {
   startThinking(think)
   try {
     const result = await run()
+    // 已被新的一轮取代（用户改了说法/面板接手后马上问了下一句）：结果直接丢弃
+    if (turn !== turnSeq) return
+    // 这句话已由扩展面板接管：查询结论整条丢弃，连语音播报也不再念
+    if (panelTakeover) {
+      finishThinking()
+      return
+    }
     showResult(result)
     // TTS 失败时静默降级为仅展示
     speak(result.reply)
   } catch {
+    if (turn !== turnSeq) return
+    if (panelTakeover) {
+      finishThinking()
+      return
+    }
     finishThinking()
     const msg = reactive<ChatMsg>({ role: 'assistant', text: '', done: false })
     chat.items.push(msg)
@@ -355,7 +444,9 @@ async function submit(run: () => Promise<VoiceQueryResult>): Promise<void> {
     })
     ElMessage.error('查询失败，请稍后重试')
   } finally {
-    dialog.loading = false
+    // 只有「当前轮」且没被扩展面板接管时才有权收掉加载态：
+    // 接管后由面板的 settled 事件负责恢复，否则会在面板还在解析时就放开输入
+    if (turn === turnSeq && !panelTakeover) dialog.loading = false
   }
 }
 
@@ -369,7 +460,7 @@ function finishThinking(): void {
 
 function showResult(result: VoiceQueryResult): void {
   finishThinking()
-  dialog.title = result.card?.title ? `${result.card.title} · 语音助手` : '语音助手'
+  dialog.title = '语音助手'
   dialog.transcript = result.transcript ?? ''
   dialog.replyType = result.intentId === 'fallback' || /出了点问题/.test(result.reply) ? 'warning' : 'success'
   dialog.card = result.intentId === 'fallback' ? null : result.card ?? null
@@ -395,12 +486,22 @@ function onSampleCmd(cmd: string): void {
 
 function onSubmitText(): void {
   const text = dialog.textContent.trim()
-  if (!text || dialog.loading) return
+  if (!text) return
+  // 解析中重复回车：给一句提示，否则用户只会觉得「按了没反应」
+  if (dialog.loading) {
+    ElMessage.info('上一条还在处理，稍等一两秒')
+    return
+  }
+  // 新一轮对话：先复位接管标记，否则上一轮的写操作会把这一轮的查询结果也吞掉
+  panelTakeover = false
   if (stageTimer) {
     clearTimeout(stageTimer)
     stageTimer = null
   }
   dialog.textContent = ''
+  // 语音与打字两条路径都收口在这里：先记下原话，
+  // 供 voice.assistant.panel 插槽上的扩展插件（如 ai-voice）实时消费。
+  dialog.transcript = text
   chat.items.push({ role: 'user', text, done: true })
   void submit(() => voiceApi.queryText(text))
 }
@@ -539,9 +640,59 @@ onUnmounted(() => {
   }
 }
 
+.voice-hero {
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  border: 1px dashed var(--el-border-color, #dcdfe6);
+  border-radius: 8px;
+  background: var(--el-fill-color-lighter, #fafbfc);
+
+  &__title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--el-text-color-primary, #303133);
+
+    kbd {
+      padding: 0 5px;
+      border: 1px solid var(--el-border-color, #dcdfe6);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 12px;
+      background: #fff;
+    }
+  }
+
+  &__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  &__chip {
+    padding: 1px 9px;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 18px;
+    color: var(--app-primary, #409eff);
+    background: rgb(64 158 255 / 10%);
+  }
+
+  &__tip {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--el-text-color-secondary, #909399);
+  }
+}
+
 .voice-dialog {
-  &__hint {
-    margin-bottom: 10px;
+  &__cardtitle {
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--el-text-color-primary, #303133);
   }
 
   &__chat {
@@ -654,12 +805,25 @@ onUnmounted(() => {
 
   &__cmds {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 6px;
+  }
 
-    .voice-dialog__cmd {
-      cursor: pointer;
-    }
+  &__cmdgroup {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__cmdlabel {
+    flex: 0 0 28px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary, #909399);
+  }
+
+  .voice-dialog__cmd {
+    cursor: pointer;
   }
 }
 

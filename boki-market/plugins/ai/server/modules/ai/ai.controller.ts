@@ -7,7 +7,7 @@ import { AiService } from './ai.service'
 export class AiController {
   constructor(private readonly ai: AiService) {}
 
-  /** 登录即可查：语音助手前端据此展示「AI 增强」徽标 */
+  /** 登录即可查：语音助手前端据此展示「AI 已接入」徽标 */
   @Get('status')
   @Operation('查询 AI 接入状态')
   async status() {
