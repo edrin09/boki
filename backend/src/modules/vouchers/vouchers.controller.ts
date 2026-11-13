@@ -58,6 +58,13 @@ export class VouchersController {
     return this.vouchersService.getNextVoucherNo(period, word || '记')
   }
 
+  @Get('employee-options')
+  @RequirePermissions('voucher:list', 'voucher:create')
+  @Operation('员工辅助核算选项')
+  employeeOptions() {
+    return this.vouchersService.employeeOptions()
+  }
+
   @Get(':id')
   @RequirePermissions('voucher:list')
   @Operation('查询凭证详情')

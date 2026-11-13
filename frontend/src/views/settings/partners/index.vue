@@ -80,7 +80,7 @@
         <OcrUpload target="partner" @apply="onOcrApply" />
       </div>
 
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px">
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" placeholder="往来单位全称" />
         </el-form-item>

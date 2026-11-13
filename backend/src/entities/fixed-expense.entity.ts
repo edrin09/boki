@@ -4,13 +4,12 @@ import { decimalTransformer } from '../common/transformers/decimal.transformer'
 
 /** 固定费用频率 */
 export const FIXED_EXPENSE_FREQUENCIES = {
-  ONCE: 'once', // 一次性
   MONTHLY: 'monthly', // 每月
   QUARTERLY: 'quarterly', // 每季度
   YEARLY: 'yearly', // 每年
 } as const
 
-/** 固定费用模板：一次性录入，周期性自动生成支出凭证 */
+/** 固定费用模板：周期性强，自动生成支出凭证 */
 @Entity('fin_fixed_expense')
 export class FixedExpense extends BaseEntity {
   @Index('idx_fixed_expense_company')
@@ -20,7 +19,7 @@ export class FixedExpense extends BaseEntity {
   @Column({ length: 100, comment: '费用名称' })
   name: string
 
-  @Column({ length: 20, default: 'monthly', comment: '频率 once/monthly/quarterly/yearly' })
+  @Column({ length: 20, default: 'monthly', comment: '频率 monthly/quarterly/yearly' })
   frequency: string
 
   @Column({ type: 'decimal', precision: 18, scale: 2, default: 0, transformer: decimalTransformer })

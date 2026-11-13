@@ -28,6 +28,15 @@
         </el-button>
       </div>
 
+      <el-alert
+        v-if="checkResult && !checkResult.balanced"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="mb12"
+        :title="`期初余额借贷不平衡，差额 ${formatAmount(checkResult.difference)}；未平衡前不能结转损益。`"
+      />
+
       <el-table v-loading="loading" :data="rows" empty-text="该年度暂无期初余额">
         <el-table-column prop="accountCode" label="科目编码" width="110" />
         <el-table-column prop="accountFullName" label="科目名称" min-width="220" />
@@ -39,6 +48,9 @@
         </el-table-column>
         <el-table-column prop="projectName" label="项目" width="120">
           <template #default="{ row }">{{ row.projectName || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="employeeName" label="员工" width="110">
+          <template #default="{ row }">{{ row.employeeName || '-' }}</template>
         </el-table-column>
         <el-table-column label="方向" width="80" align="center">
           <template #default="{ row }">
@@ -143,6 +155,17 @@
               />
             </el-select>
           </el-form-item>
+
+          <el-form-item v-if="auxTypes.includes('employee')" label="员工" prop="employeeId">
+            <el-select v-model="form.employeeId" filterable placeholder="必选" style="width: 100%">
+              <el-option
+                v-for="e in employeeOptions"
+                :key="e.id"
+                :label="`${e.code} ${e.name}`"
+                :value="e.id"
+              />
+            </el-select>
+          </el-form-item>
         </template>
 
         <el-form-item label="期初金额" prop="amount">
@@ -166,7 +189,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search, Download, Delete } from '@element-plus/icons-vue'
-import { accountApi, initialBalanceApi } from '@/api'
+import { accountApi, employeeApi, initialBalanceApi } from '@/api'
 import { confirmDelete, ok } from '@/composables/useList'
 import { exportExcel } from '@/utils/export'
 import { formatAmount } from '@/utils/format'
@@ -180,6 +203,7 @@ const saving = ref(false)
 const rows = ref<any[]>([])
 const checkResult = ref<any>(null)
 const accountOptions = ref<any[]>([])
+const employeeOptions = ref<any[]>([])
 
 const dialogVisible = ref(false)
 const formRef = ref<FormInstance>()
@@ -190,6 +214,7 @@ const initialForm = {
   partnerId: '',
   departmentId: '',
   projectId: '',
+  employeeId: '',
   direction: 'debit' as 'debit' | 'credit',
   amount: 0,
   remark: '',
@@ -222,6 +247,7 @@ function onAccountChange() {
   form.partnerId = ''
   form.departmentId = ''
   form.projectId = ''
+  form.employeeId = ''
 }
 
 watch(dialogVisible, (v) => {
@@ -262,6 +288,10 @@ async function onSubmit() {
     ElMessage.warning('期初金额必须大于 0')
     return
   }
+  if (auxTypes.value.includes('employee') && !form.employeeId) {
+    ElMessage.warning('该科目需要指定员工')
+    return
+  }
   saving.value = true
   try {
     await initialBalanceApi.save({
@@ -270,6 +300,7 @@ async function onSubmit() {
       partnerId: form.partnerId || undefined,
       departmentId: form.departmentId || undefined,
       projectId: form.projectId || undefined,
+      employeeId: form.employeeId || undefined,
       direction: form.direction,
       amount: form.amount,
       remark: form.remark || undefined,
@@ -294,6 +325,7 @@ function onExport() {
       { title: '往来单位', prop: 'partnerName', width: 18 },
       { title: '部门', prop: 'departmentName', width: 14 },
       { title: '项目', prop: 'projectName', width: 14 },
+      { title: '员工', prop: 'employeeName', width: 12 },
       { title: '方向', prop: 'direction', width: 8, format: (r) => (r.direction === 'debit' ? '借' : '贷') },
       { title: '金额', prop: 'amount', width: 16, amount: true },
       { title: '备注', prop: 'remark', width: 20 },
@@ -311,6 +343,7 @@ function onExport() {
 
 onMounted(async () => {
   accountOptions.value = await accountApi.options()
+  employeeOptions.value = await employeeApi.options(true)
   await basicStore.loadAll()
   load()
 })

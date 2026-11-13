@@ -93,19 +93,19 @@ export class CompanyScopedRepository<T extends ObjectLiteral> {
   }
 
   async findBy(where: any): Promise<T[]> {
-    return this.repo.findBy(this.withScope(where))
+    return this.repo.findBy(this.scopeWhere(where))
   }
 
   async findAndCount(options?: any): Promise<[T[], number]> {
     return this.repo.findAndCount(this.withScope(options))
   }
 
-  async findOne(options?: any): Promise<T | null> {
+  async findOne(options: any): Promise<T | null> {
     return this.repo.findOne(this.withScope(options))
   }
 
   async findOneBy(where: any): Promise<T | null> {
-    return this.repo.findOneBy(this.withScope(where))
+    return this.repo.findOneBy(this.scopeWhere(where))
   }
 
   async count(options?: any): Promise<number> {
@@ -113,7 +113,7 @@ export class CompanyScopedRepository<T extends ObjectLiteral> {
   }
 
   async countBy(where: any): Promise<number> {
-    return this.repo.countBy(this.withScope(where))
+    return this.repo.countBy(this.scopeWhere(where))
   }
 
   async exists(options?: any): Promise<boolean> {
@@ -121,7 +121,7 @@ export class CompanyScopedRepository<T extends ObjectLiteral> {
   }
 
   async existsBy(where: any): Promise<boolean> {
-    return this.repo.existsBy(this.withScope(where))
+    return this.repo.existsBy(this.scopeWhere(where))
   }
 
   // ---------------- 写 ----------------
@@ -179,6 +179,17 @@ export class CompanyScopedRepository<T extends ObjectLiteral> {
 
   private get cid(): string {
     return requireCompanyId()
+  }
+
+  /** 给 findBy / findOneBy / countBy / existsBy 的 where 追加 companyId（不包 where 层） */
+  private scopeWhere(where: any): any {
+    if (!where) return { companyId: this.cid }
+    if (Array.isArray(where)) return where.map((w) => ({ ...w, companyId: this.cid }))
+    if (typeof where !== 'object') {
+      // 字符串条件 TypeORM 的 *By 系列不支持，提示改用 find(options)
+      throw new Error('按条件查询请传入对象形式的 where（CompanyScopedRepository）')
+    }
+    return { ...where, companyId: this.cid }
   }
 
   /** 给查询选项里的 where 追加 companyId */

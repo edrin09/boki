@@ -6,6 +6,15 @@
           <div class="page-toolbar">
             <strong>数据备份</strong>
             <div class="page-toolbar__spacer" />
+            <el-upload
+              :show-file-list="false"
+              accept=".db,.sqlite,.sqlite3"
+              :before-upload="onRestorePlain"
+            >
+              <el-button v-permission="'system:backup:restore'" type="warning" :loading="restoringPlain">
+                上传明文库恢复
+              </el-button>
+            </el-upload>
             <el-button v-permission="'system:backup:download'" type="primary" :loading="creating" @click="onCreate">
               <el-icon><Download /></el-icon>立即备份
             </el-button>
@@ -13,6 +22,8 @@
 
           <el-alert type="info" :closable="false" show-icon class="mb12"
             title="SQLite 单文件数据库，备份即完整复制。建议在月末结账或批量导入前先备份一次。" />
+          <el-alert type="warning" :closable="false" show-icon class="mb12"
+            title="「上传明文库恢复」用于把明文的 .db 文件恢复到本系统：系统会先用当前密钥加密，再覆盖主库，并自动保留恢复前的安全备份。" />
 
           <el-table v-loading="loading" :data="backups" empty-text="暂无备份">
             <el-table-column prop="filename" label="文件名" min-width="220" />
@@ -89,6 +100,7 @@ const backups = ref<any[]>([])
 const loading = ref(false)
 const loadingInfo = ref(false)
 const creating = ref(false)
+const restoringPlain = ref(false)
 const info = ref<any>(null)
 
 async function load() {
@@ -169,6 +181,32 @@ async function onRestore(row: any) {
   } catch {
     /* 错误已提示 */
   }
+}
+
+async function onRestorePlain(file: File) {
+  try {
+    await ElMessageBox.confirm(
+      `即将用「${file.name}」覆盖当前全部数据。系统会先用当前密钥把该文件加密，再自动生成一份 pre-restore-plain 安全备份。恢复完成后需重启服务并重新登录。确定继续吗？`,
+      '上传明文库恢复',
+      { type: 'warning', confirmButtonText: '确定恢复', cancelButtonText: '取消' },
+    )
+  } catch {
+    return false
+  }
+  restoringPlain.value = true
+  try {
+    const res = await systemApi.restorePlain(file)
+    ElMessageBox.alert(res.message ?? '恢复完成，请重启服务使数据生效', '恢复完成', {
+      type: 'success',
+    })
+    load()
+    loadInfo()
+  } catch {
+    /* 错误已由拦截器提示 */
+  } finally {
+    restoringPlain.value = false
+  }
+  return false
 }
 
 async function onRemove(row: any) {

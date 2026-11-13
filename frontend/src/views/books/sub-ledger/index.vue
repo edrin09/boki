@@ -59,6 +59,9 @@
         <el-table-column label="项目" width="130">
           <template #default="{ row }">{{ row.projectName || '-' }}</template>
         </el-table-column>
+        <el-table-column label="员工" width="120">
+          <template #default="{ row }">{{ row.employeeName || '-' }}</template>
+        </el-table-column>
         <el-table-column label="期初借方" width="140" align="right">
           <template #default="{ row }">
             <span class="amount amount--debit">{{ row.openingDebit ? formatAmount(row.openingDebit) : '' }}</span>
@@ -154,6 +157,7 @@ function onExport() {
     partnerName: g.partnerName ?? '（无）',
     departmentName: g.departmentName ?? '',
     projectName: g.projectName ?? '',
+    employeeName: g.employeeName ?? '',
     openingDebit: g.openingDebit,
     openingCredit: g.openingCredit,
     periodDebit: g.periodDebit,
@@ -169,6 +173,7 @@ function onExport() {
       { title: '往来单位', prop: 'partnerName', width: 18 },
       { title: '部门', prop: 'departmentName', width: 14 },
       { title: '项目', prop: 'projectName', width: 14 },
+      { title: '员工', prop: 'employeeName', width: 14 },
       { title: '期初借方', prop: 'openingDebit', width: 15, amount: true },
       { title: '期初贷方', prop: 'openingCredit', width: 15, amount: true },
       { title: '本期借方', prop: 'periodDebit', width: 15, amount: true },

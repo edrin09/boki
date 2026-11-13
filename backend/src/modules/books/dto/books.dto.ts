@@ -59,4 +59,10 @@ export class LedgerQueryDto extends BooksQueryDto {
   @ToArray()
   @IsArray()
   projectIds?: string[]
+
+  /** 员工过滤 */
+  @IsOptional()
+  @ToArray()
+  @IsArray()
+  employeeIds?: string[]
 }

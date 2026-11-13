@@ -5,6 +5,7 @@ import { Account } from '../../entities/account.entity'
 import { Partner } from '../../entities/partner.entity'
 import { Department } from '../../entities/department.entity'
 import { Project } from '../../entities/project.entity'
+import { Employee } from '../../entities/hr.entity'
 import { BalanceDirection } from '../../common/enums'
 import { toCents, fromCents } from '../../common/utils/money.util'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
@@ -23,40 +24,44 @@ export class InitialBalanceService {
     @InjectCompanyRepo(Department)
     private readonly departmentRepo: CompanyScopedRepository<Department>,
     @InjectCompanyRepo(Project) private readonly projectRepo: CompanyScopedRepository<Project>,
+    @InjectCompanyRepo(Employee) private readonly employeeRepo: CompanyScopedRepository<Employee>,
   ) {}
 
   /** 按年度查询期初余额（可按科目过滤） */
   async findByYear(fiscalYear: number, accountId?: string): Promise<any[]> {
+    // 注意：getRawMany 会对实体列自动加「别名_」前缀（如 ib_id），
+    // 因此这里用显式别名把原始列统一映射为无前缀字段，保证 toVo 取值正确。
     const qb = this.repo
       .createQueryBuilder('ib')
       .leftJoin('Account', 'a', 'a.id = ib.accountId')
       .leftJoin('Partner', 'p', 'p.id = ib.partnerId')
       .leftJoin('Department', 'd', 'd.id = ib.departmentId')
       .leftJoin('Project', 'pr', 'pr.id = ib.projectId')
-      .select([
-        'ib.id',
-        'ib.fiscalYear',
-        'ib.accountId',
-        'ib.accountCode',
-        'ib.accountName',
-        'ib.partnerId',
-        'ib.departmentId',
-        'ib.projectId',
-        'ib.direction',
-        'ib.amount',
-        'ib.remark',
-        'ib.createdAt',
-        'ib.updatedAt',
-        'a.code',
-        'a.name',
-        'a.fullName',
-        'a.category',
-        'a.direction',
-        'a.level',
-        'p.name',
-        'd.name',
-        'pr.name',
-      ])
+      .leftJoin('Employee', 'emp', 'emp.id = ib.employeeId')
+      .select('ib.id', 'id')
+      .addSelect('ib.fiscalYear', 'fiscalYear')
+      .addSelect('ib.accountId', 'accountId')
+      .addSelect('ib.accountCode', 'accountCode')
+      .addSelect('ib.accountName', 'accountName')
+      .addSelect('ib.partnerId', 'partnerId')
+      .addSelect('ib.departmentId', 'departmentId')
+      .addSelect('ib.projectId', 'projectId')
+      .addSelect('ib.employeeId', 'employeeId')
+      .addSelect('ib.direction', 'direction')
+      .addSelect('ib.amount', 'amount')
+      .addSelect('ib.remark', 'remark')
+      .addSelect('ib.createdAt', 'createdAt')
+      .addSelect('ib.updatedAt', 'updatedAt')
+      .addSelect('a.code', 'a_code')
+      .addSelect('a.name', 'a_name')
+      .addSelect('a.fullName', 'a_fullName')
+      .addSelect('a.category', 'a_category')
+      .addSelect('a.direction', 'a_direction')
+      .addSelect('a.level', 'a_level')
+      .addSelect('p.name', 'p_name')
+      .addSelect('d.name', 'd_name')
+      .addSelect('pr.name', 'pr_name')
+      .addSelect('emp.name', 'emp_name')
       .where('ib.fiscalYear = :fiscalYear', { fiscalYear })
 
     if (accountId) {
@@ -95,6 +100,7 @@ export class InitialBalanceService {
       partnerId: dto.partnerId || null,
       departmentId: dto.departmentId || null,
       projectId: dto.projectId || null,
+      employeeId: dto.employeeId || null,
       direction: dto.direction as BalanceDirection,
       amount: dto.amount,
       remark: dto.remark ?? null,
@@ -105,6 +111,22 @@ export class InitialBalanceService {
 
   /** 批量保存 */
   async batchSave(dto: BatchSaveInitialBalanceDto): Promise<{ count: number; message: string }> {
+    // 批量导入视为一套完整期初，先校验借贷平衡，避免把不平衡数据落库
+    let debitCents = 0
+    let creditCents = 0
+    for (const item of dto.items) {
+      const cents = toCents(item.amount)
+      if (cents === 0) continue
+      if (item.direction === BalanceDirection.DEBIT) debitCents += cents
+      else creditCents += cents
+    }
+    if (debitCents !== creditCents) {
+      throw new BadRequestException(
+        `期初余额借贷不平衡：借方 ${fromCents(debitCents)}，贷方 ${fromCents(creditCents)}，` +
+          `差额 ${fromCents(Math.abs(debitCents - creditCents))}`,
+      )
+    }
+
     let count = 0
     for (const item of dto.items) {
       if (toCents(item.amount) === 0) continue
@@ -167,6 +189,7 @@ export class InitialBalanceService {
         partnerId: norm(dto.partnerId) as any,
         departmentId: norm(dto.departmentId) as any,
         projectId: norm(dto.projectId) as any,
+        employeeId: norm(dto.employeeId) as any,
       },
     })
   }
@@ -195,6 +218,11 @@ export class InitialBalanceService {
       const exists = await this.projectRepo.findOne({ where: { id: dto.projectId } })
       if (!exists) throw new NotFoundException('项目不存在')
     }
+    if (types.includes('employee')) {
+      if (!dto.employeeId) throw new BadRequestException(`科目「${account.fullName}」必须指定员工`)
+      const exists = await this.employeeRepo.findOne({ where: { id: dto.employeeId } })
+      if (!exists) throw new NotFoundException('员工不存在')
+    }
   }
 
   private toVo(row: any): any {
@@ -214,6 +242,8 @@ export class InitialBalanceService {
       departmentName: row.d_name ?? null,
       projectId: row.projectId,
       projectName: row.pr_name ?? null,
+      employeeId: row.employeeId,
+      employeeName: row.emp_name ?? null,
       direction: row.direction,
       amount: row.amount,
       remark: row.remark,

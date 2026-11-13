@@ -11,8 +11,12 @@ import {
   Put,
   Query,
   Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common'
 import type { Response } from 'express'
+import { FileInterceptor } from '@nestjs/platform-express'
+import { memoryStorage } from 'multer'
 import { SystemService } from './system.service'
 import { CleanLogsDto, RestoreBackupDto } from './dto/system.dto'
 import { PaginationQueryDto } from '../../common/dto/pagination.dto'
@@ -128,6 +132,25 @@ export class SystemController {
   @Operation('从备份恢复数据库')
   restore(@Body() dto: RestoreBackupDto) {
     return this.systemService.restoreBackup(dto.filename)
+  }
+
+  /**
+   * 上传明文 SQLite 数据库，用当前 vault.key 重新加密后恢复。
+   * 与列表恢复的区别：允许明文文件（《数据备份与恢复手册》§4 的界面化实现）。
+   */
+  @Post('backups/restore-plain')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('system:backup:restore')
+  @Operation('上传明文数据库并加密恢复')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      // 单文件上限 1GB，正常账套库远小于此
+      limits: { fileSize: 1024 * 1024 * 1024 },
+    }),
+  )
+  restorePlain(@UploadedFile() file: Express.Multer.File, @Body() body: { confirm?: string }) {
+    return this.systemService.restorePlainDatabase(file, body?.confirm)
   }
 
   @Delete('backups/:filename')

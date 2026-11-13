@@ -90,9 +90,11 @@ export const ACCOUNT_SEED: SeedAccountNode[] = [
     direction: C,
     sort: 13,
     children: [
-      { code: '2211.01', name: '工资', direction: D, sort: 1 },
-      { code: '2211.02', name: '社会保险费', direction: D, sort: 2 },
-      { code: '2211.03', name: '住房公积金', direction: D, sort: 3 },
+      // 负债类明细科目余额方向必须为贷方：早期版本误写成借方，
+      // 会让「应付职工薪酬」在科目余额表里显示成借方余额
+      { code: '2211.01', name: '工资', direction: C, sort: 1 },
+      { code: '2211.02', name: '社会保险费', direction: C, sort: 2 },
+      { code: '2211.03', name: '住房公积金', direction: C, sort: 3 },
     ],
   },
   {
@@ -101,12 +103,12 @@ export const ACCOUNT_SEED: SeedAccountNode[] = [
     direction: C,
     sort: 14,
     children: [
-      { code: '2221.01', name: '应交增值税', direction: D, sort: 1 },
-      { code: '2221.02', name: '未交增值税', direction: D, sort: 2 },
-      { code: '2221.03', name: '应交企业所得税', direction: D, sort: 3 },
-      { code: '2221.04', name: '应交个人所得税', direction: D, sort: 4 },
-      { code: '2221.05', name: '应交城市维护建设税', direction: D, sort: 5 },
-      { code: '2221.06', name: '应交教育费附加', direction: D, sort: 6 },
+      { code: '2221.01', name: '应交增值税', direction: C, sort: 1 },
+      { code: '2221.02', name: '未交增值税', direction: C, sort: 2 },
+      { code: '2221.03', name: '应交企业所得税', direction: C, sort: 3 },
+      { code: '2221.04', name: '应交个人所得税', direction: C, sort: 4 },
+      { code: '2221.05', name: '应交城市维护建设税', direction: C, sort: 5 },
+      { code: '2221.06', name: '应交教育费附加', direction: C, sort: 6 },
     ],
   },
   { code: '2231', name: '应付利息', direction: C, sort: 15 },

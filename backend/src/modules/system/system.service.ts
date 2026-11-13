@@ -19,6 +19,8 @@ import { Partner } from '../../entities/partner.entity'
 import { Voucher } from '../../entities/voucher.entity'
 import { VoucherEntry } from '../../entities/voucher-entry.entity'
 import { resolveDatabasePath } from '../../config/database.config'
+import { openDatabase } from '../../vault/db-open'
+import { getBootKeyHex } from '../../vault/keystore'
 import {
   checkBackupCompatibility,
   createBackupSnapshot,
@@ -343,6 +345,119 @@ export class SystemService {
     return {
       message: `已从备份「${safe}」恢复。安全备份已保存为 pre-restore-${stamp}.db；WAL 模式下新数据在下次重启后完全生效。`,
       filename: safety,
+    }
+  }
+
+  /**
+   * 上传明文数据库 → 用当前 vault.key 加密 → 覆盖主库（恢复后需重启）。
+   *
+   * 对应《数据备份与恢复手册》§4 的明文恢复：手工会话里要「挪走 vault.json 让系统
+   * 启动时重新加密」，这里直接在内存/临时文件里完成 rekey，界面一键完成且无需停机。
+   *
+   * 安全约束：
+   * - 只接受明文 SQLite（密文备份走列表里的「恢复」，否则会得到 file is not a database）；
+   * - 先校验是本系统库（关键表齐全），再校验加密后可读且凭证条数一致；
+   * - 覆盖前必须生成 pre-restore 安全备份。
+   */
+  async restorePlainDatabase(
+    file: { buffer: Buffer; originalname: string; size: number } | undefined,
+    confirm?: string | boolean,
+  ): Promise<{ message: string; filename: string; vouchers: number }> {
+    if (!file?.buffer?.length) throw new BadRequestException('请选择要恢复的数据库文件')
+    if (confirm !== true && confirm !== 'true') {
+      throw new BadRequestException('恢复会覆盖当前全部数据，请确认后重试')
+    }
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const tmpDir = path.join(os.tmpdir(), 'boki-vault-restore')
+    if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true })
+    const plainFile = path.join(tmpDir, `upload-${randomBytes(6).toString('hex')}.db`)
+    const encFile = path.join(tmpDir, `encrypted-${randomBytes(6).toString('hex')}.db`)
+
+    await fs.writeFile(plainFile, file.buffer)
+    try {
+      if (!isPlaintextDatabase(plainFile)) {
+        throw new BadRequestException(
+          '该文件不是明文 SQLite 数据库；如果是系统导出的加密备份，请用备份列表里的「恢复」',
+        )
+      }
+
+      const keyHex = getBootKeyHex()
+      if (!keyHex) {
+        throw new BadRequestException('当前数据库未处于加密状态或未加载密钥，无法执行加密恢复')
+      }
+
+      // 1) 校验是本系统的库，并记录凭证条数用于加密后比对
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const Database = require('better-sqlite3')
+      const plain = new Database(plainFile)
+      let before = 0
+      try {
+        plain.pragma('wal_checkpoint(TRUNCATE)')
+        plain.pragma('journal_mode = DELETE')
+        const tables = new Set(
+          (plain.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>).map(
+            (r) => r.name,
+          ),
+        )
+        const missing = ['sys_company', 'fin_voucher', 'fin_voucher_entry'].filter((t) => !tables.has(t))
+        if (missing.length) {
+          throw new BadRequestException(`该文件不是本系统的数据库（缺少表：${missing.join('、')}）`)
+        }
+        before = (plain.prepare('SELECT count(*) AS c FROM fin_voucher').get() as { c: number }).c
+      } finally {
+        plain.close()
+      }
+
+      // 2) 明文 → 与当前 vault.key 一致的密文（原地 rekey）
+      await fs.copyFile(plainFile, encFile)
+      const enc = new Database(encFile)
+      try {
+        enc.pragma("cipher = 'sqlcipher'")
+        enc.pragma('legacy = 4')
+        enc.pragma(`rekey = "x'${keyHex}'"`)
+      } finally {
+        enc.close()
+      }
+
+      // 3) 用当前密钥重开校验，确保恢复后一定打得开
+      const check = openDatabase(encFile, { readonly: true, keyHex, legacy: 4, fileMustExist: true })
+      let after = 0
+      try {
+        after = (check.prepare('SELECT count(*) AS c FROM fin_voucher').get() as { c: number }).c
+      } finally {
+        check.close()
+      }
+      if (after !== before) {
+        throw new BadRequestException(`加密校验失败（凭证 ${before} → ${after}），已中止恢复，当前数据未改动`)
+      }
+
+      // 4) 覆盖前先给当前库做安全备份
+      const safety = path.join(this.backupDir, `pre-restore-plain-${stamp}.db`)
+      await this.copyDbFile(resolveDatabasePath(), safety)
+
+      // 5) 覆盖主库
+      await this.copyDbFile(encFile, resolveDatabasePath())
+
+      this.logger.warn(
+        `已从上传的明文数据库「${file.originalname}」恢复并加密，凭证 ${after} 条，安全备份: ${path.basename(safety)}`,
+      )
+      return {
+        message: `已恢复「${file.originalname}」并用当前密钥重新加密（凭证 ${after} 条）。安全备份已保存为 ${path.basename(safety)}；请重启服务使数据完全生效，并重新登录。`,
+        filename: safety,
+        vouchers: after,
+      }
+    } finally {
+      for (const p of [
+        plainFile,
+        `${plainFile}-wal`,
+        `${plainFile}-shm`,
+        encFile,
+        `${encFile}-wal`,
+        `${encFile}-shm`,
+      ]) {
+        await fs.rm(p, { force: true }).catch(() => undefined)
+      }
     }
   }
 

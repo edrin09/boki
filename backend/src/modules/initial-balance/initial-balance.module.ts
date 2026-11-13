@@ -5,6 +5,7 @@ import { Account } from '../../entities/account.entity'
 import { Partner } from '../../entities/partner.entity'
 import { Department } from '../../entities/department.entity'
 import { Project } from '../../entities/project.entity'
+import { Employee } from '../../entities/hr.entity'
 import { InitialBalanceService } from './initial-balance.service'
 import { InitialBalanceController } from './initial-balance.controller'
 
@@ -16,6 +17,7 @@ import { InitialBalanceController } from './initial-balance.controller'
       Partner,
       Department,
       Project,
+      Employee,
     ]),
   ],
   controllers: [InitialBalanceController],

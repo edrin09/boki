@@ -19,6 +19,7 @@ import { PartnersModule } from './partners/partners.module'
 import { VouchersModule } from './vouchers/vouchers.module'
 import { InitialBalanceModule } from './initial-balance/initial-balance.module'
 import { BooksModule } from './books/books.module'
+import { ClosingModule } from './closing/closing.module'
 import { SystemModule } from './system/system.module'
 import { SetupModule } from './setup/setup.module'
 import { MetaModule } from './meta/meta.module'
@@ -39,6 +40,8 @@ const CORE_MODULES = [
   VouchersModule,
   InitialBalanceModule,
   BooksModule,
+  // 期末结转损益（内核功能：每月月末把损益类科目余额转入本年利润）
+  ClosingModule,
   SystemModule,
   // /api/meta：应用身份与联系方式（根 .env → 桌面 sidecar env / ConfigModule），
   // 前端登录页署名等消费；无数据库依赖，必须排在最前尽快就绪

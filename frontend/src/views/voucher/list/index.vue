@@ -121,10 +121,15 @@
             </el-table-column>
             <el-table-column label="辅助核算" min-width="150">
               <template #default="{ row }">
-                <span v-if="!row.partnerId && !row.departmentId && !row.projectId">-</span>
+                <span v-if="!row.partnerId && !row.departmentId && !row.projectId && !row.employeeId">
+                  -
+                </span>
                 <el-tag v-if="row.partnerId" size="small" class="aux-tag">{{ row.partnerName }}</el-tag>
                 <el-tag v-if="row.departmentId" size="small" class="aux-tag">{{ row.departmentName }}</el-tag>
                 <el-tag v-if="row.projectId" size="small" class="aux-tag">{{ row.projectName }}</el-tag>
+                <el-tag v-if="row.employeeId" size="small" type="warning" class="aux-tag">
+                  {{ row.employeeName || '员工' }}
+                </el-tag>
               </template>
             </el-table-column>
             <el-table-column label="借方金额" width="140" align="right">
@@ -405,12 +410,17 @@ function onExport() {
   const rows: any[] = []
   for (const v of list.value as any[]) {
     for (const e of v.entries ?? []) {
+      // 辅助核算拼成一行文本：往来单位/部门/项目/员工，便于导出后按人核对
+      const aux = [e.partnerName, e.departmentName, e.projectName, e.employeeName]
+        .filter(Boolean)
+        .join('/')
       rows.push({
         date: v.voucherDate,
         word: v.word,
         no: pad(v.voucherNo),
         summary: e.summary,
         account: `${e.accountCode} ${e.accountName}`,
+        aux,
         debit: e.debit,
         credit: e.credit,
       })
@@ -426,6 +436,7 @@ function onExport() {
       { title: '凭证号', prop: 'no', width: 10 },
       { title: '摘要', prop: 'summary', width: 26 },
       { title: '会计科目', prop: 'account', width: 26 },
+      { title: '辅助核算', prop: 'aux', width: 20 },
       { title: '借方金额', prop: 'debit', width: 15, amount: true },
       { title: '贷方金额', prop: 'credit', width: 15, amount: true },
     ],

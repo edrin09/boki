@@ -283,6 +283,14 @@ export const PERMISSION_SEED: SeedPermissionNode[] = [
         path: '/books/trial-balance',
         sort: 4,
       },
+      {
+        code: 'books:closing',
+        name: '期末结转',
+        module: 'books',
+        type: PermissionType.MENU,
+        path: '/books/closing',
+        sort: 5,
+      },
     ],
   },
   {
@@ -1123,6 +1131,7 @@ export const ROLE_SEED: Array<{
       'books:sub-ledger',
       'books:balance',
       'books:trial-balance',
+      'books:closing',
       'reports',
       'reports:balance-sheet',
       'reports:profit-loss',

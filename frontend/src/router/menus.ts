@@ -76,6 +76,7 @@ export const MENUS: MenuNode[] = [
       { title: '明细账', path: '/books/sub-ledger', permission: 'books:sub-ledger' },
       { title: '科目余额表', path: '/books/balance', permission: 'books:balance' },
       { title: '试算平衡表', path: '/books/trial-balance', permission: 'books:trial-balance' },
+      { title: '期末结转', path: '/books/closing', permission: 'books:closing' },
     ],
   },
   {

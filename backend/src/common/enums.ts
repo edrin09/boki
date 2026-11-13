@@ -207,6 +207,8 @@ export enum VoucherSource {
   PAYROLL = 'payroll',
   LOAN = 'loan',
   EMPLOYEE_SETTLEMENT = 'employee_settlement',
+  /** 期末结转损益（内核 closing 模块生成） */
+  CLOSING = 'closing',
 }
 
 /** 系统参数键 */

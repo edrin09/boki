@@ -76,6 +76,17 @@ export const systemApi = {
   createBackup: () => post<{ filename: string; size: number }>('/system/backups'),
   restore: (data: { filename: string; confirm: boolean }) =>
     post<{ message: string }>('/system/backups/restore', data),
+  /** 上传明文数据库：服务端用当前 vault.key 重新加密后覆盖主库 */
+  restorePlain: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('confirm', 'true')
+    return post<{ message: string; filename: string; vouchers: number }>(
+      '/system/backups/restore-plain',
+      form,
+      { timeout: 300000 },
+    )
+  },
   removeBackup: (filename: string) => del(`/system/backups/${encodeURIComponent(filename)}`),
   downloadBackup: (filename: string) =>
     download('/system/backups/download', { filename }, filename),
@@ -319,6 +330,22 @@ export const voucherApi = {
   reverse: (id: string, data?: { reversalDate?: string; reason?: string }) =>
     post<{ message: string }>(`/vouchers/${id}/reverse`, data ?? {}),
   remove: (id: string) => del(`/vouchers/${id}`),
+  /** 员工辅助核算选项（内核提供，供凭证录入的「员工」列使用） */
+  employeeOptions: () =>
+    get<Array<{ id: string; code: string; name: string; departmentName?: string | null }>>(
+      '/vouchers/employee-options',
+    ),
+}
+
+// ============ 期末结转 ============
+export const closingApi = {
+  /** 结转预览（本期损益余额 + 将生成的结转分录） */
+  preview: (period: number) => get<any>('/closing/preview', { period }),
+  /** 执行结转（生成已审核的结转凭证） */
+  execute: (data: { period: number; voucherDate?: string; remark?: string }) =>
+    post<any>('/closing/execute', data),
+  /** 取消结转（删除本期结转凭证） */
+  rollback: (period: number) => post<{ message: string }>('/closing/rollback', { period }),
 }
 
 // ============ 现金银行 / 往来 / 其他收支 ============

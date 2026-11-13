@@ -9,7 +9,7 @@ import { decimalTransformer } from '../common/transformers/decimal.transformer'
 @Entity('fin_initial_balance')
 @Index(
   'uk_initial_balance',
-  ['companyId', 'fiscalYear', 'accountId', 'partnerId', 'departmentId', 'projectId'],
+  ['companyId', 'fiscalYear', 'accountId', 'partnerId', 'departmentId', 'projectId', 'employeeId'],
   { unique: true },
 )
 export class InitialBalance extends BaseEntity {
@@ -37,6 +37,9 @@ export class InitialBalance extends BaseEntity {
 
   @Column({ name: 'project_id', type: 'varchar', nullable: true, comment: '项目ID' })
   projectId: string | null
+
+  @Column({ name: 'employee_id', type: 'varchar', nullable: true, comment: '员工ID' })
+  employeeId: string | null
 
   @Column({ length: 10, default: 'debit', comment: '期初余额方向：debit/credit' })
   direction: BalanceDirection

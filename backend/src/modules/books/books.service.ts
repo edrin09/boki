@@ -7,7 +7,8 @@ import { InitialBalance } from '../../entities/initial-balance.entity'
 import { Partner } from '../../entities/partner.entity'
 import { Department } from '../../entities/department.entity'
 import { Project } from '../../entities/project.entity'
-import { AccountCategory, BalanceDirection, VoucherStatus } from '../../common/enums'
+import { Employee } from '../../entities/hr.entity'
+import { AccountCategory, BalanceDirection, VoucherSource, VoucherStatus } from '../../common/enums'
 import { toCents, fromCents } from '../../common/utils/money.util'
 import {
   currentPeriod,
@@ -55,6 +56,7 @@ interface AuxRow {
   partnerId: string | null
   departmentId: string | null
   projectId: string | null
+  employeeId: string | null
 }
 
 @Injectable()
@@ -68,6 +70,7 @@ export class BooksService {
     @InjectCompanyRepo(Partner) private readonly partnerRepo: CompanyScopedRepository<Partner>,
     @InjectCompanyRepo(Department) private readonly deptRepo: CompanyScopedRepository<Department>,
     @InjectCompanyRepo(Project) private readonly projectRepo: CompanyScopedRepository<Project>,
+    @InjectCompanyRepo(Employee) private readonly employeeRepo: CompanyScopedRepository<Employee>,
   ) {}
 
   // ==================== 公共计算内核 ====================
@@ -319,7 +322,7 @@ export class BooksService {
 
     // 分组 key
     const groupKey = (e: AuxRow): string =>
-      `${e.partnerId ?? '-'}|${e.departmentId ?? '-'}|${e.projectId ?? '-'}`
+      `${e.partnerId ?? '-'}|${e.departmentId ?? '-'}|${e.projectId ?? '-'}|${e.employeeId ?? '-'}`
 
     // 1) 期初按辅助组合
     const initialRows = await this.initialBalanceRepo.find({
@@ -336,7 +339,12 @@ export class BooksService {
       return groups.get(key)!
     }
     for (const row of initialRows) {
-      const key = groupKey(row)
+      const key = groupKey({
+        partnerId: row.partnerId ?? null,
+        departmentId: row.departmentId ?? null,
+        projectId: row.projectId ?? null,
+        employeeId: (row as any).employeeId ?? null,
+      })
       const g = ensure(key)
       if (row.direction === BalanceDirection.DEBIT) g.openDebit += toCents(row.amount)
       else g.openCredit += toCents(row.amount)
@@ -382,9 +390,9 @@ export class BooksService {
 
     // 3) 生成按辅助组合分组的明细行
     const list = Array.from(groups.entries())
-      .filter(([key, g]) => key !== '-|-|-' || g.openDebit || g.openCredit || g.periodDebit || g.periodCredit)
+      .filter(([key, g]) => key !== '-|-|-|-' || g.openDebit || g.openCredit || g.periodDebit || g.periodCredit)
       .map(([key, g]) => {
-        const [partnerId, departmentId, projectId] = key.split('|')
+        const [partnerId, departmentId, projectId, employeeId] = key.split('|')
         const openNet = g.openDebit - g.openCredit
         const closeNet = openNet + g.periodDebit - g.periodCredit
         const sign = account.direction === BalanceDirection.DEBIT ? 1 : -1
@@ -396,6 +404,8 @@ export class BooksService {
           departmentName: departmentId === '-' ? null : auxNames.department.get(departmentId) ?? null,
           projectId: projectId === '-' ? null : projectId,
           projectName: projectId === '-' ? null : auxNames.project.get(projectId) ?? null,
+          employeeId: employeeId === '-' ? null : employeeId,
+          employeeName: employeeId === '-' ? null : auxNames.employee.get(employeeId) ?? null,
           openingDebit: this.toAmount(Math.max(openNet * sign, 0)),
           openingCredit: this.toAmount(Math.max(-openNet * sign, 0)),
           periodDebit: this.toAmount(g.periodDebit),
@@ -416,6 +426,10 @@ export class BooksService {
       .filter((g) => {
         if (!query.projectIds?.length) return true
         return g.projectId && query.projectIds.includes(g.projectId)
+      })
+      .filter((g) => {
+        if (!query.employeeIds?.length) return true
+        return g.employeeId && query.employeeIds.includes(g.employeeId)
       })
 
     // 明细行归属分组
@@ -630,29 +644,36 @@ export class BooksService {
     return { balances: result.balances, accounts: result.accounts }
   }
 
-  /** 取某科目在本年内的累计发生额（用于利润表本年累计） */
-  async getYearToDateAmounts(
+  /**
+   * 取指定期间区间的发生额（含父级汇总）。
+   * excludeClosing=true 时排除期末结转凭证，避免损益类科目被结转分录冲平。
+   */
+  async getPeriodAmounts(
+    startPeriod: number,
     endPeriod: number,
-    fiscalYear: number,
     includeUnapproved = false,
+    excludeClosing = false,
   ): Promise<Map<string, { debit: number; credit: number }>> {
     const result = new Map<string, { debit: number; credit: number }>()
     const accounts = await this.accountRepo.find()
     const accountMap = new Map(accounts.map((a) => [a.id, a]))
     const parentMap = new Map(accounts.map((a) => [a.id, a.parentId]))
 
-    const yearStart = fiscalYear * 100 + 1
-
     const voucherQb = this.voucherRepo
       .createQueryBuilder('v')
       .select(['v.id'])
-      .where('v.period >= :yearStart AND v.period <= :endPeriod', { yearStart, endPeriod })
+      .where('v.period >= :startPeriod AND v.period <= :endPeriod', { startPeriod, endPeriod })
 
     if (!includeUnapproved) {
       voucherQb.andWhere('v.status = :status', { status: VoucherStatus.APPROVED })
     } else {
       voucherQb.andWhere('v.status IN (:...statuses)', {
         statuses: [VoucherStatus.APPROVED, VoucherStatus.DRAFT],
+      })
+    }
+    if (excludeClosing) {
+      voucherQb.andWhere('v.sourceType != :closingSource', {
+        closingSource: VoucherSource.CLOSING,
       })
     }
 
@@ -684,6 +705,15 @@ export class BooksService {
     return result
   }
 
+  /** 取某科目在本年内的累计发生额（用于利润表本年累计，排除期末结转） */
+  async getYearToDateAmounts(
+    endPeriod: number,
+    fiscalYear: number,
+    includeUnapproved = false,
+  ): Promise<Map<string, { debit: number; credit: number }>> {
+    return this.getPeriodAmounts(fiscalYear * 100 + 1, endPeriod, includeUnapproved, true)
+  }
+
   /** 按类别汇总期末余额（一级科目） */
   categoryTotals(balances: Map<string, AmountSet>, accounts: Account[]): Record<AccountCategory, number> {
     const result: Record<string, number> = {}
@@ -703,16 +733,19 @@ export class BooksService {
     partner: Map<string, string>
     department: Map<string, string>
     project: Map<string, string>
+    employee: Map<string, string>
   }> {
-    const [partners, depts, projects] = await Promise.all([
+    const [partners, depts, projects, employees] = await Promise.all([
       this.partnerRepo.find(),
       this.deptRepo.find(),
       this.projectRepo.find(),
+      this.employeeRepo.find(),
     ])
     return {
       partner: new Map(partners.map((p) => [p.id, p.name])),
       department: new Map(depts.map((d) => [d.id, d.name])),
       project: new Map(projects.map((p) => [p.id, p.name])),
+      employee: new Map(employees.map((e) => [e.id, e.name])),
     }
   }
 

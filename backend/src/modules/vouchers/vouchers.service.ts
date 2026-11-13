@@ -101,10 +101,14 @@ export class VouchersService {
       )
     }
 
+    // 排序：凭证日期倒序（最新在前）→ 凭证字 → 凭证号升序。
+    // 凭证号是在建单时按期间顺序分配的，与日期不一定同序；
+    // 同一天内必须按凭证号升序排列，否则列表看起来像是乱序（如 0014/0008/0007/0006）。
     const [list, total] = await qb
       .orderBy('v.voucherDate', 'DESC')
       .addOrderBy('v.word', 'ASC')
-      .addOrderBy('v.voucherNo', 'DESC')
+      .addOrderBy('v.voucherNo', 'ASC')
+      .addOrderBy('v.createdAt', 'DESC')
       .skip((page - 1) * pageSize)
       .take(pageSize)
       .getManyAndCount()
@@ -196,7 +200,7 @@ export class VouchersService {
       where: { voucherId: id },
       order: { sort: 'ASC' },
     })
-    const { partnerMap, deptMap, projectMap } = await this.loadAuxNames(entries)
+    const { partnerMap, deptMap, projectMap, employeeMap } = await this.loadAuxNames(entries)
     const sourceReceipts = await this.loadSourceReceipts([id])
 
     return {
@@ -214,6 +218,8 @@ export class VouchersService {
         departmentName: deptMap.get(e.departmentId) ?? null,
         projectId: e.projectId,
         projectName: projectMap.get(e.projectId) ?? null,
+        employeeId: e.employeeId,
+        employeeName: employeeMap.get(e.employeeId) ?? e.employeeName ?? null,
         debit: e.debit,
         credit: e.credit,
         sort: e.sort,
@@ -230,6 +236,32 @@ export class VouchersService {
       .andWhere('v.word = :word', { word })
       .getRawOne<{ max: number | null }>()
     return (max?.max ?? 0) + 1
+  }
+
+  /**
+   * 员工辅助核算选项。
+   *
+   * 「其他应收款」等科目声明了 employee 辅助核算，凭证录入必须能选到人；
+   * 员工档案表属于内核实体（插件未装也存在），这里提供只读选项接口，
+   * 避免内核页面依赖 hr 插件。
+   */
+  async employeeOptions(): Promise<
+    Array<{ id: string; code: string; name: string; departmentName: string | null }>
+  > {
+    const employees = await this.employeeRepo.find({
+      where: { status: 1 },
+      order: { code: 'ASC' },
+    })
+    if (!employees.length) return []
+    const deptIds = Array.from(new Set(employees.map((e) => e.departmentId).filter(Boolean) as string[]))
+    const depts = deptIds.length ? await this.deptRepo.find({ where: { id: In(deptIds) } }) : []
+    const deptMap = new Map(depts.map((d) => [d.id, d.name]))
+    return employees.map((e) => ({
+      id: e.id,
+      code: e.code,
+      name: e.name,
+      departmentName: e.departmentId ? (deptMap.get(e.departmentId) ?? null) : null,
+    }))
   }
 
   // ==================== 复制 / 红冲 ====================
@@ -250,6 +282,7 @@ export class VouchersService {
         partnerId: e.partnerId ?? undefined,
         departmentId: e.departmentId ?? undefined,
         projectId: e.projectId ?? undefined,
+        employeeId: e.employeeId ?? undefined,
         debit: Number(e.debit ?? 0),
         credit: Number(e.credit ?? 0),
       })),
@@ -266,6 +299,9 @@ export class VouchersService {
   ): Promise<any> {
     const original = await this.voucherRepo.findOne({ where: { id } })
     if (!original) throw new NotFoundException('凭证不存在')
+    if (original.sourceType === VoucherSource.CLOSING) {
+      throw new BadRequestException('结转凭证请通过「期末结转-取消结转」处理')
+    }
 
     if (original.status === VoucherStatus.DRAFT) {
       throw new BadRequestException('仅「已审核」的凭证可以红冲，草稿请直接删除或修改')
@@ -301,6 +337,7 @@ export class VouchersService {
           partnerId: e.partnerId ?? undefined,
           departmentId: e.departmentId ?? undefined,
           projectId: e.projectId ?? undefined,
+          employeeId: e.employeeId ?? undefined,
           debit: Number(e.credit ?? 0),
           credit: Number(e.debit ?? 0),
         })),
@@ -331,9 +368,11 @@ export class VouchersService {
     dto: SaveVoucherDto,
     operator: { id: string; nickname: string },
     autoApprove = false,
+    source?: { type: VoucherSource; id: string | null },
   ): Promise<any> {
     const period = toPeriod(dto.voucherDate)
     if (!period) throw new BadRequestException('凭证日期不合法')
+    await this.assertPeriodOpen(period)
 
     const entries = await this.normalizeEntries(dto.entries)
     const totals = this.sumEntries(entries)
@@ -353,8 +392,8 @@ export class VouchersService {
         status: autoApprove ? VoucherStatus.APPROVED : VoucherStatus.DRAFT,
         attachments: dto.attachments ?? 0,
         remark: dto.remark ?? null,
-        sourceType: VoucherSource.MANUAL,
-        sourceId: null,
+        sourceType: source?.type ?? VoucherSource.MANUAL,
+        sourceId: source?.id ?? null,
         createdBy: operator.id,
         createdByName: operator.nickname,
         approvedBy: autoApprove ? operator.id : null,
@@ -387,10 +426,15 @@ export class VouchersService {
     if (voucher.status === VoucherStatus.CANCELLED) {
       throw new BadRequestException('已作废凭证不可修改')
     }
+    if (voucher.sourceType === VoucherSource.CLOSING) {
+      throw new BadRequestException('结转凭证不可直接修改，请通过「期末结转-取消结转」处理')
+    }
+    await this.assertPeriodOpen(voucher.period)
     void operator
 
     const period = toPeriod(dto.voucherDate)
     if (!period) throw new BadRequestException('凭证日期不合法')
+    if (period !== voucher.period) await this.assertPeriodOpen(period)
 
     const entries = await this.normalizeEntries(dto.entries)
     const totals = this.sumEntries(entries)
@@ -429,12 +473,19 @@ export class VouchersService {
   }
 
   /** 删除凭证（仅草稿） */
-  async remove(id: string): Promise<{ message: string }> {
+  async remove(
+    id: string,
+    options?: { allowClosing?: boolean },
+  ): Promise<{ message: string }> {
     const voucher = await this.voucherRepo.findOne({ where: { id } })
     if (!voucher) throw new NotFoundException('凭证不存在')
+    if (voucher.sourceType === VoucherSource.CLOSING && !options?.allowClosing) {
+      throw new BadRequestException('结转凭证请通过「期末结转-取消结转」处理')
+    }
     if (voucher.status === VoucherStatus.APPROVED) {
       throw new BadRequestException('已审核凭证不可删除，请先反审核')
     }
+    await this.assertPeriodOpen(voucher.period, Boolean(options?.allowClosing))
     await this.entryRepo.delete({ voucherId: id })
     await this.voucherRepo.delete({ id } as any)
     return { message: '删除成功' }
@@ -450,6 +501,7 @@ export class VouchersService {
     if (voucher.status === VoucherStatus.CANCELLED) {
       throw new BadRequestException('已作废凭证不可审核')
     }
+    await this.assertPeriodOpen(voucher.period, voucher.sourceType === VoucherSource.CLOSING)
 
     // 审核前再次校验借贷平衡，防止历史数据异常
     const entries = await this.entryRepo.find({ where: { voucherId: id } })
@@ -468,12 +520,16 @@ export class VouchersService {
   }
 
   /** 反审核 */
-  async unapprove(id: string): Promise<any> {
+  async unapprove(id: string, options?: { allowClosing?: boolean }): Promise<any> {
     const voucher = await this.voucherRepo.findOne({ where: { id } })
     if (!voucher) throw new NotFoundException('凭证不存在')
+    if (voucher.sourceType === VoucherSource.CLOSING && !options?.allowClosing) {
+      throw new BadRequestException('结转凭证请通过「期末结转-取消结转」处理')
+    }
     if (voucher.status !== VoucherStatus.APPROVED) {
       throw new BadRequestException('仅已审核凭证可以反审核')
     }
+    await this.assertPeriodOpen(voucher.period, Boolean(options?.allowClosing))
     voucher.status = VoucherStatus.DRAFT
     voucher.approvedBy = null
     voucher.approvedByName = null
@@ -486,6 +542,10 @@ export class VouchersService {
   async cancel(id: string, reason?: string): Promise<any> {
     const voucher = await this.voucherRepo.findOne({ where: { id } })
     if (!voucher) throw new NotFoundException('凭证不存在')
+    if (voucher.sourceType === VoucherSource.CLOSING) {
+      throw new BadRequestException('结转凭证请通过「期末结转-取消结转」处理')
+    }
+    await this.assertPeriodOpen(voucher.period)
     if (voucher.status === VoucherStatus.CANCELLED) {
       throw new BadRequestException('该凭证已作废')
     }
@@ -519,10 +579,23 @@ export class VouchersService {
       },
       operator,
       params.autoApprove ?? true,
+      { type: params.sourceType, id: params.sourceId },
     ) as Promise<any>
   }
 
   // ==================== 内部方法 ====================
+
+  /** 已结转期间禁止直接改动凭证；结转凭证自身的取消/删除由结账模块显式放行 */
+  private async assertPeriodOpen(period: number, allowClosing = false): Promise<void> {
+    const closing = await this.voucherRepo.findOne({
+      where: { sourceType: VoucherSource.CLOSING, sourceId: String(period) },
+    })
+    if (!closing || closing.status === VoucherStatus.CANCELLED) return
+    if (allowClosing) return
+    throw new BadRequestException(
+      `${period} 期间已结转，不能再新增、修改、删除、作废或反审核该期间凭证；如需调整请先取消结转`,
+    )
+  }
 
   private async nextVoucherNoInTx(
     manager: EntityManager,

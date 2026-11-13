@@ -40,8 +40,9 @@
             <th style="width: 200px">摘要</th>
             <th style="width: 260px">会计科目</th>
             <th style="width: 150px">往来单位</th>
-            <th style="width: 130px">部门</th>
-            <th style="width: 130px">项目</th>
+            <th style="width: 120px">部门</th>
+            <th style="width: 120px">项目</th>
+            <th style="width: 130px">员工</th>
             <th style="width: 140px">借方金额</th>
             <th style="width: 140px">贷方金额</th>
             <th style="width: 56px">操作</th>
@@ -111,6 +112,26 @@
                   style="width: 100%"
                 >
                   <el-option v-for="p in basicStore.projects" :key="p.id" :label="p.name" :value="p.id" />
+                </el-select>
+                <span v-else class="text-muted">-</span>
+              </div>
+            </td>
+            <td>
+              <div class="cell">
+                <el-select
+                  v-if="auxOf(entry).includes('employee') || !!entry.employeeId"
+                  v-model="entry.employeeId"
+                  filterable
+                  clearable
+                  :placeholder="auxOf(entry).includes('employee') ? '必选' : '可选'"
+                  style="width: 100%"
+                >
+                  <el-option
+                    v-for="e in employeeOptions"
+                    :key="e.id"
+                    :label="e.name"
+                    :value="e.id"
+                  />
                 </el-select>
                 <span v-else class="text-muted">-</span>
               </div>
@@ -219,6 +240,7 @@ interface EntryRow {
   partnerId: string
   departmentId: string
   projectId: string
+  employeeId: string
   debit: number
   credit: number
 }
@@ -241,11 +263,22 @@ const entries = ref<EntryRow[]>([
 ])
 
 const accountOptions = ref<any[]>([])
+/** 员工辅助核算选项（其他应收款-员工往来等科目必选） */
+const employeeOptions = ref<Array<{ id: string; code: string; name: string }>>([])
 const saving = ref(false)
 const nextNo = ref<number | null>(null)
 
 function newRow(): EntryRow {
-  return { summary: '', accountId: '', partnerId: '', departmentId: '', projectId: '', debit: 0, credit: 0 }
+  return {
+    summary: '',
+    accountId: '',
+    partnerId: '',
+    departmentId: '',
+    projectId: '',
+    employeeId: '',
+    debit: 0,
+    credit: 0,
+  }
 }
 
 const nextNoDisplay = computed(() =>
@@ -268,6 +301,7 @@ function onAccountChange(entry: EntryRow) {
   entry.partnerId = ''
   entry.departmentId = ''
   entry.projectId = ''
+  entry.employeeId = ''
   fillSummary(entries.value.indexOf(entry))
 }
 
@@ -337,9 +371,23 @@ function validate(): boolean {
       return false
     }
     for (const t of auxOf(e)) {
-      const value = t === 'partner' ? e.partnerId : t === 'department' ? e.departmentId : e.projectId
+      const value =
+        t === 'partner'
+          ? e.partnerId
+          : t === 'department'
+            ? e.departmentId
+            : t === 'employee'
+              ? e.employeeId
+              : e.projectId
       if (!value) {
-        const label = t === 'partner' ? '往来单位' : t === 'department' ? '部门' : '项目'
+        const label =
+          t === 'partner'
+            ? '往来单位'
+            : t === 'department'
+              ? '部门'
+              : t === 'employee'
+                ? '员工'
+                : '项目'
         ElMessage.error(`第 ${i + 1} 行：请指定${label}`)
         return false
       }
@@ -384,6 +432,7 @@ async function save(approveNow: boolean) {
           partnerId: e.partnerId || undefined,
           departmentId: e.departmentId || undefined,
           projectId: e.projectId || undefined,
+          employeeId: e.employeeId || undefined,
           debit: e.debit || 0,
           credit: e.credit || 0,
         })),
@@ -418,6 +467,7 @@ async function loadVoucherDetail(id: string) {
     partnerId: e.partnerId ?? '',
     departmentId: e.departmentId ?? '',
     projectId: e.projectId ?? '',
+    employeeId: e.employeeId ?? '',
     debit: Number(e.debit ?? 0),
     credit: Number(e.credit ?? 0),
   }))
@@ -439,6 +489,7 @@ async function loadCopyPayload(id: string) {
     partnerId: e.partnerId ?? '',
     departmentId: e.departmentId ?? '',
     projectId: e.projectId ?? '',
+    employeeId: e.employeeId ?? '',
     debit: Number(e.debit ?? 0),
     credit: Number(e.credit ?? 0),
   }))
@@ -450,6 +501,7 @@ async function loadCopyPayload(id: string) {
 
 onMounted(async () => {
   accountOptions.value = await accountApi.options()
+  employeeOptions.value = await voucherApi.employeeOptions().catch(() => [])
   await basicStore.loadAll()
   if (editId.value) {
     await loadVoucherDetail(editId.value)

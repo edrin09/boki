@@ -96,6 +96,12 @@ export const businessRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/books/trial-balance/index.vue'),
         meta: { title: '试算平衡表', permission: 'books:trial-balance' },
       },
+      {
+        path: 'closing',
+        name: 'BooksClosing',
+        component: () => import('@/views/books/closing/index.vue'),
+        meta: { title: '期末结转', permission: 'books:closing' },
+      },
     ],
   },
 
