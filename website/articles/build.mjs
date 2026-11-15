@@ -41,7 +41,7 @@ const ARTICLES = [
     cover: 'cover-03-readonly-mcp.png',
     channel: '掘金',
     tags: ['MCP', 'AI', '接口设计'],
-    desc: '让 Claude 查你的账本，但改不了它。MCP 服务端物理只读的实现与能力边界。',
+    desc: '注册表拒绝写工具、写操作返回「工具不存在」——MCP 服务端怎么做到物理只读，以及这套边界的三个代价。',
   },
   {
     slug: '09-token-vuln',
@@ -366,18 +366,34 @@ ${body}
   if (!btn) return
   btn.addEventListener('click', function () {
     var label = btn.textContent
-    var done = function (ok) {
-      btn.textContent = ok ? '已复制' : '复制失败，请手动打开 md 文件'
-      setTimeout(function () { btn.textContent = label }, 1800)
+    var done = function (ok, msg) {
+      btn.textContent = msg || (ok ? '已复制' : '复制失败，请手动打开 md 文件')
+      setTimeout(function () { btn.textContent = label }, 2000)
+    }
+    var legacyCopy = function (t) {
+      var ta = document.createElement('textarea')
+      ta.value = t
+      ta.style.position = 'fixed'
+      ta.style.top = '-1000px'
+      document.body.appendChild(ta)
+      ta.select()
+      var ok = false
+      try { ok = document.execCommand('copy') } catch (e) { ok = false }
+      document.body.removeChild(ta)
+      return ok
     }
     fetch(btn.dataset.md).then(function (r) { return r.text() }).then(function (t) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(t).then(function () { done(true) }, function () { done(false) })
+        navigator.clipboard.writeText(t).then(function () { done(true) }, function () {
+          if (legacyCopy(t)) return done(true)
+          window.open(btn.dataset.md, '_blank')
+          done(false, '已在新标签打开原文')
+        })
+      } else if (legacyCopy(t)) {
+        done(true)
       } else {
-        var ta = document.createElement('textarea')
-        ta.value = t; document.body.appendChild(ta); ta.select()
-        try { done(document.execCommand('copy')) } catch (e) { done(false) }
-        document.body.removeChild(ta)
+        window.open(btn.dataset.md, '_blank')
+        done(false, '已在新标签打开原文')
       }
     }).catch(function () { done(false) })
   })
