@@ -27,6 +27,8 @@ import {
   exportPlainDatabase,
   isPlaintextDatabase,
 } from '../../vault/vault-backup'
+import { stagePendingRestore } from '../../vault/pending-restore'
+import { scheduleSelfRestart, processStartedAt } from '../../vault/self-restart'
 import { requireCompanyId } from '../../common/company/company-context'
 import { DEFAULT_AUTO_POST_THRESHOLD } from '../../common/company/company.constants'
 import { invalidateCompanyCache } from '../../common/company/company-scope.interceptor'
@@ -218,6 +220,25 @@ export class SystemService {
     return dir
   }
 
+  /**
+   * 备份文件名时间戳（本地时间）：`YYYY-MM-DD-HH-mm-ss`
+   *
+   * 不用 `toISOString()`：那是 UTC，东八区会比实际时间少 8 小时，
+   * 文件名与界面「备份时间」列对不上；同时把 `T` 也换成 `-`，
+   * 便于按文件名直接排序（如 financial-2026-11-14-18-40-03.db）。
+   */
+  private backupStamp(date = new Date()): string {
+    const p = (n: number) => String(n).padStart(2, '0')
+    return [
+      date.getFullYear(),
+      p(date.getMonth() + 1),
+      p(date.getDate()),
+      p(date.getHours()),
+      p(date.getMinutes()),
+      p(date.getSeconds()),
+    ].join('-')
+  }
+
   /** 列出可用备份 */
   async listBackups(): Promise<any[]> {
     const dir = this.backupDir
@@ -247,8 +268,7 @@ export class SystemService {
     const dbPath = resolveDatabasePath()
     if (!existsSync(dbPath)) throw new NotFoundException('数据库文件不存在')
 
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-    const filename = `financial-${stamp}.db`
+    const filename = `financial-${this.backupStamp()}.db`
     const target = path.join(this.backupDir, filename)
 
     // VACUUM INTO 要求目标文件不存在
@@ -318,12 +338,17 @@ export class SystemService {
   }
 
   /**
-   * 从备份恢复（会覆盖当前数据库，需重启服务生效）
+   * 从备份恢复（**重启后生效**，运行期只做暂存）
    *
-   * ⚠️ 加密库必须先校验「备份与当前密钥是否一致」——
-   * 把明文备份恢复到密文库（或反过来）都会导致恢复后永久打不开。
+   * ⚠️ 两条硬约束：
+   * - 加密库必须先校验「备份与当前密钥是否一致」——把明文备份恢复到密文库
+   *   （或反过来）都会导致恢复后永久打不开；
+   * - **绝不能在运行期覆盖主库文件**：WAL 模式下旧 `-wal`/`-shm` 换不掉，
+   *   新文件配旧日志会被 SQLite 判成 `file is not a database` / `malformed`，
+   *   整个应用当场报废。因此这里只把备份暂存到主库同目录，
+   *   由 `main.ts` 启动早期（无连接时）原子替换。
    */
-  async restoreBackup(filename: string): Promise<{ message: string; filename: string }> {
+  async restoreBackup(filename: string): Promise<{ message: string; filename: string; restarting: boolean }> {
     const safe = path.basename(filename)
     const source = path.join(this.backupDir, safe)
     if (!existsSync(source)) throw new NotFoundException('备份文件不存在')
@@ -333,17 +358,23 @@ export class SystemService {
       throw new BadRequestException({ code: 50011, message: compatible.message })
     }
 
-    const dbPath = resolveDatabasePath()
-    // 恢复前先给当前库做一份安全备份
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    // 当前库先做一份一致性快照（VACUUM INTO：把 WAL 里未落盘的提交也带上，
+    // 裸 copyFile 会丢这部分数据）
+    const stamp = this.backupStamp()
     const safety = path.join(this.backupDir, `pre-restore-${stamp}.db`)
-    await this.copyDbFile(dbPath, safety)
+    await createBackupSnapshot(resolveDatabasePath(), safety)
 
-    await this.copyDbFile(source, dbPath)
+    stagePendingRestore(source, safe)
 
-    this.logger.warn(`数据库已从备份 ${safe} 恢复，安全备份: ${path.basename(safety)}`)
+    // 响应写完后自动重启：新进程启动时在「无连接」状态下原子换库
+    scheduleSelfRestart({ log: (message) => this.logger.warn(message) })
+
+    this.logger.warn(`已暂存备份 ${safe}，安全备份: ${path.basename(safety)}；服务即将自动重启换库`)
     return {
-      message: `已从备份「${safe}」恢复。安全备份已保存为 pre-restore-${stamp}.db；WAL 模式下新数据在下次重启后完全生效。`,
+      restarting: true,
+      message:
+        `已从备份「${safe}」恢复，恢复前的安全备份已保存为 ${path.basename(safety)}。` +
+        '服务正在自动重启以切换到新库，请稍候（约 10 秒），重启后需要重新登录。',
       filename: safety,
     }
   }
@@ -362,13 +393,13 @@ export class SystemService {
   async restorePlainDatabase(
     file: { buffer: Buffer; originalname: string; size: number } | undefined,
     confirm?: string | boolean,
-  ): Promise<{ message: string; filename: string; vouchers: number }> {
+  ): Promise<{ message: string; filename: string; vouchers: number; restarting: boolean }> {
     if (!file?.buffer?.length) throw new BadRequestException('请选择要恢复的数据库文件')
     if (confirm !== true && confirm !== 'true') {
       throw new BadRequestException('恢复会覆盖当前全部数据，请确认后重试')
     }
 
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const stamp = this.backupStamp()
     const tmpDir = path.join(os.tmpdir(), 'boki-vault-restore')
     if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true })
     const plainFile = path.join(tmpDir, `upload-${randomBytes(6).toString('hex')}.db`)
@@ -432,18 +463,25 @@ export class SystemService {
         throw new BadRequestException(`加密校验失败（凭证 ${before} → ${after}），已中止恢复，当前数据未改动`)
       }
 
-      // 4) 覆盖前先给当前库做安全备份
+      // 4) 当前库先做一致性快照（含 WAL 中未落盘的提交）
       const safety = path.join(this.backupDir, `pre-restore-plain-${stamp}.db`)
-      await this.copyDbFile(resolveDatabasePath(), safety)
+      await createBackupSnapshot(resolveDatabasePath(), safety)
 
-      // 5) 覆盖主库
-      await this.copyDbFile(encFile, resolveDatabasePath())
+      // 5) 只暂存，不覆盖运行中的主库（重启时由 main.ts 替换）
+      stagePendingRestore(encFile, file.originalname)
+
+      // 响应写完后自动重启：新进程启动时在「无连接」状态下原子换库
+      scheduleSelfRestart({ log: (message) => this.logger.warn(message) })
 
       this.logger.warn(
-        `已从上传的明文数据库「${file.originalname}」恢复并加密，凭证 ${after} 条，安全备份: ${path.basename(safety)}`,
+        `已暂存上传的明文库「${file.originalname}」（凭证 ${after} 条），安全备份: ${path.basename(safety)}；服务即将自动重启换库`,
       )
       return {
-        message: `已恢复「${file.originalname}」并用当前密钥重新加密（凭证 ${after} 条）。安全备份已保存为 ${path.basename(safety)}；请重启服务使数据完全生效，并重新登录。`,
+        restarting: true,
+        message:
+          `已恢复「${file.originalname}」并用当前密钥重新加密（凭证 ${after} 条）。` +
+          `恢复前的安全备份已保存为 ${path.basename(safety)}。` +
+          '服务正在自动重启以切换到新库，请稍候（约 10 秒），重启后需要重新登录。',
         filename: safety,
         vouchers: after,
       }
@@ -459,31 +497,6 @@ export class SystemService {
         await fs.rm(p, { force: true }).catch(() => undefined)
       }
     }
-  }
-
-  /**
-   * 复制 SQLite 数据库文件。
-   * 说明：运行中无法删除 -wal/-shm（文件被占用），
-   * 这里采用「先写主库、附属日志由 SQLite 自行重放」的方式，避免 EBUSY。
-   *
-   * ⚠️ 密文库下 `db.backup()` 不可用，兜底走 `VACUUM INTO`；
-   * 且 `VACUUM INTO` 要求目标文件不存在。
-   */
-  private async copyDbFile(from: string, to: string): Promise<void> {
-    try {
-      await fs.copyFile(from, to)
-      return
-    } catch (err: any) {
-      if (err?.code !== 'EBUSY' && err?.code !== 'EPERM') throw err
-    }
-
-    // EBUSY 兜底：使用 SQLite VACUUM INTO 生成一致快照
-    const { copyDatabaseSnapshot } = await import('../../vault/db-open')
-    const { getBootKeyHex } = await import('../../vault/keystore')
-    for (const p of [to, `${to}-wal`, `${to}-shm`]) {
-      if (existsSync(p)) await fs.rm(p, { force: true })
-    }
-    await copyDatabaseSnapshot(from, to, { keyHex: getBootKeyHex() })
   }
 
   /** 删除备份文件 */
@@ -522,6 +535,9 @@ export class SystemService {
       nodeVersion: process.version,
       platform: `${process.platform} ${process.arch}`,
       uptime: Math.floor(process.uptime()),
+      // 进程启动时间与 pid：恢复后自重启，前端据此确认「已经是新进程」
+      startedAt: processStartedAt(),
+      pid: process.pid,
     }
   }
 

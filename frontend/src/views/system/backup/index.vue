@@ -23,7 +23,7 @@
           <el-alert type="info" :closable="false" show-icon class="mb12"
             title="SQLite 单文件数据库，备份即完整复制。建议在月末结账或批量导入前先备份一次。" />
           <el-alert type="warning" :closable="false" show-icon class="mb12"
-            title="「上传明文库恢复」用于把明文的 .db 文件恢复到本系统：系统会先用当前密钥加密，再覆盖主库，并自动保留恢复前的安全备份。" />
+            title="「上传明文库恢复」用于把明文的 .db 文件恢复到本系统：系统会先用当前密钥加密并暂存，随后自动重启服务切换数据库，并自动保留恢复前的安全备份。" />
 
           <el-table v-loading="loading" :data="backups" empty-text="暂无备份">
             <el-table-column prop="filename" label="文件名" min-width="220" />
@@ -90,7 +90,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElLoading, ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import { systemApi } from '@/api'
 import { confirmDelete, ok } from '@/composables/useList'
@@ -102,6 +102,112 @@ const loadingInfo = ref(false)
 const creating = ref(false)
 const restoringPlain = ref(false)
 const info = ref<any>(null)
+
+/** 与 axios 同一前缀：探活用原生 fetch，不经过拦截器（重启期间 token 可能已失效） */
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/+$/, '')
+const HEALTH_URL = `${API_BASE}/health`
+/** 重启最长等待时间（含插件加载与建连） */
+const RESTART_TIMEOUT = 120_000
+
+interface HealthInfo {
+  pid: number
+  startedAt: string
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+/** 探活：服务不可达（正在重启）时返回 null */
+async function probeHealth(): Promise<HealthInfo | null> {
+  try {
+    const res = await fetch(`${HEALTH_URL}?_=${Date.now()}`, { cache: 'no-store' })
+    if (!res.ok) return null
+    const body = await res.json()
+    const data = body?.data
+    return data && typeof data.pid === 'number' ? (data as HealthInfo) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 等后端换库重启完成。
+ *
+ * 只判断「接口能通」是不够的 —— 旧进程在关闭前一直能通。
+ * 必须等 pid 变化才算新进程接上了新库；拿不到旧 pid 时，
+ * 至少要观察到一次「连不上」再恢复，避免误判成已完成。
+ */
+async function waitForRestart(beforePid: number | null): Promise<boolean> {
+  const start = Date.now()
+  let downSeen = false
+  while (Date.now() - start < RESTART_TIMEOUT) {
+    await sleep(1000)
+    const health = await probeHealth()
+    if (!health) {
+      downSeen = true
+      continue
+    }
+    if (beforePid !== null) {
+      if (health.pid !== beforePid) return true
+    } else if (downSeen) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
+ * 「恢复 + 自动重启」的统一收尾。
+ *
+ * 后端恢复只做暂存，随后自己重启换库，所以这里要：
+ * 1) 全屏遮罩，避免用户以为卡死；
+ * 2) 轮询探活，直到新进程就绪；
+ * 3) 刷新页面（恢复后账号可能不在库里，会回到登录页）。
+ */
+async function runRestore(exec: () => Promise<{ message?: string }>): Promise<void> {
+  const before = await probeHealth()
+
+  const loading = ElLoading.service({
+    lock: true,
+    fullscreen: true,
+    text: '正在恢复数据，请稍候…',
+    background: 'rgba(0, 0, 0, 0.65)',
+  })
+
+  try {
+    let message = ''
+    try {
+      const res = await exec()
+      message = res?.message ?? ''
+    } catch (err: any) {
+      // 恢复本身会紧接着重启，响应可能被连接中断截断（status 0）；
+      // 真正的校验错误（密钥不匹配、文件非法等）照常抛出。
+      if (err?.status !== 0) throw err
+    }
+
+    loading.setText('服务正在自动重启以切换数据库，请勿关闭页面…')
+    const done = await waitForRestart(before?.pid ?? null)
+
+    if (!done) {
+      loading.close()
+      ElMessageBox.alert(
+        `${message ? `${message} ` : ''}已等待 2 分钟仍未检测到服务重新就绪。` +
+          '恢复文件已安全暂存，下次启动服务时会自动生效；请到后台手动启动服务。',
+        '恢复未完成',
+        { type: 'warning', confirmButtonText: '知道了' },
+      )
+      return
+    }
+
+    loading.setText('新数据库已生效，正在刷新页面…')
+    await sleep(600)
+    loading.close()
+    ElMessage.success('已切换到恢复后的数据库，请重新登录')
+    setTimeout(() => window.location.reload(), 800)
+  } catch (err) {
+    loading.close()
+    throw err
+  }
+}
 
 async function load() {
   loading.value = true
@@ -164,7 +270,8 @@ async function onDownloadPlain(row: any) {
 async function onRestore(row: any) {
   try {
     await ElMessageBox.confirm(
-      `恢复将覆盖当前全部数据（系统会先自动生成一份 pre-restore 备份）。确定从「${row.filename}」恢复吗？`,
+      `将用备份「${row.filename}」恢复数据：系统会先自动生成一份 pre-restore 安全备份，` +
+        '然后自动重启服务切换到新库。重启期间页面会短暂失去连接（约 10 秒），完成后自动刷新并需重新登录。确定恢复吗？',
       '恢复数据',
       { type: 'warning', confirmButtonText: '确定恢复', cancelButtonText: '取消' },
     )
@@ -172,12 +279,7 @@ async function onRestore(row: any) {
     return
   }
   try {
-    const res = await systemApi.restore({ filename: row.filename, confirm: true })
-    ElMessageBox.alert(res.message ?? '恢复完成，请重启服务使数据生效', '恢复数据', {
-      type: 'success',
-    })
-    load()
-    loadInfo()
+    await runRestore(() => systemApi.restore({ filename: row.filename, confirm: true }))
   } catch {
     /* 错误已提示 */
   }
@@ -186,7 +288,8 @@ async function onRestore(row: any) {
 async function onRestorePlain(file: File) {
   try {
     await ElMessageBox.confirm(
-      `即将用「${file.name}」覆盖当前全部数据。系统会先用当前密钥把该文件加密，再自动生成一份 pre-restore-plain 安全备份。恢复完成后需重启服务并重新登录。确定继续吗？`,
+      `将用「${file.name}」恢复数据：系统会先用当前密钥把该文件加密并暂存，同时生成一份 pre-restore-plain 安全备份，` +
+        '然后自动重启服务切换到新库。重启期间页面会短暂失去连接，完成后自动刷新并需重新登录。确定继续吗？',
       '上传明文库恢复',
       { type: 'warning', confirmButtonText: '确定恢复', cancelButtonText: '取消' },
     )
@@ -195,12 +298,7 @@ async function onRestorePlain(file: File) {
   }
   restoringPlain.value = true
   try {
-    const res = await systemApi.restorePlain(file)
-    ElMessageBox.alert(res.message ?? '恢复完成，请重启服务使数据生效', '恢复完成', {
-      type: 'success',
-    })
-    load()
-    loadInfo()
+    await runRestore(() => systemApi.restorePlain(file))
   } catch {
     /* 错误已由拦截器提示 */
   } finally {

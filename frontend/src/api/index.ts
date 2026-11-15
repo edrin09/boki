@@ -75,13 +75,13 @@ export const systemApi = {
   backups: () => get<any[]>('/system/backups'),
   createBackup: () => post<{ filename: string; size: number }>('/system/backups'),
   restore: (data: { filename: string; confirm: boolean }) =>
-    post<{ message: string }>('/system/backups/restore', data),
-  /** 上传明文数据库：服务端用当前 vault.key 重新加密后覆盖主库 */
+    post<{ message: string; filename: string; restarting: boolean }>('/system/backups/restore', data),
+  /** 上传明文数据库：服务端用当前 vault.key 重新加密后暂存，随后自动重启换库 */
   restorePlain: (file: File) => {
     const form = new FormData()
     form.append('file', file)
     form.append('confirm', 'true')
-    return post<{ message: string; filename: string; vouchers: number }>(
+    return post<{ message: string; filename: string; vouchers: number; restarting: boolean }>(
       '/system/backups/restore-plain',
       form,
       { timeout: 300000 },

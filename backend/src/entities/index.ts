@@ -19,6 +19,7 @@ export * from './sys-log.entity'
 export * from './sys-config.entity'
 export * from './classify-rule.entity'
 export * from './fixed-expense.entity'
+export * from './ai-doc.entity'
 
 import { Permission } from './permission.entity'
 import { Role } from './role.entity'
@@ -48,6 +49,7 @@ import { Receipt } from './receipt.entity'
 import { SysConfig } from './sys-config.entity'
 import { ClassifyRule } from './classify-rule.entity'
 import { FixedExpense, FixedExpenseLog } from './fixed-expense.entity'
+import { AiActionAlias, AiDocTypeConfig } from './ai-doc.entity'
 
 /** 全部实体（供 TypeORM 加载） */
 export const entities = [
@@ -81,4 +83,6 @@ export const entities = [
   SysLog,
   FixedExpense,
   FixedExpenseLog,
+  AiDocTypeConfig,
+  AiActionAlias,
 ]

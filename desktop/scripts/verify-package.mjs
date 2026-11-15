@@ -106,6 +106,94 @@ function waitReady(timeoutMs) {
 const unwrap = (b) => (b && typeof b === 'object' && 'data' in b ? b.data : b)
 
 /**
+ * 远程市场可达性前置检查。
+ *
+ * 插件是唯一来源：市场没起来时，「拉目录 → 安装 → 重启 → 建账 → OCR → 票据」
+ * 会连锁报 8 项失败，看起来像打包产物坏了，实际与产物无关。
+ * 市场地址指向回环且本机有 boki-market 时，由本脚本临时拉起，验证结束自动关闭；
+ * 指向外部市场则只做检查，不擅自启动任何服务。
+ */
+let marketChild = null
+let marketLogs = []
+
+const stopMarket = () =>
+  new Promise((resolve) => {
+    if (!marketChild || marketChild.exitCode !== null || marketChild.signalCode !== null) return resolve()
+    const target = marketChild
+    const timer = setTimeout(() => {
+      try {
+        target.kill('SIGKILL')
+      } catch {
+        // 已退出
+      }
+      resolve()
+    }, 5000)
+    target.once('exit', () => {
+      clearTimeout(timer)
+      resolve()
+    })
+    try {
+      target.kill()
+    } catch {
+      clearTimeout(timer)
+      resolve()
+    }
+  })
+
+async function marketHealthy(url) {
+  try {
+    const res = await fetch(`${url}/v1/health`, { signal: AbortSignal.timeout(2000) })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+async function ensureMarket(marketUrl) {
+  if (!marketUrl) {
+    check('远程插件市场服务可达', false, '未配置 PLUGIN_MARKET_URL')
+    throw new Error('未配置 PLUGIN_MARKET_URL')
+  }
+  if (await marketHealthy(marketUrl)) {
+    check('远程插件市场服务可达', true, `${marketUrl}/v1/health`)
+    return
+  }
+
+  let loopback = false
+  try {
+    const host = new URL(marketUrl).hostname
+    loopback = ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(host)
+  } catch {
+    // 非法地址按「非本机市场」处理
+  }
+  const entry = path.join(repoRoot, 'boki-market', 'server', 'src', 'main.mjs')
+  if (!loopback || !fs.existsSync(entry)) {
+    check('远程插件市场服务可达', false, `${marketUrl} 不可达；请先启动插件市场服务后重新验证`)
+    throw new Error(`插件市场不可达：${marketUrl}`)
+  }
+
+  console.log(`  [提示] 本地插件市场未运行，临时拉起 boki-market（${entry}）`)
+  marketChild = spawn(path.join(serverDir, 'node.exe'), [entry], {
+    cwd: path.join(repoRoot, 'boki-market'),
+    env: { ...process.env },
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  marketChild.stdout.on('data', (d) => marketLogs.push(d.toString()))
+  marketChild.stderr.on('data', (d) => marketLogs.push(d.toString()))
+
+  const deadline = Date.now() + 20_000
+  let ready = false
+  while (Date.now() < deadline && !ready) {
+    await new Promise((r) => setTimeout(r, 400))
+    ready = await marketHealthy(marketUrl)
+  }
+  check('本地插件市场服务已就绪', ready,
+    ready ? `${marketUrl}（临时拉起，验证结束自动关闭）` : marketLogs.join('').slice(-600))
+  if (!ready) throw new Error('插件市场未就绪，后续安装/重启/OCR 检查会连锁失败，已提前中止')
+}
+
+/**
  * 首次启动的空库还没有记账公司，业务接口会因缺少公司上下文而拒绝。
  * 这里按前端「创建记账公司」引导补齐：无公司则新建一家并切换令牌；
  * 已有公司则直接切换。
@@ -222,7 +310,10 @@ async function main() {
   }
 
   try {
-    console.log('[1/6] 启动打包后的后端（node.exe + dist/main.js，零插件）')
+    console.log('[0/6] 插件市场前置检查')
+    await ensureMarket(String(marketConfig.url || ''))
+
+    console.log('\n[1/6] 启动打包后的后端（node.exe + dist/main.js，零插件）')
     await start('首次启动')
 
     console.log('\n[2/6] 静态托管与 SPA')
@@ -241,13 +332,16 @@ async function main() {
     console.log('\n[4/6] 远程插件市场（唯一插件来源）')
     const status = loginToken ? await request('/market/remote/status', { token: loginToken }) : { status: 0, json: null }
     const statusData = unwrap(status.json)
-    check('市场地址已注入后端', status.status === 200 && statusData?.enabled === true, statusData?.url || statusData?.error || '-')
+    check('市场地址已注入后端', status.status === 200 && statusData?.enabled === true && !statusData?.error,
+      statusData?.error || statusData?.url || '-')
     check('验签公钥已注入后端', statusData?.publicKeysConfigured === true)
 
     const catalogRes = loginToken ? await request('/market/remote/catalog', { token: loginToken }) : { status: 0, json: null }
     const catalog = unwrap(catalogRes.json)
     check('插件目录可拉取且验签通过', catalogRes.status === 200 && Array.isArray(catalog?.plugins) && catalog.plugins.length > 0,
-      `${catalog?.plugins?.length ?? 0} 个插件`)
+      catalogRes.status === 200
+        ? `${catalog?.plugins?.length ?? 0} 个插件`
+        : `status=${catalogRes.status} ${(catalogRes.text || '').slice(0, 200)}`)
 
     console.log('\n[5/6] 从市场安装插件并重启生效')
     for (const id of MARKET_INSTALL) {
@@ -255,7 +349,8 @@ async function main() {
         ? await request(`/market/remote/plugins/${id}/install`, { method: 'POST', token: loginToken, body: {} })
         : { status: 0, json: null }
       const installed = unwrap(res.json)?.installed ?? []
-      check(`安装 ${id}（含硬依赖）`, res.status === 200 && installed.includes(id), installed.join(', ') || `status=${res.status}`)
+      check(`安装 ${id}（含硬依赖）`, res.status === 200 && installed.includes(id),
+        res.status === 200 ? installed.join(', ') : `status=${res.status} ${(res.text || '').slice(0, 200)}`)
     }
 
     await stop()
@@ -301,6 +396,7 @@ async function main() {
     }
   } finally {
     await stop()
+    await stopMarket()
     // 子进程刚退出时 SQLite 句柄可能尚未释放，临时目录清理失败不影响验证结论
     try {
       fs.rmSync(dataRoot, { recursive: true, force: true })

@@ -32,6 +32,8 @@ import { ensureVaultKeyFile, readVaultKeyFile, vaultKeyFilePath } from './vault/
 import { canOpenDatabase, createEmptyDatabase } from './vault/db-open'
 import { enableVaultEncryption, settleVaultMigration } from './vault/vault-migrate'
 import { isPlaintextDatabase } from './vault/vault-backup'
+import { applyPendingRestore } from './vault/pending-restore'
+import { processStartedAt, registerRestartableApp } from './vault/self-restart'
 import { encryptLegacyAttachments } from './vault/vault-attachments'
 
 async function bootstrap(): Promise<void> {
@@ -50,6 +52,11 @@ async function bootstrap(): Promise<void> {
 
   const prefix = process.env.APP_PREFIX || 'api'
   const port = Number(process.env.APP_PORT || 3000)
+
+  // ============ 待生效的数据库恢复（§6.9） ============
+  // 界面上点「恢复」只做暂存，真正的文件替换必须发生在 TypeORM 建连之前：
+  // 运行期覆盖主库会留下旧 -wal/-shm，SQLite 会报 file is not a database。
+  applyPendingRestore((message) => logger.warn(message))
 
   // ============ Vault 三态判定（§5.1） ============
   const vaultMeta = readVaultMeta()
@@ -89,6 +96,12 @@ async function bootstrap(): Promise<void> {
 
   // 静态托管前端构建产物：打包版与 API 同源，免 Nginx、免跨域
   serveWebDist(app, prefix)
+
+  // 免鉴权探活：恢复后服务会自重启，前端靠它判断新进程是否就绪
+  registerHealthEndpoint(app, prefix)
+
+  // 允许「恢复」触发自重启（先优雅关闭再拉起新进程）
+  registerRestartableApp(app)
 
   await listenWithRetry(app, port, logger)
 
@@ -327,6 +340,36 @@ async function listenWithRetry(
       await new Promise((r) => setTimeout(r, 50 * attempt))
     }
   }
+}
+
+/**
+ * 免鉴权探活接口 `GET /{prefix}/health`。
+ *
+ * 数据库恢复后服务会自重启，前端需要判断「新进程是否已经接上」，所以：
+ * - 直接挂在原生 express 上，绕过 Nest 守卫，重启后即使 token 失效也能访问；
+ * - 返回 `pid` 与 `startedAt`：pid 变了才说明确实是新进程（而不是旧进程还没死）。
+ */
+function registerHealthEndpoint(app: NestExpressApplication, prefix: string): void {
+  const expressApp = app.getHttpAdapter().getInstance()
+  const route = `/${prefix.replace(/^\/+/, '')}/health`
+
+  expressApp.get(route, (_req: Request, res: Response) => {
+    res.type('application/json').send(
+      JSON.stringify({
+        code: 0,
+        message: 'ok',
+        data: {
+          status: 'ok',
+          pid: process.pid,
+          startedAt: processStartedAt(),
+          uptime: Math.floor(process.uptime()),
+        },
+        timestamp: Date.now(),
+      }),
+    )
+  })
+
+  new Logger('Bootstrap').log(`探活接口: ${route}`)
 }
 
 /**

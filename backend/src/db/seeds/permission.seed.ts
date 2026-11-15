@@ -488,6 +488,23 @@ export const PERMISSION_SEED: SeedPermissionNode[] = [
         sort: 2,
       },
       {
+        // 单据类型的声明式配置：只改「叫什么、怎么说、要不要必填」，
+        // 改不了执行逻辑（新增类型仍要插件发版）。
+        code: 'receipts:ai-config',
+        name: 'AI 单据配置',
+        module: 'receipts',
+        type: PermissionType.MENU,
+        path: '/receipts/ai-doc-config',
+        sort: 3,
+      },
+      {
+        code: 'receipts:ai-config:write',
+        name: '修改 AI 单据配置',
+        module: 'receipts',
+        type: PermissionType.ACTION,
+        sort: 16,
+      },
+      {
         code: 'receipt:list',
         name: '查看票据',
         module: 'receipts',
@@ -1174,6 +1191,9 @@ export const ROLE_SEED: Array<{
       // AI 智能记账的语音通道：会计默认可用（写入仍受 voucher:create / voucher:audit / hr:* 二次校验）
       'receipts:voice:use',
       'receipts:voice:commit',
+      // 单据类型的展示与口语别名：会计自己维护，改不了执行逻辑
+      'receipts:ai-config',
+      'receipts:ai-config:write',
     ],
   },
   {

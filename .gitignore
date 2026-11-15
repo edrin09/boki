@@ -34,6 +34,11 @@ backend/data/*.db-*
 backend/data/*.bak*
 backend/data/backup/
 backend/data/uploads/
+# 故障现场快照（排查用，含旧 -wal / 主库副本）
+backend/data/_recovery*/
+# 待重启生效的数据库恢复（运行时临时文件）
+backend/data/.restore-pending.json
+backend/data/*.restore-pending.db
 
 # 模型与字典（体积大，运行时用 npm run models:fetch / models:fetch-asr 获取）
 backend/models/ocr/*.onnx

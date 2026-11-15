@@ -363,12 +363,19 @@ export class VouchersService {
 
   // ==================== 写入 ====================
 
-  /** 新增凭证 */
+  /**
+   * 新增凭证。
+   *
+   * `manager` 用于「业务单据 + 凭证」必须同生共死的场景（借款审核、报销审核）：
+   * 调用方开事务后把 manager 传进来，凭证写在自己的事务里，随调用方一起提交/回滚。
+   * 不传则自己开一个事务（普通手工记账）。
+   */
   async create(
     dto: SaveVoucherDto,
     operator: { id: string; nickname: string },
     autoApprove = false,
     source?: { type: VoucherSource; id: string | null },
+    manager?: EntityManager,
   ): Promise<any> {
     const period = toPeriod(dto.voucherDate)
     if (!period) throw new BadRequestException('凭证日期不合法')
@@ -377,7 +384,7 @@ export class VouchersService {
     const entries = await this.normalizeEntries(dto.entries)
     const totals = this.sumEntries(entries)
 
-    return this.dataSource.transaction(async (manager) => {
+    const write = async (manager: EntityManager) => {
       const nextNo = await this.nextVoucherNoInTx(manager, period, dto.word)
       const companyId = requireCompanyId()
       const voucher = manager.create(Voucher, {
@@ -408,7 +415,9 @@ export class VouchersService {
       await manager.save(VoucherEntry, rows)
 
       return this.toVo(savedVoucher, rows)
-    })
+    }
+
+    return manager ? write(manager) : this.dataSource.transaction(write)
   }
 
   /** 编辑凭证（仅草稿可编辑） */
@@ -557,6 +566,8 @@ export class VouchersService {
 
   /**
    * 由其他模块（现金银行 / 往来核销 / 其他收支）创建凭证
+   *
+   * `manager` 非空表示调用方已开事务，凭证写入并入该事务（见 create 的说明）。
    */
   async createFromSystem(
     params: {
@@ -569,6 +580,7 @@ export class VouchersService {
       autoApprove?: boolean
     },
     operator: { id: string; nickname: string },
+    manager?: EntityManager,
   ): Promise<Voucher> {
     return this.create(
       {
@@ -580,6 +592,7 @@ export class VouchersService {
       operator,
       params.autoApprove ?? true,
       { type: params.sourceType, id: params.sourceId },
+      manager,
     ) as Promise<any>
   }
 

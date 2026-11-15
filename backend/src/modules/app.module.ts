@@ -23,6 +23,8 @@ import { ClosingModule } from './closing/closing.module'
 import { SystemModule } from './system/system.module'
 import { SetupModule } from './setup/setup.module'
 import { MetaModule } from './meta/meta.module'
+import { AiBridgeModule } from './ai-bridge/ai-bridge.module'
+import { McpModule } from './mcp/mcp.module'
 import { CompanyReposModule } from '../common/company/company-repos.module'
 import { CompanyScopeInterceptor } from '../common/company/company-scope.interceptor'
 import { PluginsModule } from '../plugins/plugins.module'
@@ -46,6 +48,11 @@ const CORE_MODULES = [
   // /api/meta：应用身份与联系方式（根 .env → 桌面 sidecar env / ConfigModule），
   // 前端登录页署名等消费；无数据库依赖，必须排在最前尽快就绪
   MetaModule,
+  // AI 操作中间层内核（协议 / 动作注册表 / 一次性令牌 / 草稿闸门）。
+  // @Global()：插件在 onModuleInit 里注册动作，内核不反向依赖任何插件。
+  AiBridgeModule,
+  // 只读 MCP 服务：/api/mcp（JSON-RPC），把查账/余额/凭证查询暴露给外部 AI 客户端
+  McpModule,
 ]
 
 @Module({})

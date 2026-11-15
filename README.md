@@ -2,17 +2,18 @@
   <img src="assets/boki-lockup.svg" width="360" alt="BOKI — 开源财务软件" />
 </p>
 
-<h1 align="center">BOKI — 离线优先的开源财务软件</h1>
+<h1 align="center">BOKI — 开放式 AI 的开源财务软件</h1>
 
 <p align="center">
-  <strong>加密数据库 · AI 一句话记账 · 你的数据，永远只属于你</strong>
+  <strong>开放式 AI · 离线可跑 · AI 只写草稿，数据不出门</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/edrin09/boki/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-AGPL%20v3-4F46E5.svg" alt="License: AGPL v3" /></a>
   <img src="https://img.shields.io/badge/数据库-SQLCipher%20加密-16A34A.svg" alt="SQLCipher encrypted" />
-  <img src="https://img.shields.io/badge/云端依赖-0-16A34A.svg" alt="no cloud" />
-  <img src="https://img.shields.io/badge/官方插件-14-0EA5E9.svg" alt="plugins 14" />
+  <img src="https://img.shields.io/badge/数据外传-0%20字节-16A34A.svg" alt="zero egress" />
+  <img src="https://img.shields.io/badge/AI-开放接入%20%C2%B7%20只写草稿-0EA5E9.svg" alt="open AI, draft only" />
+  <img src="https://img.shields.io/badge/接口-OpenAI%20兼容-0EA5E9.svg" alt="OpenAI compatible" />
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-64748B.svg" alt="platform" />
 </p>
 
@@ -32,7 +33,9 @@
 **一套装在自己电脑上的开源财务软件：录入凭证、出报表、管多家公司，AI 帮你记账，数据库整库加密，断网也能用。**
 
 - **给谁用**：小微企业、个体工商户、代理记账公司，以及要求数据不出内网的团队
-- **凭什么**：库文件被拷走也打不开（SQLCipher 整库加密）；没有云端、没有埋点、没有遥测
+- **凭什么**：库文件被拷走也打不开（SQLCipher 整库加密）；没有云端、没有埋点、没有遥测，数据外传 **0 字节**
+- **AI 怎么放**：**接口全开，落点收紧**——模型随你换（本地 / 内网 / 云端）、一句话随便说、外部 AI 客户端可接；但所有写入只落草稿，人点了才生效
+- **离线到什么程度**：本地 OCR + 本地语音识别 + 本地大模型三件套，拔掉网线，识别、听写、记账、查账照样跑
 - **怎么用**：免环境安装包装完即用；内核免费开源，要什么功能装什么插件（14 个官方插件）
 
 ---
@@ -51,7 +54,38 @@
 2. **改确认卡片** —— AI 生成凭证草稿：科目、金额、往来单位全部可改，科目只能从科目表选，不会写错
 3. **确认执行** —— 一律生成**草稿凭证**，在凭证列表复核、审核后才正式入账，AI 永远不直接动账
 
-同一套能力还覆盖：**发工资、添加员工、修改凭证、审核凭证**，以及上传发票 PDF / 扫描件自动识别生成凭证（本地 OCR）。五类操作全部先预演、再人工确认，操作留审计记录。
+同一套能力还覆盖：**发工资、添加员工、修改凭证、审核凭证、申请借款单、申请报销单**，以及上传发票 PDF / 扫描件自动识别生成凭证（本地 OCR）。七类操作全部先预演、再人工确认，操作留审计记录。
+
+---
+
+## 🔓 开放式 AI：接口开放，落点收紧
+
+> 大多数「AI 财务」把模型锁在厂商服务器上，也顺手把改账的权力交给了模型。我们反过来：**接什么都行，改什么都不行。**
+
+| 开放什么 | 具体做法 | 你能得到什么 |
+|:--|:--|:--|
+| **模型开放** | OpenAI 兼容协议；本地 Ollama / llama.cpp / 内网推理服务 / 云端 API 走同一套接入层 | 换模型只改配置，业务代码与账套都不动 |
+| **意图开放** | 一句话办七类事：记账、发工资、添加员工、改凭证、审凭证、借款单、报销单；动作由插件注册，扩到 40 类单据不需要改 AI 内核 | 不用背指令，像跟人说话一样说事 |
+| **入口开放** | 只读 MCP：Claude Desktop、Cursor、Cherry Studio 等客户端直连 `POST /api/mcp`，查凭证、查余额、查明细 | 你现有的 AI 工作流可以直接接进来 |
+
+**收紧的是三道锁**：
+
+1. **草稿闸门** —— 动作落点只有 `draft`（草稿）/ `list`（待办清单）/ `archive`（档案），**没有 `direct`**。启动期校验：未声明落点或写成直通，注册直接失败；运行期 `assertDraftOnly` 扫结果，出现 `approved / paid / posted` 立即抛错，而不是静默接受。
+2. **一次性令牌** —— 确认动作绑定「当前用户 + 载荷哈希」，15 分钟过期。换个账号拿同一个令牌提交，返回「该指令由其他用户发起」；跨公司、重放同样拦。
+3. **只读 MCP** —— 注册表只接受 `readOnly: true` 的工具。当前 8 个工具全部是查询；外部客户端就算硬写 `voucher.create`，也只会得到「工具不存在」。
+
+```bash
+# 外部 AI 客户端查一次科目余额（只读；鉴权与网页端同一套 JWT）
+curl -s http://127.0.0.1:3000/api/mcp \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
+       "params":{"name":"account.balance","arguments":{"period":202611}}}'
+```
+
+- 工具清单：`voucher.search` · `voucher.get` · `account.search` · `account.balance` · `books.trial_balance` · `books.ledger` · `hr.loan.search` · `hr.expense_claim.search`
+- 只实现 `POST` 一条 JSON-RPC 传输，不开 SSE、不提供 `resources` / `prompts` / `sampling`——**暴露面越小，只读越守得住**
+
+一句话记住：**模型负责听懂，网关负责拦住，人负责点头。**
 
 ---
 
@@ -59,7 +93,8 @@
 
 | | 能力 | 说明 |
 |:--|:--|:--|
-| 🤖 | **AI 智能记账** | 一句话记账 / 发工资 / 审凭证；发票 PDF、扫描件上传自动识别去重生成凭证；语音查账 + 导出 Excel。**AI 全链路可离线**（本地 OCR + 本地语音识别 + 本地大模型） |
+| 🤖 | **AI 智能记账** | 一句话办七类事：记账 / 发工资 / 建档 / 改凭证 / 审凭证 / 借款单 / 报销单；发票 PDF、扫描件自动识别去重生成凭证；语音查账 + 导出 Excel。**AI 全链路可离线**（本地 OCR + 本地语音识别 + 本地大模型） |
+| 🔓 | **开放式 AI** | 模型随你换（本地 / 内网 / 云端，OpenAI 兼容）；外部 AI 客户端经只读 MCP 直连查账；扩展新单据类型不动 AI 内核 |
 | 📒 | **复式记账** | 借贷必相等前后端双重强校验；75 个中文科目预置；辅助核算（往来单位/部门/项目） |
 | 📊 | **财务报表** | 资产负债表、利润表、科目余额表、试算平衡表、明细账、票据台账、经营看板，导出 Excel |
 | 🗓️ | **期末结转** | 一键结转本期损益并生成结转凭证；已结转期间锁定，禁止新增、修改、删除、反审核凭证，历史账不可被改 |
@@ -68,7 +103,7 @@
 | 🏦 | **银行流水** | 对账单导入自动去重，智能匹配往来单位、员工、工资、社保、税费、房租等关键词，高置信流水一键批量入账 |
 | 🏢 | **多公司** | 一个账号管多家记账公司，数据完全隔离，顶部一键切换 |
 | 🧩 | **插件化** | 内核只留记账引擎，14 个官方插件按需安装，不装的插件界面里不留痕迹 |
-| 🔐 | **安全** | SQLCipher 整库加密 + 附件 AES-256-GCM + RBAC 权限 + 审计日志 + 备份密钥校验 |
+| 🔐 | **安全** | SQLCipher 整库加密 + 附件 AES-256-GCM + RBAC + 审计日志 + 备份密钥校验；**AI 只落草稿**（草稿闸门 + 一次性令牌 + 只读 MCP） |
 | 💻 | **桌面安装包** | 不装 Node、不装数据库、不能联网的机器装完即用，同机即局域网服务器 |
 
 <details>
@@ -124,12 +159,14 @@ npm run dev                   # 打开 http://localhost:5173
 
 ---
 
-## 🔐 数据安全，两句话说清
+## 🔐 离线 AI 与数据安全：四句话说清
 
-1. **数据库整库加密，默认开启、零配置**：密钥文件 `vault.key` 生成在程序目录，没有它库就打不开——**备份 / 搬机器请务必连它一起带走**。
-2. **没有任何外传**：无云端依赖、无第三方 SDK 回传、无埋点遥测，代码可审计。
+1. **AI 全链路可离线**：本地 OCR（约 25MB）、本地语音识别（约 160MB）、本地大模型（Ollama / llama.cpp）三件套，模型权重留在你自己的机器上；拔掉网线，识别、听写、记账、查账照样跑。
+2. **数据库整库加密，默认开启、零配置**：密钥文件 `vault.key` 生成在程序目录，没有它库就打不开——**备份 / 搬机器请务必连它一起带走**。附件走 AES-256-GCM。
+3. **默认零外传**：无云端依赖、无第三方 SDK 回传、无埋点遥测，代码可审计。只有你自己在「AI 模型接入」里配了云端 API，才会产生一个由你决定的出口——这条我们不会含糊。
+4. **AI 越不过人的确认**：写入只落草稿、令牌绑人绑载荷、只读 MCP 没有写工具、每一步落审计表。**AI 可以很快，但不能替你做主。**
 
-安全架构细节（HKDF 密钥派生、附件加密、备份校验、已知边界）见[官网](https://edrin09.github.io/boki/)与 [SECURITY.md](.github/SECURITY.md)。
+安全架构细节（HKDF 密钥派生、附件加密、备份校验、已知边界）见[官网](https://edrin09.github.io/boki/)与 [SECURITY.md](.github/SECURITY.md)；AI 的边界设计与三道锁的代码位置见下文「开放式 AI」与 [SECURITY.md](.github/SECURITY.md)。
 
 ---
 
@@ -145,15 +182,14 @@ npm run dev                   # 打开 http://localhost:5173
 | `departments` | 部门档案 | `projects` | 项目档案与辅助核算 |
 | `iam` | 用户 / 角色 / 权限管理 | `multi-company` | 多公司管理 |
 
-在应用内「插件市场」安装；插件唯一来源是远程插件市场（配置 `PLUGIN_MARKET_URL` 与验签公钥），详见 [插件发布与升级手册](docs/插件发布与升级手册.md)。零插件状态也能完成「登录 → 建账 → 记账」完整闭环。
+在应用内「插件市场」安装；插件唯一来源是远程插件市场（配置 `PLUGIN_MARKET_URL` 与验签公钥），详见[官网插件开发指南](https://edrin09.github.io/boki/docs-plugin.html)。零插件状态也能完成「登录 → 建账 → 记账」完整闭环。
 
 ---
 
 ## 📁 更多文档
 
-- [AI 语音记账插件：需求与开发文档](docs/AI语音记账插件-需求与开发文档.md) —— 一句话记账的完整设计（预演 / 令牌 / 确认协议）
-- [插件发布与升级手册](docs/插件发布与升级手册.md) · [开源运营与赞助落地方案](docs/开源运营与赞助落地方案.md)
-- 社区规范：[CONTRIBUTING](.github/CONTRIBUTING.md) · [行为准则](.github/CODE_OF_CONDUCT.md) · [安全策略](.github/SECURITY.md) · [隐私](.github/PRIVACY.md) · [条款](.github/TERMS.md)
+- 社区规范：[CONTRIBUTING](.github/CONTRIBUTING.md) · [行为准则](.github/CODE_OF_CONDUCT.md) · [安全策略](.github/SECURITY.md) · [隐私](.github/PRIVACY.md) · [条款](.github/TERMS.md) · [治理](.github/GOVERNANCE.md)
+- 内部技术口径（《AI 智能化方案》《插件发布与升级手册》）与运营方案仅本地维护，不随仓库分发；**对外口径以本 README 与[官网](https://edrin09.github.io/boki/)为准**，避免多版本并存。
 
 ---
 
@@ -180,7 +216,7 @@ npm run dev                   # 打开 http://localhost:5173
 - 闭源商用请购买[商业授权](#-联系与支持)；品牌资产（logo / 商标）不在开源许可范围
 
 <!--
-Keywords: 开源记账软件, 免费财务软件, 复式记账, 数据库加密, SQLCipher, 私有化部署, 内网部署, 离线记账, 会计软件, 代理记账, 小微企业记账, AI 记账, 电子发票识别, 发票 OCR, 一句话记账, open-source accounting software, self-hosted bookkeeping, offline-first finance, double-entry bookkeeping, encrypted database, invoice OCR, local-first
+Keywords: 开源记账软件, 免费财务软件, 复式记账, 数据库加密, SQLCipher, 私有化部署, 内网部署, 离线记账, 离线 AI, 本地大模型, 数据不出内网, 开放式 AI, OpenAI 兼容, MCP, 草稿闸门, 会计软件, 代理记账, 小微企业记账, AI 记账, 电子发票识别, 发票 OCR, 一句话记账, open-source accounting software, self-hosted bookkeeping, offline-first finance, local-first AI, on-premise LLM, MCP read-only, double-entry bookkeeping, encrypted database, invoice OCR
 -->
 
 <p align="center">

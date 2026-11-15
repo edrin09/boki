@@ -22,6 +22,7 @@ import { PayrollItem } from '../../entities/hr.entity'
 import { Receipt } from '../../entities/receipt.entity'
 import { ClassifyRule } from '../../entities/classify-rule.entity'
 import { FixedExpense, FixedExpenseLog } from '../../entities/fixed-expense.entity'
+import { AiActionAlias, AiDocTypeConfig } from '../../entities/ai-doc.entity'
 
 /** 所有需要公司隔离的业务实体 */
 export const COMPANY_SCOPED_ENTITIES = [
@@ -48,6 +49,8 @@ export const COMPANY_SCOPED_ENTITIES = [
   ClassifyRule,
   FixedExpense,
   FixedExpenseLog,
+  AiDocTypeConfig,
+  AiActionAlias,
 ]
 
 /**
