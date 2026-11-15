@@ -69,6 +69,8 @@ Thumbs.db
 # 杂项
 # =====================================================================
 coverage/
+# 演示录制器临时产物（Chrome profile / 帧缓冲，由 push-tools 工具链生成）
+/out/
 *.pem
 npm-shrinkwrap.json
 
@@ -80,7 +82,7 @@ starts/
 boki-market/
 
 # 官网：随仓库分发，由 .github/workflows/pages.yml 自动部署到 GitHub Pages
-# （仅 website/assets 内的媒体大文件走 COS 外链，本地保留源文件）
+# 视频类大文件走 COS 外链（boki/demo/），仓库内只保留 assets/ 下的一份源文件
 
 # 品牌 / 商标资产（含内部知识产权方案）
 brand/

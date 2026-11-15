@@ -46,19 +46,21 @@
 
 **① 一句话记账（1 分 12 秒）** — 本地模型 → 确认卡片 → 改字段 → 草稿 → 人工审核
 
-![AI 一句话记账演示](assets/demo/ai-bookkeeping-demo.gif)
+![AI 一句话记账演示](https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/demo/ai-bookkeeping-demo.gif)
 
-<video src="assets/demo/ai-bookkeeping-demo.mp4" autoplay muted loop playsinline></video>
+<video src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/demo/ai-bookkeeping-demo.mp4" autoplay muted loop playsinline></video>
 
-📥 [下载完整 MP4（1440×900，含字幕）](assets/demo/ai-bookkeeping-demo.mp4)
+📥 [下载完整 MP4（1440×900，含字幕）](https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/demo/ai-bookkeeping-demo.mp4)
 
 **② 只读 MCP（20 秒）** — 外部 AI 客户端连进来查账，写工具根本不存在
 
-<video src="assets/demo/mcp-readonly-demo.mp4" autoplay muted loop playsinline></video>
+<video src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/demo/mcp-readonly-demo.mp4" autoplay muted loop playsinline></video>
 
-📥 [下载 MP4](assets/demo/mcp-readonly-demo.mp4)
+📥 [下载 MP4](https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/demo/mcp-readonly-demo.mp4)
 
 📄 一页看清差异：[BOKI 与三类替代方案对比（PDF）](assets/pdf/boki-comparison.pdf) —— 云端 SaaS / 本地 ERP / 通用 AI / BOKI 四列，只列事实。
+
+📅 想先看一遍再决定：[预约 30 分钟真机演示](https://edrin09.github.io/boki/#download) —— 你出场景，现场跑，含当场拔网线跑本地模型。
 
 流程只有三步：
 
