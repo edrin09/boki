@@ -657,41 +657,6 @@
     .contact-row .contact-value { display: block; font-weight: 700; font-size: 15px; margin-top: 1px; }
     .contact-note { margin: 0; font-size: 12px; color: var(--slate); line-height: 1.6; }
 
-    /* ============ 预约真机演示 ============ */
-    .book-strip {
-      margin-top: 22px; display: flex; align-items: center; justify-content: space-between; gap: 22px;
-      padding: 20px 24px; border-radius: 14px; background: #fff;
-      border: 1.5px solid var(--border); box-shadow: var(--shadow-sm);
-    }
-    .book-strip .bt-title { font-weight: 700; font-size: 16px; color: var(--ink); display: flex; align-items: center; gap: 8px; }
-    .book-strip .bt-sub { font-size: 13px; color: var(--slate); margin-top: 4px; line-height: 1.6; }
-    .book-strip .bt-actions { display: flex; gap: 10px; flex: none; }
-    #bookBtnSecondary { font: inherit; cursor: pointer; }
-    .modal.modal-wide { max-width: 540px; max-height: 88vh; overflow-y: auto; }
-    .book-form { display: grid; gap: 13px; }
-    .book-field { display: grid; gap: 6px; }
-    .book-field label { font-size: 12.5px; font-weight: 700; color: var(--slate); letter-spacing: .2px; }
-    .book-field input, .book-field select, .book-field textarea {
-      font-family: var(--font); font-size: 14.5px; color: var(--ink); background: #fff;
-      border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; width: 100%;
-      transition: border-color .15s, box-shadow .15s;
-    }
-    .book-field input:focus, .book-field select:focus, .book-field textarea:focus {
-      outline: none; border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(79, 70, 229, .12);
-    }
-    .book-field textarea { resize: vertical; min-height: 64px; line-height: 1.6; }
-    .book-hint { margin: 0; font-size: 12px; color: var(--slate); line-height: 1.6; }
-    .book-actions { display: flex; gap: 10px; align-items: center; }
-    .book-actions .btn { flex: 1; }
-    .book-error { display: none; margin: 0; font-size: 12.5px; font-weight: 600; color: #DC2626; }
-    .book-error.show { display: block; }
-    .book-result { display: none; gap: 10px; }
-    .book-result.show { display: grid; }
-    #bookDraft { font-family: var(--mono); font-size: 12.5px; min-height: 148px; }
-    @media (max-width: 720px) {
-      .book-strip { flex-direction: column; align-items: stretch; }
-      .book-strip .bt-actions { flex-direction: column; }
-    }
   </style>
 </head>
 <body>
@@ -768,7 +733,6 @@
         <p class="show-note">按住 Alt 说话或直接打字都行 · 全程无剪辑 · <a href="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/demo/ai-bookkeeping-demo.mp4" target="_blank" rel="noopener">下载高清版 MP4</a></p>
         <div class="show-cta">
           <a class="btn btn-primary" href="#download">免费下载 BOKI →</a>
-          <button class="btn btn-ghost" id="bookBtn" type="button">预约 30 分钟真机演示</button>
           <a class="btn btn-ghost" href="#features">看看它还能做什么 ↓</a>
         </div>
       </div>
@@ -1173,19 +1137,6 @@
           </div>
         </div>
         <p class="download-note">当前提供 Windows 安装包，发布于 <a href="https://github.com/edrin09/boki/releases/latest" target="_blank" rel="noopener">GitHub Releases</a> 与 <a href="https://gitee.com/edrin/boki/releases" target="_blank" rel="noopener">Gitee 发行版</a>；macOS / Linux 请走源码运行，桌面壳多平台打包已在路线图中。</p>
-
-        <div class="book-strip">
-          <div>
-            <div class="bt-title">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;color:var(--indigo)"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
-              先看一遍再决定：30 分钟真机演示
-            </div>
-            <div class="bt-sub">你出场景，我们现场跑——包括当场拔网线跑本地模型、用你自己的 AI 客户端通过只读 MCP 查账。不录屏、不留资料，只为让你判断「能不能用」。</div>
-          </div>
-          <div class="bt-actions">
-            <button class="btn btn-primary" id="bookBtnSecondary" type="button">预约演示</button>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -1368,60 +1319,6 @@
     </div>
   </div>
 
-  <!-- 预约真机演示弹窗：纯静态，不采集不上传，提交只是生成一封待发邮件 -->
-  <div class="modal-overlay" id="bookModal" aria-hidden="true">
-    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="bookModalTitle">
-      <button class="modal-close" id="bookModalClose" type="button" aria-label="关闭">&times;</button>
-      <h3 id="bookModalTitle">预约 30 分钟真机演示</h3>
-      <p class="modal-sub">填三项就够（称呼可留空）。点提交不会上传任何数据——它只是把内容整理成一封待发邮件，由你自己的邮件客户端发出。</p>
-      <form class="book-form" id="bookForm" novalidate>
-        <div class="book-field">
-          <label for="bookName">怎么称呼 / 什么单位</label>
-          <input id="bookName" name="name" type="text" placeholder="张会计 · 某制造企业" autocomplete="off" />
-        </div>
-        <div class="book-field">
-          <label for="bookContact">联系方式（邮箱或微信，必填）</label>
-          <input id="bookContact" name="contact" type="text" placeholder="you@example.com 或微信号" required autocomplete="off" />
-        </div>
-        <div class="book-field">
-          <label for="bookScene">想先看哪个场景</label>
-          <select id="bookScene" name="scene">
-            <option>一句话记账（改字段 → 草稿 → 人工审核）</option>
-            <option>票据拍照识别 + 自动归类</option>
-            <option>只读 MCP：用我自己的 AI 客户端查账</option>
-            <option>内网 / 断网部署（本地模型当场拔网线）</option>
-            <option>多账套 / 权限 / 历史数据迁移</option>
-            <option>其他（在下面说明）</option>
-          </select>
-        </div>
-        <div class="book-field">
-          <label for="bookTime">方便的时段</label>
-          <input id="bookTime" name="time" type="text" placeholder="工作日下午 3 点后 / 周二上午" autocomplete="off" />
-        </div>
-        <div class="book-field">
-          <label for="bookNote">补充说明（可选）</label>
-          <textarea id="bookNote" name="note" placeholder="部署环境、数据量、要过的合规要求……"></textarea>
-        </div>
-        <p class="book-error" id="bookError">请先留一个能联系到你的邮箱或微信。</p>
-        <div class="book-actions">
-          <button class="btn btn-primary" type="submit">生成预约邮件</button>
-        </div>
-        <p class="book-hint">不想填表也行：直接写信到 <a id="bookMailFallback" href="mailto:y_p09@163.com">y_p09@163.com</a>，或看<a href="#download" id="bookToDownload">安装包直接自己跑</a>。</p>
-        <div class="book-result" id="bookResult">
-          <div class="book-field">
-            <label for="bookDraft">预约邮件内容（没自动唤起邮件客户端就复制这段）</label>
-            <textarea id="bookDraft" readonly></textarea>
-          </div>
-          <div class="book-actions">
-            <button class="btn btn-ghost" type="button" id="bookCopy">复制内容</button>
-            <a class="btn btn-primary" id="bookMailto" href="mailto:y_p09@163.com">打开邮件客户端</a>
-          </div>
-          <p class="book-hint" id="bookCopyTip"></p>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <!-- 联系我们弹窗（静态值为快照，运行时由 website/contact.js 覆盖，源头是仓库根 .env） -->
   <div class="modal-overlay" id="contactModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
@@ -1571,112 +1468,6 @@
 
       document.getElementById('year').textContent = new Date().getFullYear();
 
-      // ============ 预约真机演示 ============
-      var bookBtn = document.getElementById('bookBtn');
-      var bookBtn2 = document.getElementById('bookBtnSecondary');
-      var bookModal = document.getElementById('bookModal');
-      var bookClose = document.getElementById('bookModalClose');
-      var bookForm = document.getElementById('bookForm');
-      var bookError = document.getElementById('bookError');
-      var bookResult = document.getElementById('bookResult');
-      var bookDraft = document.getElementById('bookDraft');
-      var bookMailto = document.getElementById('bookMailto');
-      var bookCopy = document.getElementById('bookCopy');
-      var bookCopyTip = document.getElementById('bookCopyTip');
-
-      function openBook() {
-        if (!bookModal) return;
-        bookModal.classList.add('open');
-        bookModal.setAttribute('aria-hidden', 'false');
-        var first = document.getElementById('bookName');
-        if (first) first.focus({ preventScroll: true });
-      }
-      function closeBook() {
-        if (!bookModal) return;
-        bookModal.classList.remove('open');
-        bookModal.setAttribute('aria-hidden', 'true');
-      }
-      function v(id) {
-        var el = document.getElementById(id);
-        return el && el.value ? el.value.trim() : '';
-      }
-
-      function buildDraft() {
-        var name = v('bookName') || '未填写';
-        var contact = v('bookContact');
-        var scene = v('bookScene');
-        var time = v('bookTime') || '时间灵活，听你们安排';
-        var note = v('bookNote') || '（无）';
-        var subject = '[BOKI 真机演示预约] ' + (v('bookName') || '未留单位');
-        var body = [
-          '你好，',
-          '',
-          '我想预约一次 BOKI 真机演示（30 分钟）。',
-          '',
-          '称呼 / 单位：' + name,
-          '联系方式：' + contact,
-          '想看的场景：' + scene,
-          '方便时段：' + time,
-          '补充说明：' + note,
-          '',
-          '（来自官网 edrin09.github.io/boki 的「预约真机演示」）',
-        ].join('\n');
-        return { subject: subject, body: body, mail: 'mailto:' + (C.email || 'y_p09@163.com') + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body) };
-      }
-
-      if (bookBtn) bookBtn.addEventListener('click', openBook);
-      if (bookBtn2) bookBtn2.addEventListener('click', openBook);
-      if (bookClose) bookClose.addEventListener('click', closeBook);
-      if (bookModal) {
-        bookModal.addEventListener('click', function (e) {
-          if (e.target === bookModal) closeBook();
-        });
-      }
-      document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && bookModal && bookModal.classList.contains('open')) closeBook();
-      });
-      var bookFallback = document.getElementById('bookMailFallback');
-      if (bookFallback && C.email) bookFallback.href = 'mailto:' + C.email;
-      var bookToDownload = document.getElementById('bookToDownload');
-      if (bookToDownload) bookToDownload.addEventListener('click', closeBook);
-
-      if (bookForm) {
-        bookForm.addEventListener('submit', function (e) {
-          e.preventDefault();
-          if (!v('bookContact')) {
-            bookError.classList.add('show');
-            document.getElementById('bookContact').focus();
-            return;
-          }
-          bookError.classList.remove('show');
-          var d = buildDraft();
-          bookDraft.value = '收件人：' + (C.email || 'y_p09@163.com') + '\n主题：' + d.subject + '\n\n' + d.body;
-          bookMailto.href = d.mail;
-          bookResult.classList.add('show');
-          bookCopyTip.textContent = '';
-          // 尝试唤起本机邮件客户端；没装也不会报错，上面那段可直接复制
-          window.location.href = d.mail;
-          bookDraft.focus({ preventScroll: true });
-          bookDraft.select();
-        });
-        bookCopy.addEventListener('click', function () {
-          var text = bookDraft.value;
-          function fallbackCopy() {
-            bookDraft.focus();
-            bookDraft.select();
-            var ok = false;
-            try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
-            bookCopyTip.textContent = ok ? '已复制，粘到邮件里发出去就行。' : '复制失败，请手动全选手动复制。';
-          }
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(function () {
-              bookCopyTip.textContent = '已复制，粘到邮件里发出去就行。';
-            }, fallbackCopy);
-          } else {
-            fallbackCopy();
-          }
-        });
-      }
     })();
   </script>
 </body>

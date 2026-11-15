@@ -60,8 +60,6 @@
 
 📄 一页看清差异：[BOKI 与三类替代方案对比（PDF）](assets/pdf/boki-comparison.pdf) —— 云端 SaaS / 本地 ERP / 通用 AI / BOKI 四列，只列事实。
 
-📅 想先看一遍再决定：[预约 30 分钟真机演示](https://edrin09.github.io/boki/#download) —— 你出场景，现场跑，含当场拔网线跑本地模型。
-
 📝 想看设计细节：[技术文章（4 篇）](https://edrin09.github.io/boki/articles/) —— 三道锁怎么被代码钉死、只读 MCP 的边界，以及一个真实漏洞的复盘。
 
 流程只有三步：
