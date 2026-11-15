@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>开发进度 · BOKI</title>
+<style>
+:root{--indigo:#4f46e5;--indigo-deep:#3730a3;--slate:#64748b;--border:#e5e7eb;--bg-soft:#f8fafc;--text:#0f172a;--green:#16a34a;--amber:#d97706;}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);line-height:1.75;background:#fff}
+header.bar{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:14px;z-index:10}
+header.bar a{color:var(--indigo);text-decoration:none;font-weight:600;font-size:14px}
+header.bar .logo{font-weight:800;color:var(--text)}
+main{max-width:840px;margin:0 auto;padding:40px 22px 80px}
+h1{font-size:28px;margin:0 0 8px}
+.eyebrow{color:var(--indigo);font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
+h2{font-size:20px;margin:34px 0 10px;border-left:3px solid var(--indigo);padding-left:10px}
+p,li{color:#334155}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+th,td{border:1px solid var(--border);padding:10px 12px;text-align:left}
+th{background:var(--bg-soft);color:var(--indigo-deep)}
+.badge{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600}
+.badge.done{background:#dcfce7;color:var(--green)}
+.badge.dev{background:#fef3c7;color:var(--amber)}
+footer{text-align:center;color:var(--slate);font-size:13px;padding:30px;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a href="index.html">← 返回官网</a>
+  <span class="logo">BOKI</span>
+  <span style="color:var(--slate);font-size:13px">开发进度</span>
+</header>
+<main>
+  <span class="eyebrow">Roadmap</span>
+  <h1>开发进度</h1>
+  <p>BOKI 走公开路线图。下方为内核与官方插件的当前状态，所有交付均可在仓库与官网验证。</p>
+
+  <h2>内核（AGPL-3.0）</h2>
+  <table>
+    <tr><th>模块</th><th>状态</th><th>说明</th></tr>
+    <tr><td>复式记账引擎</td><td><span class="badge done">已交付</span></td><td>凭证 / 科目 / 账套 / 月结</td></tr>
+    <tr><td>插件运行时</td><td><span class="badge done">已交付</span></td><td>加载、启用、停用、卸载、版本比对</td></tr>
+    <tr><td>离线 OCR / ASR</td><td><span class="badge done">已交付</span></td><td>PP-OCRv4 + 流式语音识别，本地推理</td></tr>
+    <tr><td>数据可迁移</td><td><span class="badge done">已交付</span></td><td>单文件 SQLite，一键备份 / 下载 / 恢复</td></tr>
+  </table>
+
+  <h2>官方插件（Apache-2.0，14 个）</h2>
+  <table>
+    <tr><th>分类</th><th>状态</th></tr>
+    <tr><td>banks · departments · projects · cash-bank · ar-ap</td><td><span class="badge done">已交付</span></td></tr>
+    <tr><td>income-expense · hr · receipts · ocr · report-pack</td><td><span class="badge done">已交付</span></td></tr>
+    <tr><td>ai · voice · iam · multi-company</td><td><span class="badge done">已交付</span></td></tr>
+  </table>
+
+  <h2>桌面版与部署</h2>
+  <table>
+    <tr><th>形态</th><th>状态</th><th>说明</th></tr>
+    <tr><td>Windows 免环境安装包</td><td><span class="badge done">已交付</span></td><td>发布于 <a href="https://github.com/edrin09/boki/releases/latest">GitHub Releases</a> / <a href="https://gitee.com/edrin/boki/releases">Gitee 发行版</a></td></tr>
+    <tr><td>macOS / Linux 打包</td><td><span class="badge dev">路线图中</span></td></tr>
+    <tr><td>Docker 镜像</td><td><span class="badge dev">开发中</span></td><td>一键容器化部署</td></tr>
+    <tr><td>独立服务器部署版</td><td><span class="badge dev">开发中</span></td><td>面向内网 / 专属服务器的部署包</td></tr>
+  </table>
+
+  <h2>近期方向</h2>
+  <ul>
+    <li>桌面壳多平台打包（macOS / Linux）</li>
+    <li>Docker 镜像与独立服务器部署版</li>
+    <li>插件仓库在线自动拉取（发布为独立产物后启用）</li>
+  </ul>
+</main>
+<footer>© BOKI · 开源财务软件 · 路线图持续更新</footer>
+</body>
+</html>

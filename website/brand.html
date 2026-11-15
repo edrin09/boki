@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>品牌规范 · BOKI</title>
+<style>
+:root{--indigo:#4f46e5;--indigo-deep:#3730a3;--slate:#64748b;--border:#e5e7eb;--bg-soft:#f8fafc;--text:#0f172a;}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);line-height:1.75;background:#fff}
+header.bar{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:14px;z-index:10}
+header.bar a{color:var(--indigo);text-decoration:none;font-weight:600;font-size:14px}
+header.bar .logo{font-weight:800;color:var(--text)}
+main{max-width:840px;margin:0 auto;padding:40px 22px 80px}
+h1{font-size:28px;margin:0 0 8px}
+.eyebrow{color:var(--indigo);font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
+h2{font-size:20px;margin:34px 0 10px;border-left:3px solid var(--indigo);padding-left:10px}
+p,li{color:#334155}
+.sw{display:inline-block;width:18px;height:18px;border-radius:5px;vertical-align:-3px;margin-right:8px;border:1px solid rgba(0,0,0,.1)}
+.grid{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0}
+.swatch{flex:1;min-width:160px;border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center}
+.swatch .c{width:46px;height:46px;border-radius:12px;margin:0 auto 10px}
+ul.do,ul.dont{list-style:none;padding-left:0}
+ul.do li:before{content:"✓ ";color:#16a34a;font-weight:700}
+ul.dont li:before{content:"✕ ";color:#dc2626;font-weight:700}
+footer{text-align:center;color:var(--slate);font-size:13px;padding:30px;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a href="index.html">← 返回官网</a>
+  <span class="logo">BOKI</span>
+  <span style="color:var(--slate);font-size:13px">品牌规范</span>
+</header>
+<main>
+  <span class="eyebrow">Brand</span>
+  <h1>品牌规范</h1>
+  <p><strong>BOKI</strong> 是纯英文单品牌（无中文名）。本页面向媒体、社区与合作伙伴，说明 logo 与配色的基本使用方式。商标归 BOKI 所有。</p>
+
+  <h2>品牌色</h2>
+  <div class="grid">
+    <div class="swatch"><div class="c" style="background:#4f46e5"></div>Indigo<br><code>#4f46e5</code></div>
+    <div class="swatch"><div class="c" style="background:#3730a3"></div>Indigo Deep<br><code>#3730a3</code></div>
+    <div class="swatch"><div class="c" style="background:#f8fafc;border:1px solid #e5e7eb"></div>Soft BG<br><code>#f8fafc</code></div>
+    <div class="swatch"><div class="c" style="background:#0f172a"></div>Ink<br><code>#0f172a</code></div>
+  </div>
+
+  <h2>Logo 使用</h2>
+  <ul class="do">
+    <li>在白色或浅色背景上使用标准 lockup（文字 + 标记组合）</li>
+    <li>保持标记与文字的安全间距，不拉伸、不变形</li>
+    <li>引用时标注「BOKI · 开源财务软件」</li>
+  </ul>
+  <ul class="dont">
+    <li>不修改配色、比例或文字</li>
+    <li>不将 logo 用于暗示官方背书或担保的场景</li>
+    <li>不在低对比度背景下使用导致不可辨识</li>
+  </ul>
+
+  <h2>商标</h2>
+  <p>「BOKI」名称与标识为注册商标（申请/注册状态以官方公示为准）。在开源项目、技术文章、二次开发作品中可正当提及，但不得注册相同或近似商标，不得用于混淆性商业用途。</p>
+
+  <h2>开源许可与品牌的关系</h2>
+  <p>软件以 AGPL-3.0（内核）+ Apache-2.0（官方插件）许可，与商标授权相互独立：使用代码不自动授予商标使用权。商业产品集成需另行取得商业授权与商标使用许可。</p>
+</main>
+<footer>© BOKI · 开源财务软件 · 商标归 BOKI 所有</footer>
+</body>
+</html>

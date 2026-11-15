@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://edrin09.github.io/boki/sitemap.xml

@@ -79,8 +79,8 @@ npm-shrinkwrap.json
 starts/
 boki-market/
 
-# 官网（仅本地维护，不随仓库分发）
-website/
+# 官网：随仓库分发，由 .github/workflows/pages.yml 自动部署到 GitHub Pages
+# （仅 website/assets 内的媒体大文件走 COS 外链，本地保留源文件）
 
 # 品牌 / 商标资产（含内部知识产权方案）
 brand/
@@ -106,3 +106,6 @@ docs/
 # 客户端不随包任何插件：新克隆的仓库插件目录为空，需要什么自己从市场装
 backend/data/plugins/
 /.dsh-acl-recovery
+
+# 官网素材：未引用的历史截图不随仓库分发（本机保留）
+website/assets/GitHub_repository_social_previ_*.png
