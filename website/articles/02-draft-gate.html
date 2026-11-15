@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>为什么我们不让 AI 直接改账：草稿闸门的设计 · BOKI</title>
+<meta name="description" content="落点没有 direct 这个选项：注册期校验、执行期扫描、幂等确认，以及这套设计的三个局限。" />
+<link rel="canonical" href="https://edrin09.github.io/boki/articles/02-draft-gate.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="为什么我们不让 AI 直接改账：草稿闸门的设计" />
+<meta property="og:description" content="落点没有 direct 这个选项：注册期校验、执行期扫描、幂等确认，以及这套设计的三个局限。" />
+<meta property="og:url" content="https://edrin09.github.io/boki/articles/02-draft-gate.html" />
+<style>
+:root{--indigo:#4f46e5;--indigo-deep:#3730a3;--slate:#64748b;--border:#e5e7eb;--bg-soft:#f8fafc;--text:#0f172a;--green:#16a34a;--amber:#d97706}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);line-height:1.8;background:#fff;-webkit-font-smoothing:antialiased}
+header.bar{position:sticky;top:0;background:rgba(255,255,255,.92);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--border);padding:13px 20px;display:flex;align-items:center;gap:14px;z-index:20}
+header.bar a{color:var(--indigo);text-decoration:none;font-weight:600;font-size:14px;white-space:nowrap;flex:none}
+header.bar .logo{font-weight:800;color:var(--text);letter-spacing:.02em;white-space:nowrap;flex:none}
+header.bar .crumb{color:var(--slate);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+header.bar .spacer{flex:1}
+header.bar .copy{border:1px solid var(--border);background:#fff;color:var(--slate);font-size:12.5px;line-height:1.2;padding:5px 12px;border-radius:999px;cursor:pointer;font-family:inherit;transition:.15s;white-space:nowrap;flex:none}
+header.bar .copy:hover{border-color:var(--indigo);color:var(--indigo)}
+main{max-width:760px;margin:0 auto;padding:44px 22px 72px}
+.eyebrow{color:var(--indigo);font-weight:700;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase}
+h1{font-size:32px;line-height:1.35;margin:10px 0 14px;letter-spacing:-.01em}
+.meta{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;color:var(--slate);font-size:13px;padding-bottom:22px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.meta .dot{width:3px;height:3px;border-radius:50%;background:#cbd5e1}
+.tag{background:var(--bg-soft);border:1px solid var(--border);color:var(--slate);border-radius:999px;padding:1px 9px;font-size:12px}
+h2{font-size:22px;margin:44px 0 14px;padding-left:12px;border-left:3px solid var(--indigo);line-height:1.5;scroll-margin-top:70px}
+h3{font-size:17px;margin:28px 0 10px;scroll-margin-top:70px}
+p{margin:16px 0;color:#334155}
+strong{color:var(--text);font-weight:700}
+a{color:var(--indigo);text-decoration:none;border-bottom:1px solid rgba(79,70,229,.28)}
+a:hover{border-bottom-color:var(--indigo)}
+ul,ol{padding-left:24px;margin:16px 0;color:#334155}
+li{margin:7px 0}
+li>ul,li>ol{margin:6px 0}
+hr{border:0;border-top:1px solid var(--border);margin:40px 0}
+blockquote{margin:24px 0;padding:14px 18px;background:var(--bg-soft);border-left:3px solid var(--indigo);border-radius:0 8px 8px 0}
+blockquote p{margin:0;color:#334155}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;font-size:.9em;background:#f1f5f9;color:#0f172a;padding:1.5px 5px;border-radius:4px;border:1px solid #e2e8f0}
+.code{margin:22px 0;border-radius:10px;overflow:hidden;border:1px solid #1e293b;background:#0f172a}
+.code-lang{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;padding:7px 14px;border-bottom:1px solid #1e293b;background:#111c2e}
+.code pre{margin:0;padding:15px 16px;overflow-x:auto;line-height:1.65}
+.code code{background:none;border:0;padding:0;color:#e2e8f0;font-size:13px}
+.tok-c{color:#64748b;font-style:italic}
+.tok-s{color:#fcd34d}
+.tok-k{color:#c4b5fd}
+.tok-n{color:#7dd3fc}
+figure{margin:26px 0}
+figure img,.article-img{width:100%;border-radius:10px;border:1px solid var(--border);display:block}
+figcaption{color:var(--slate);font-size:12.5px;text-align:center;margin-top:10px;line-height:1.6}
+p.caption{color:var(--slate);font-size:13px;text-align:center;margin-top:-8px}
+.table-wrap{overflow-x:auto;margin:22px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{border:1px solid var(--border);padding:9px 12px;text-align:left;vertical-align:top}
+th{background:var(--bg-soft);color:var(--indigo-deep);font-weight:600;white-space:nowrap}
+tbody tr:nth-child(even){background:#fcfdff}
+.toc{background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin:28px 0 8px}
+.toc-t{font-size:12.5px;font-weight:700;color:var(--slate);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.toc ol,.toc ul{margin:0;font-size:14px}
+.toc ol.num{padding-left:20px}
+.toc ul.plain{list-style:none;padding-left:2px}
+.toc li{margin:4px 0}
+.toc a{border:0;color:#334155}
+.toc a:hover{color:var(--indigo)}
+.end{margin-top:52px;padding-top:22px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.end .btn{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:8px 18px;font-size:14px;color:var(--text);background:#fff;cursor:pointer;font-family:inherit}
+.end .btn:hover{border-color:var(--indigo);color:var(--indigo)}
+.end .btn.primary{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.end .btn.primary:hover{background:var(--indigo-deep);color:#fff}
+footer{text-align:center;color:var(--slate);font-size:13px;padding:28px 20px 40px;border-top:1px solid var(--border)}
+footer a{color:var(--slate)}
+@media(max-width:600px){h1{font-size:26px}h2{font-size:19px}main{padding:30px 18px 56px}.code code{font-size:12px}header.bar .crumb{display:none}header.bar{gap:10px;padding:11px 14px}header.bar .copy{font-size:11.5px;padding:5px 9px}}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a href="../index.html">← 官网</a>
+  <span class="logo">BOKI</span>
+  <span class="crumb">为什么我们不让 AI 直接改账：草稿闸门的设计</span>
+  <span class="spacer"></span>
+  <button class="copy" id="copyMd" data-md="md/02-draft-gate.md">复制 Markdown 原文</button>
+</header>
+<main>
+  <span class="eyebrow">掘金</span>
+  <h1>为什么我们不让 AI 直接改账：草稿闸门的设计</h1>
+  <div class="meta">
+    <span>2026-11-15</span><span class="dot"></span>
+    <span>约 10 分钟</span><span class="dot"></span>
+    <span>4246 字</span>
+    <span class="tag">TypeScript</span><span class="tag">AI</span><span class="tag">工程约束</span>
+  </div>
+  <nav class="toc"><div class="toc-t">本文目录</div><ul class="plain"><li><a href="#一-先把问题建模">一、先把问题建模</a></li><li><a href="#二-注册期闸-起不来的进程">二、注册期闸：起不来的进程</a></li><li><a href="#三-执行期闸-不信适配器">三、执行期闸：不信适配器</a></li><li><a href="#四-为什么不用-信任-代码审查">四、为什么不用&quot;信任 + 代码审查&quot;</a></li><li><a href="#五-幂等-确认两次不等于记两笔">五、幂等：确认两次不等于记两笔</a></li><li><a href="#六-怎么证明-真的没有直通分支">六、怎么证明&quot;真的没有直通分支&quot;</a></li><li><a href="#七-这套设计的局限">七、这套设计的局限</a></li><li><a href="#八-小结">八、小结</a></li></ul></nav>
+  <article>
+<p>给财务软件接 AI，最先想到的是&quot;让它帮我记账&quot;。做了三个版本之后我的结论是：<strong>让 AI 记账不难，难的是让它记完账不能自己签字。</strong></p>
+<p>这篇文章讲我们怎么用代码把一个架构约束钉死——不是写在文档里的&quot;建议&quot;，是写进注册流程和执行路径的&quot;做不到&quot;。</p>
+<figure><img src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/articles/open-flow.png" alt="AI 动作的五步链路：人说一句 → 模型听懂 → 服务端只读预演 → 人点确认 → 只落草稿" loading="lazy"></figure>
+<p class="caption">全文要解释的就是这张图里「第 3 步只读」和「第 5 步只落草稿」为什么必须由代码保证。</p>
+<hr>
+<h2 id="一-先把问题建模">一、先把问题建模</h2>
+<p>AI 写操作，按&quot;落点&quot;可以分成四类：</p>
+<div class="table-wrap"><table><thead><tr><th>落点</th><th>含义</th><th>例子</th></tr></thead><tbody><tr><td><code>direct</code></td><td>直接生成已生效数据</td><td>AI 直接创建一张<strong>已审核</strong>的凭证</td></tr><tr><td><code>draft</code></td><td>生成草稿，等人处理</td><td>AI 创建凭证草稿，状态 <code>draft</code></td></tr><tr><td><code>archive</code></td><td>只建档案，不影响账簿</td><td>AI 新增员工档案</td></tr><tr><td><code>list</code></td><td>只跳转到列表</td><td>只做查询引导</td></tr></tbody></table></div>
+<p>财务系统的特殊性在于：<strong>凭证一旦&quot;已审核&quot;就计入账簿和报表</strong>。所以 <code>direct</code> 这一类，在我们这个产品里是不能存在的——不是&quot;默认关闭&quot;，是<strong>不存在</strong>。</p>
+<p>于是有了第一行代码：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code>/** landing 白名单：注册期校验用，故意不提供 direct */
+<span class="tok-k">export</span> <span class="tok-k">const</span> AI_LANDINGS = [<span class="tok-s">'draft'</span>, <span class="tok-s">'list'</span>, <span class="tok-s">'archive'</span>] <span class="tok-k">as</span> <span class="tok-k">const</span></code></pre></div>
+<p><code>AiLanding</code> 类型从它推导，声明动作时只能填这三个之一。TypeScript 层面先挡一层。</p>
+<p>但类型只是编译期约束，插件是运行时加载的（我们支持第三方插件注册 AI 动作），所以还需要运行期的两道闸。</p>
+<hr>
+<h2 id="二-注册期闸-起不来的进程">二、注册期闸：起不来的进程</h2>
+<p>插件注册 AI 动作时走 <code>AiActionRegistry.register()</code>，第一件事就是校验落点：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-c">// ai-action.registry.ts</span>
+register(manifest: ActionManifest) {
+  assertLanding({ ...manifest, id })      <span class="tok-c">// 不合法直接 throw</span>
+  <span class="tok-c">// ... 写入注册表</span>
+}</code></pre></div>
+<p><code>assertLanding</code> 的实现很简单，但错误信息写得很啰嗦，是故意的：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-k">export</span> <span class="tok-k">function</span> assertLanding(manifest: ActionManifest): AiLanding {
+  <span class="tok-k">const</span> landing = manifest?.landing
+  <span class="tok-k">if</span> (!landing || !AI_LANDINGS.includes(landing)) {
+    <span class="tok-k">throw</span> <span class="tok-k">new</span> Error(
+      <span class="tok-s">`动作「${manifest?.id ?? '(未命名)'}」未声明合法 landing`</span> +
+      <span class="tok-s">`（只允许 ${AI_LANDINGS.join(' / ')}），注册已拒绝`</span>
+    )
+  }
+  <span class="tok-k">return</span> landing
+}</code></pre></div>
+<p><strong>为什么要在启动期抛错，而不是运行时返回一个 400？</strong></p>
+<p>因为返回 400 意味着&quot;这个动作只是这次失败了&quot;，进程还活着，其他人还能继续用。而我们的目标是：<strong>如果有人写了 <code>landing: 'direct'</code>，整个应用起不来</strong>。开发者必须立刻看到这个问题，而不是等线上某次调用才发现。</p>
+<p>这是一个常见的取舍：启动严格、运行宽松，还是反过来。安全相关的配置项，我们一律选前者。</p>
+<p>顺带一提，这个校验对内核动作和插件动作一视同仁。目前已注册的 7 类动作用的是 <code>draft</code> / <code>list</code> / <code>archive</code> 的组合，没有一个能直通。</p>
+<hr>
+<h2 id="三-执行期闸-不信适配器">三、执行期闸：不信适配器</h2>
+<p>注册期只能保证&quot;声明的落点合法&quot;，保证不了&quot;实际干了什么&quot;。</p>
+<p>比如一个动作声明了 <code>landing: 'draft'</code>，但适配器内部可能调用了 <code>voucherService.approve()</code>——它甚至不用改声明。这在动态插件模型里防不住，因为适配器是插件自己的代码。</p>
+<p>所以还需要第三层：<strong>执行完扫一遍结果</strong>。</p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-k">const</span> STATE_KEYS = <span class="tok-k">new</span> <span class="tok-k">Set</span>([
+  <span class="tok-s">'status'</span>, <span class="tok-s">'state'</span>, <span class="tok-s">'newStatus'</span>,
+  <span class="tok-s">'voucherStatus'</span>, <span class="tok-s">'payrollStatus'</span>, <span class="tok-s">'docStatus'</span>, <span class="tok-s">'approveStatus'</span>,
+])
+
+<span class="tok-k">const</span> FORBIDDEN_STATES = <span class="tok-k">new</span> <span class="tok-k">Set</span>([
+  <span class="tok-s">'approved'</span>, <span class="tok-s">'audited'</span>, <span class="tok-s">'paid'</span>, <span class="tok-s">'posted'</span>,
+  <span class="tok-s">'issued'</span>, <span class="tok-s">'settled'</span>, <span class="tok-s">'confirmed'</span>, <span class="tok-s">'completed'</span>,
+])
+
+<span class="tok-k">export</span> <span class="tok-k">function</span> assertDraftOnly(result: <span class="tok-k">unknown</span>, actionId = <span class="tok-s">''</span>): <span class="tok-k">void</span> {
+  <span class="tok-k">const</span> hit = scan(result, <span class="tok-n">0</span>)
+  <span class="tok-k">if</span> (hit) {
+    <span class="tok-k">throw</span> <span class="tok-k">new</span> DraftGateViolation(
+      <span class="tok-s">`动作「${actionId || '未知'}」返回了 ${hit.key}=${hit.value}，AI 路径不允许产生已生效数据`</span>
+    )
+  }
+}</code></pre></div>
+<p><code>scan</code> 是个深度受限（5 层）的递归遍历，只在<strong>约定的状态字段名</strong>上判断，避免误伤普通业务字段（比如一个叫 <code>status</code> 的字符串恰好是 <code>'paid'</code> 的备注字段——这种会误报，但我们宁可误报）。</p>
+<p>调用点在两个地方：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-c">// 通用单据提交动作</span>
+assertDraftOnly(result, <span class="tok-s">`doc.submit:${def.key}`</span>)
+
+<span class="tok-c">// 语音/文字网关执行动作后</span>
+assertDraftOnly(result, actionLabel)</code></pre></div>
+<p>注意第二个调用点：<strong>网关是唯一的执行出口</strong>。所有 AI 发起的写操作都要经过它，所以在这里兜一次底，覆盖所有动作，包括未来插件新增的。</p>
+<hr>
+<h2 id="四-为什么不用-信任-代码审查">四、为什么不用&quot;信任 + 代码审查&quot;</h2>
+<p>有人会问：你都有 code review 了，为什么不靠规范？</p>
+<p>因为规范会腐化，而且腐化的方式很隐蔽。举个具体的例子：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-c">// 三个月后某人为了&quot;体验更顺滑&quot;加的一行</span>
+<span class="tok-k">const</span> voucher = <span class="tok-k">await</span> voucherService.create({ ...args, status: <span class="tok-s">'approved'</span> })</code></pre></div>
+<p>这一行在 diff 里毫不起眼，reviewer 大概率会放过——它长得像一次普通的参数传递。而 <code>assertDraftOnly</code> 会让它<strong>在第一次执行时就抛错</strong>，连带把测试打断。</p>
+<p>也就是说，闸门的作用不是&quot;阻止恶意&quot;，而是<strong>给善意的手滑设定一个立即反馈</strong>。</p>
+<p>我认为这是所有&quot;约束类架构&quot;的共同点：你没法阻止人犯错，但可以让人犯错的代价从&quot;线上数据污染&quot;降到&quot;一个红色堆栈&quot;。</p>
+<hr>
+<h2 id="五-幂等-确认两次不等于记两笔">五、幂等：确认两次不等于记两笔</h2>
+<p>闸门管的是&quot;能不能生效&quot;，还有一个相邻问题：<strong>同一条指令被确认两次会怎样？</strong></p>
+<p>场景很真实：网络卡，用户点了两下&quot;确认执行&quot;；或者前端重试逻辑触发了两次请求。</p>
+<p><code>TokenStore</code> 的处理是：<code>commit</code> 成功后把结果写回令牌条目，重复提交直接返回同一份结果：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code>commit(token, companyId, userId, exec: () =&gt; <span class="tok-k">Promise</span>&lt;T&gt;) {
+  <span class="tok-k">const</span> payload = <span class="tok-k">this</span>.require(token, companyId, userId)
+  <span class="tok-k">if</span> (payload.committed) <span class="tok-k">return</span> payload.committed   <span class="tok-c">// 幂等返回</span>
+  <span class="tok-c">// ... 执行并写回</span>
+}</code></pre></div>
+<p>接口返回里带 <code>idempotent: true</code>，前端提示&quot;已处理过&quot;，用户不会以为失败又去点一次。</p>
+<hr>
+<h2 id="六-怎么证明-真的没有直通分支">六、怎么证明&quot;真的没有直通分支&quot;</h2>
+<p>这是我比较在意的一点：<strong>安全声明必须可验证</strong>，否则只是文案。</p>
+<p>三个层次的验证：</p>
+<p><strong>1）静态可查</strong></p>
+<div class="code"><div class="code-lang">bash</div><pre><code>$ grep -rn <span class="tok-s">&quot;landing.*direct&quot;</span> backend/src/
+<span class="tok-c"># 无输出</span></code></pre></div>
+<p><strong>2）行为可查</strong></p>
+<div class="code"><div class="code-lang">bash</div><pre><code><span class="tok-c"># 让 AI 审一张凭证</span>
+$ curl -s -X POST .../api/mcp -d '{<span class="tok-s">&quot;method&quot;</span>:<span class="tok-s">&quot;tools/call&quot;</span>,
+    <span class="tok-s">&quot;params&quot;</span>:{<span class="tok-s">&quot;name&quot;</span>:<span class="tok-s">&quot;voucher.approve&quot;</span>}}'
+{<span class="tok-s">&quot;error&quot;</span>:{<span class="tok-s">&quot;message&quot;</span>:<span class="tok-s">&quot;工具不存在：voucher.approve&quot;</span>}}</code></pre></div>
+<p><strong>3）端到端复测</strong></p>
+<p>我们把 AI 的五类动作（记账 / 发工资 / 加档案 / 改凭证 / 审凭证）做成场景脚本，三遍互不重叠的数据跑下来：41/41、48/48、51/51 全通过。每次改 AI 相关代码都跑一遍。</p>
+<p>第三层最贵，但也最有说服力——它验证的是&quot;行为&quot;而不是&quot;意图&quot;。</p>
+<hr>
+<h2 id="七-这套设计的局限">七、这套设计的局限</h2>
+<p>诚实列三条：</p>
+<p><strong>1）扫描是启发式的。</strong> 它依赖&quot;状态字段叫 <code>status</code> / <code>state</code> / <code>newStatus</code> 这类约定名&quot;。如果有人写了个 <code>pgStatus: 'approved'</code>，扫不到。这是用约定换简单，接受。</p>
+<p><strong>2）不防&quot;绕过路径&quot;。</strong> 如果某个适配器直接调用了数据库连接而不返回结果，<code>assertDraftOnly</code> 看不到。真正的兜底是&quot;执行出口唯一&quot;这个架构约束——目前 AI 写操作只有网关一条路，但这需要持续维护。</p>
+<p><strong>3）多了一步人工确认。</strong> 这是产品代价，不是技术代价。有些人就想要全自动，我们没做。</p>
+<hr>
+<h2 id="八-小结">八、小结</h2>
+<p>三句话总结这套设计：</p>
+<ol><li><strong>落点是类型</strong>：<code>AI_LANDINGS</code> 里没有 <code>direct</code>，编译期就没有这个选项；</li><li><strong>声明在启动期校验</strong>：写错 landing，进程起不来，而不是运行时 400；</li><li><strong>结果在执行期扫描</strong>：适配器返回已生效状态就抛错，不静默接受。</li></ol>
+<p>再补一句我越来越确信的话：<strong>AI 产品的安全边界，不该建在提示词上，该建在类型和启动流程上。</strong> 提示词能被绕过，类型不能。</p>
+<hr>
+<p>代码在 GitHub <code>edrin09/boki</code>（内核 AGPL-3.0，官方插件 Apache-2.0），闸门实现在 <code>backend/src/modules/ai-bridge/landing.ts</code>，欢迎来挑刺——尤其是第七节那三条局限，我很想知道还有哪些绕过方式没被想到。</p>
+  </article>
+  <div class="end">
+    <a class="btn" href="./index.html">← 全部技术文章</a>
+    <a class="btn primary" href="https://github.com/edrin09/boki" target="_blank" rel="noopener">在 GitHub 上看代码</a>
+  </div>
+</main>
+<footer>BOKI · 开源财务软件 · 内核 AGPL-3.0 / 官方插件 Apache-2.0 · 文中数据均可自行验证</footer>
+<script>
+(function () {
+  var btn = document.getElementById('copyMd')
+  if (!btn) return
+  btn.addEventListener('click', function () {
+    var label = btn.textContent
+    var done = function (ok) {
+      btn.textContent = ok ? '已复制' : '复制失败，请手动打开 md 文件'
+      setTimeout(function () { btn.textContent = label }, 1800)
+    }
+    fetch(btn.dataset.md).then(function (r) { return r.text() }).then(function (t) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(t).then(function () { done(true) }, function () { done(false) })
+      } else {
+        var ta = document.createElement('textarea')
+        ta.value = t; document.body.appendChild(ta); ta.select()
+        try { done(document.execCommand('copy')) } catch (e) { done(false) }
+        document.body.removeChild(ta)
+      }
+    }).catch(function () { done(false) })
+  })
+})()
+</script>
+</body>
+</html>

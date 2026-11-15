@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>只读 MCP：让 Claude 查你的账本，但改不了它 · BOKI</title>
+<meta name="description" content="让 Claude 查你的账本，但改不了它。MCP 服务端物理只读的实现与能力边界。" />
+<link rel="canonical" href="https://edrin09.github.io/boki/articles/03-readonly-mcp.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="只读 MCP：让 Claude 查你的账本，但改不了它" />
+<meta property="og:description" content="让 Claude 查你的账本，但改不了它。MCP 服务端物理只读的实现与能力边界。" />
+<meta property="og:url" content="https://edrin09.github.io/boki/articles/03-readonly-mcp.html" />
+<style>
+:root{--indigo:#4f46e5;--indigo-deep:#3730a3;--slate:#64748b;--border:#e5e7eb;--bg-soft:#f8fafc;--text:#0f172a;--green:#16a34a;--amber:#d97706}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);line-height:1.8;background:#fff;-webkit-font-smoothing:antialiased}
+header.bar{position:sticky;top:0;background:rgba(255,255,255,.92);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--border);padding:13px 20px;display:flex;align-items:center;gap:14px;z-index:20}
+header.bar a{color:var(--indigo);text-decoration:none;font-weight:600;font-size:14px;white-space:nowrap;flex:none}
+header.bar .logo{font-weight:800;color:var(--text);letter-spacing:.02em;white-space:nowrap;flex:none}
+header.bar .crumb{color:var(--slate);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+header.bar .spacer{flex:1}
+header.bar .copy{border:1px solid var(--border);background:#fff;color:var(--slate);font-size:12.5px;line-height:1.2;padding:5px 12px;border-radius:999px;cursor:pointer;font-family:inherit;transition:.15s;white-space:nowrap;flex:none}
+header.bar .copy:hover{border-color:var(--indigo);color:var(--indigo)}
+main{max-width:760px;margin:0 auto;padding:44px 22px 72px}
+.eyebrow{color:var(--indigo);font-weight:700;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase}
+h1{font-size:32px;line-height:1.35;margin:10px 0 14px;letter-spacing:-.01em}
+.meta{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;color:var(--slate);font-size:13px;padding-bottom:22px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.meta .dot{width:3px;height:3px;border-radius:50%;background:#cbd5e1}
+.tag{background:var(--bg-soft);border:1px solid var(--border);color:var(--slate);border-radius:999px;padding:1px 9px;font-size:12px}
+h2{font-size:22px;margin:44px 0 14px;padding-left:12px;border-left:3px solid var(--indigo);line-height:1.5;scroll-margin-top:70px}
+h3{font-size:17px;margin:28px 0 10px;scroll-margin-top:70px}
+p{margin:16px 0;color:#334155}
+strong{color:var(--text);font-weight:700}
+a{color:var(--indigo);text-decoration:none;border-bottom:1px solid rgba(79,70,229,.28)}
+a:hover{border-bottom-color:var(--indigo)}
+ul,ol{padding-left:24px;margin:16px 0;color:#334155}
+li{margin:7px 0}
+li>ul,li>ol{margin:6px 0}
+hr{border:0;border-top:1px solid var(--border);margin:40px 0}
+blockquote{margin:24px 0;padding:14px 18px;background:var(--bg-soft);border-left:3px solid var(--indigo);border-radius:0 8px 8px 0}
+blockquote p{margin:0;color:#334155}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;font-size:.9em;background:#f1f5f9;color:#0f172a;padding:1.5px 5px;border-radius:4px;border:1px solid #e2e8f0}
+.code{margin:22px 0;border-radius:10px;overflow:hidden;border:1px solid #1e293b;background:#0f172a}
+.code-lang{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;padding:7px 14px;border-bottom:1px solid #1e293b;background:#111c2e}
+.code pre{margin:0;padding:15px 16px;overflow-x:auto;line-height:1.65}
+.code code{background:none;border:0;padding:0;color:#e2e8f0;font-size:13px}
+.tok-c{color:#64748b;font-style:italic}
+.tok-s{color:#fcd34d}
+.tok-k{color:#c4b5fd}
+.tok-n{color:#7dd3fc}
+figure{margin:26px 0}
+figure img,.article-img{width:100%;border-radius:10px;border:1px solid var(--border);display:block}
+figcaption{color:var(--slate);font-size:12.5px;text-align:center;margin-top:10px;line-height:1.6}
+p.caption{color:var(--slate);font-size:13px;text-align:center;margin-top:-8px}
+.table-wrap{overflow-x:auto;margin:22px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{border:1px solid var(--border);padding:9px 12px;text-align:left;vertical-align:top}
+th{background:var(--bg-soft);color:var(--indigo-deep);font-weight:600;white-space:nowrap}
+tbody tr:nth-child(even){background:#fcfdff}
+.toc{background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin:28px 0 8px}
+.toc-t{font-size:12.5px;font-weight:700;color:var(--slate);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.toc ol,.toc ul{margin:0;font-size:14px}
+.toc ol.num{padding-left:20px}
+.toc ul.plain{list-style:none;padding-left:2px}
+.toc li{margin:4px 0}
+.toc a{border:0;color:#334155}
+.toc a:hover{color:var(--indigo)}
+.end{margin-top:52px;padding-top:22px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.end .btn{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:8px 18px;font-size:14px;color:var(--text);background:#fff;cursor:pointer;font-family:inherit}
+.end .btn:hover{border-color:var(--indigo);color:var(--indigo)}
+.end .btn.primary{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.end .btn.primary:hover{background:var(--indigo-deep);color:#fff}
+footer{text-align:center;color:var(--slate);font-size:13px;padding:28px 20px 40px;border-top:1px solid var(--border)}
+footer a{color:var(--slate)}
+@media(max-width:600px){h1{font-size:26px}h2{font-size:19px}main{padding:30px 18px 56px}.code code{font-size:12px}header.bar .crumb{display:none}header.bar{gap:10px;padding:11px 14px}header.bar .copy{font-size:11.5px;padding:5px 9px}}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a href="../index.html">← 官网</a>
+  <span class="logo">BOKI</span>
+  <span class="crumb">只读 MCP：让 Claude 查你的账本，但改不了它</span>
+  <span class="spacer"></span>
+  <button class="copy" id="copyMd" data-md="md/03-readonly-mcp.md">复制 Markdown 原文</button>
+</header>
+<main>
+  <span class="eyebrow">掘金</span>
+  <h1>只读 MCP：让 Claude 查你的账本，但改不了它</h1>
+  <div class="meta">
+    <span>2026-11-15</span><span class="dot"></span>
+    <span>约 12 分钟</span><span class="dot"></span>
+    <span>5104 字</span>
+    <span class="tag">MCP</span><span class="tag">AI</span><span class="tag">接口设计</span>
+  </div>
+  <nav class="toc"><div class="toc-t">本文目录</div><ul class="plain"><li><a href="#一-先想清楚-财务场景的读写不对称">一、先想清楚：财务场景的读写不对称</a></li><li><a href="#二-协议面-只实现四个方法">二、协议面：只实现四个方法</a></li><li><a href="#三-注册表-非只读工具进不来">三、注册表：非只读工具进不来</a></li><li><a href="#四-8-个工具-全是查询">四、8 个工具，全是查询</a></li><li><a href="#五-身份与权限-跟网页端同一套">五、身份与权限：跟网页端同一套</a></li><li><a href="#六-接进-claude-desktop-cursor">六、接进 Claude Desktop / Cursor</a></li><li><a href="#七-边界与残留风险">七、边界与残留风险</a></li><li><a href="#八-小结">八、小结</a></li></ul></nav>
+  <article>
+<p>MCP（Model Context Protocol）现在已经是 AI 客户端接外部工具的通用接口。Claude Desktop、Cursor、各种 Agent 框架都支持。</p>
+<p>对财务软件来说，这个协议的诱惑非常直接：让用户对着 AI 说&quot;这个月收支怎么样&quot;&quot;谁还欠我钱&quot;，AI 自己去查库、算好、组织成人话回你。体验比点菜单好太多。</p>
+<p>但危险同样直接：<strong>能查的接口，稍不留神就变成能写的接口</strong>。</p>
+<p>这篇文章讲我们怎么把 MCP 服务端做成&quot;物理只读&quot;——不是靠权限配置，是代码里没写写操作。</p>
+<hr>
+<h2 id="一-先想清楚-财务场景的读写不对称">一、先想清楚：财务场景的读写不对称</h2>
+<p>一般的 MCP 服务端会提供一组混合能力：查天气、发邮件、建工单。读写比例看业务。</p>
+<p>财务不一样，因为<strong>写操作是不可逆的，而且会传播</strong>：</p>
+<ul><li>一张凭证被审核 → 计入账簿 → 影响报表 → 影响税</li><li>一个金额填错 → 资产负债表、利润表、科目余额表全错</li><li>而且这些错误不会立刻报错，它们看起来都是&quot;合法数据&quot;</li></ul>
+<p>所以我们的结论是：<strong>MCP 这一层只读，写操作不开放给外部 AI 客户端</strong>。</p>
+<p>不是&quot;暂时不开放&quot;，是架构上不提供。理由有三：</p>
+<ol><li>外部客户端的确认交互我们控制不了。它可能一句&quot;好的我来办&quot;就调了，用户根本没看清；</li><li>审计链会断。AI 客户端调了什么、以什么理由调，我们只能看到一次 HTTP 请求；</li><li>一旦开放，边界会不断被推。&quot;就加一个改凭证吧&quot;&quot;就加一个审核吧&quot;——这种滑坡在真实项目里一定会发生。</li></ol>
+<p>网页端里 AI 只能出草稿、人点确认，这条链路上的读写分离是清楚的。MCP 保持同样的姿态就行：<strong>看可以，改不行。</strong></p>
+<hr>
+<h2 id="二-协议面-只实现四个方法">二、协议面：只实现四个方法</h2>
+<p>MCP 的 HTTP 传输有几种形态（stdio、SSE、streamable HTTP）。我们只做了 streamable HTTP 里最核心的一条：<strong>JSON-RPC 2.0 over POST</strong>。</p>
+<p>实现的方法只有四个：</p>
+<div class="table-wrap"><table><thead><tr><th>方法</th><th>作用</th></tr></thead><tbody><tr><td><code>initialize</code></td><td>握手，声明能力</td></tr><tr><td><code>tools/list</code></td><td>列出可用工具</td></tr><tr><td><code>tools/call</code></td><td>调用工具</td></tr><tr><td><code>ping</code></td><td>保活</td></tr></tbody></table></div>
+<p><code>resources</code> / <code>prompts</code> / <code>sampling</code> 一概不实现。有客户端会先发 <code>resources/list</code> 探测，我们会明确告诉它没有：</p>
+<div class="code"><div class="code-lang">bash</div><pre><code>$ curl -s -X POST .../api/mcp -H <span class="tok-s">&quot;Authorization: Bearer $TOKEN&quot;</span> \
+    -H <span class="tok-s">'Content-Type: application/json'</span> \
+    -d <span class="tok-s">'{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:10,&quot;method&quot;:&quot;resources/list&quot;}'</span>
+
+{<span class="tok-s">&quot;jsonrpc&quot;</span>:<span class="tok-s">&quot;2.0&quot;</span>,<span class="tok-s">&quot;id&quot;</span>:<span class="tok-n">10</span>,<span class="tok-s">&quot;error&quot;</span>:{<span class="tok-s">&quot;code&quot;</span>:-<span class="tok-n">32603</span>,<span class="tok-s">&quot;message&quot;</span>:<span class="tok-s">&quot;不支持的方法：resources/list&quot;</span>}}</code></pre></div>
+<p>还有客户端会先 <code>GET</code> 一下看看有没有 SSE 通道，我们也明确拒绝：</p>
+<div class="code"><div class="code-lang">bash</div><pre><code>$ curl -s -i .../api/mcp -H <span class="tok-s">&quot;Authorization: Bearer $TOKEN&quot;</span>
+
+HTTP/<span class="tok-n">1.1</span> <span class="tok-n">405</span> Method Not Allowed
+{<span class="tok-s">&quot;jsonrpc&quot;</span>:<span class="tok-s">&quot;2.0&quot;</span>,<span class="tok-s">&quot;error&quot;</span>:{<span class="tok-s">&quot;code&quot;</span>:-<span class="tok-n">32600</span>,
+  <span class="tok-s">&quot;message&quot;</span>:<span class="tok-s">&quot;本服务只支持 POST JSON-RPC（只读工具，无 SSE 通道）&quot;</span>}}</code></pre></div>
+<p><strong>为什么不做 SSE？</strong></p>
+<p>SSE 是为了服务端主动推送（长任务进度、异步事件）。我们所有工具都是同步查询，几百毫秒返回，没有推送需求。为一个用不上的能力去维护长连接、心跳、重连、并发上限，是纯负担。</p>
+<p>而且长连接在财务这种&quot;内网单机&quot;场景里还有个现实问题：<strong>防火墙和反向代理经常把它掐掉</strong>。少一个形态，少一类线上问题。</p>
+<p><code>initialize</code> 的返回里我把 <code>instructions</code> 也写了进去，客户端会把这段给模型看：</p>
+<div class="code"><div class="code-lang">json</div><pre><code>{
+  <span class="tok-s">&quot;protocolVersion&quot;</span>: <span class="tok-s">&quot;2024-11-05&quot;</span>,
+  <span class="tok-s">&quot;capabilities&quot;</span>: { <span class="tok-s">&quot;tools&quot;</span>: { <span class="tok-s">&quot;listChanged&quot;</span>: <span class="tok-k">false</span> } },
+  <span class="tok-s">&quot;serverInfo&quot;</span>: { <span class="tok-s">&quot;name&quot;</span>: <span class="tok-s">&quot;boki&quot;</span>, <span class="tok-s">&quot;version&quot;</span>: <span class="tok-s">&quot;1.0.0&quot;</span> },
+  <span class="tok-s">&quot;instructions&quot;</span>: <span class="tok-s">&quot;本服务只提供只读查询（凭证、科目、余额、账簿）。所有工具都不会修改数据；如需记账请用网页端或 AI 指令面板。&quot;</span>
+}</code></pre></div>
+<p>一句大白话告诉模型边界，比藏在文档里有用。</p>
+<hr>
+<h2 id="三-注册表-非只读工具进不来">三、注册表：非只读工具进不来</h2>
+<p>真正的护栏在注册表入口：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code>register(tool: McpTool) {
+  <span class="tok-k">if</span> (tool.readOnly !== <span class="tok-k">true</span>) {
+    <span class="tok-k">throw</span> <span class="tok-k">new</span> Error(<span class="tok-s">`MCP 工具「${tool?.name ?? '?'}」必须声明 readOnly: true`</span>)
+  }
+  <span class="tok-c">// ... 写入注册表</span>
+}</code></pre></div>
+<p><code>readOnly: true</code> 是必填的显式声明，不是默认值。<strong>想注册写工具，得先改这行代码</strong> —— 那已经不是配置错误，是有人主动拆护栏，会在 review 里被看到。</p>
+<p><code>tools/list</code> 返回时还会带标准注解：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code>annotations: { readOnlyHint: <span class="tok-k">true</span>, title: tool.title }</code></pre></div>
+<p>这样客户端 UI 里也会显示&quot;只读&quot;徽标。</p>
+<hr>
+<h2 id="四-8-个工具-全是查询">四、8 个工具，全是查询</h2>
+<p>当前注册了 8 个：</p>
+<div class="table-wrap"><table><thead><tr><th>工具名</th><th>说明</th></tr></thead><tbody><tr><td><code>voucher.search</code></td><td>按期间/状态/关键字分页查凭证</td></tr><tr><td><code>voucher.get</code></td><td>按 ID 查一张凭证的完整分录</td></tr><tr><td><code>account.search</code></td><td>按关键字/类别查会计科目</td></tr><tr><td><code>account.balance</code></td><td>查指定期间科目余额表</td></tr><tr><td><code>books.trial_balance</code></td><td>试算平衡表</td></tr><tr><td><code>books.ledger</code></td><td>某科目明细账</td></tr><tr><td><code>hr.loan.search</code></td><td>员工借款单查询</td></tr><tr><td><code>hr.expense_claim.search</code></td><td>费用报销单查询</td></tr></tbody></table></div>
+<p>前 6 个来自内核，后 2 个由 HR 插件在启动时注册 —— <strong>插件可以扩工具，但同样受&quot;必须只读&quot;约束</strong>。</p>
+<figure><img src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/articles/mcp-notfound.png" alt="真实会话：tools/list 返回 8 个 readOnly: true，tools/call 试算平衡拿到真实数据，voucher.approve 返回「工具不存在」" loading="lazy"></figure>
+<p class="caption">这是用自建调试台连 <code>POST /api/mcp</code> 的原始输出，不是示意图。</p>
+<p>实际调一次：</p>
+<div class="code"><div class="code-lang">bash</div><pre><code>$ curl -s -X POST .../api/mcp -H <span class="tok-s">&quot;Authorization: Bearer $TOKEN&quot;</span> \
+    -H <span class="tok-s">'Content-Type: application/json'</span> \
+    -d '{<span class="tok-s">&quot;jsonrpc&quot;</span>:<span class="tok-s">&quot;2.0&quot;</span>,<span class="tok-s">&quot;id&quot;</span>:<span class="tok-n">3</span>,<span class="tok-s">&quot;method&quot;</span>:<span class="tok-s">&quot;tools/call&quot;</span>,
+         <span class="tok-s">&quot;params&quot;</span>:{<span class="tok-s">&quot;name&quot;</span>:<span class="tok-s">&quot;books.trial_balance&quot;</span>,<span class="tok-s">&quot;arguments&quot;</span>:{<span class="tok-s">&quot;period&quot;</span>:<span class="tok-n">202611</span>}}}'</code></pre></div>
+<p>返回的是 MCP 标准的 <code>content</code> 数组，<code>text</code> 里放人可读的表格摘要 + JSON：</p>
+<div class="code"><div class="code-lang">json</div><pre><code>{<span class="tok-s">&quot;jsonrpc&quot;</span>:<span class="tok-s">&quot;2.0&quot;</span>,<span class="tok-s">&quot;id&quot;</span>:<span class="tok-n">3</span>,<span class="tok-s">&quot;result&quot;</span>:{<span class="tok-s">&quot;content&quot;</span>:[{<span class="tok-s">&quot;type&quot;</span>:<span class="tok-s">&quot;text&quot;</span>,
+  <span class="tok-s">&quot;text&quot;</span>:<span class="tok-s">&quot;试算平衡 202611-202611\n{\&quot;</span>period\<span class="tok-s">&quot;:{...},\&quot;</span>rows\<span class="tok-s">&quot;:[\n    {\&quot;</span>code\<span class="tok-s">&quot;:\&quot;</span><span class="tok-n">1001</span>\<span class="tok-s">&quot;,\&quot;</span>name\<span class="tok-s">&quot;:\&quot;</span>库存现金\<span class="tok-s">&quot;,\&quot;</span>closingBalance\<span class="tok-s">&quot;:1240},\n    {\&quot;</span>code\<span class="tok-s">&quot;:\&quot;</span><span class="tok-n">1002</span>\<span class="tok-s">&quot;,\&quot;</span>name\<span class="tok-s">&quot;:\&quot;</span>银行存款\<span class="tok-s">&quot;,\&quot;</span>closingBalance\<span class="tok-s">&quot;:30340}, ...]}&quot;</span>}]}}</code></pre></div>
+<p><strong>为什么既给文字又给 JSON？</strong> 因为不同模型对结构化数据的消化能力不一样。文字摘要让它&quot;看懂&quot;，JSON 让它&quot;算准&quot;。两个都给，成本很低。</p>
+<hr>
+<h2 id="五-身份与权限-跟网页端同一套">五、身份与权限：跟网页端同一套</h2>
+<p>MCP 服务端不是独立账号体系，它走全局 JWT 守卫：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-c">// 调用时按当前用户再校验一次工具权限</span>
+<span class="tok-k">const</span> user = getCurrentUser(req)
+<span class="tok-k">this</span>.assertPermission(user, tool.permission)</code></pre></div>
+<p>也就是说：</p>
+<ul><li>用一个只有&quot;查询凭证&quot;权限的账号连 MCP，<code>account.balance</code> 会返回权限不足；</li><li>换账号、换账套，看到的数据跟着变；</li><li>所有调用都进审计日志。</li></ul>
+<p>这条设计我很坚持：<strong>外部 AI 客户端不应该是一个特权通道</strong>。它就是&quot;另一个 UI&quot;，权限和数据边界跟网页完全一致。</p>
+<hr>
+<h2 id="六-接进-claude-desktop-cursor">六、接进 Claude Desktop / Cursor</h2>
+<p>服务端是标准 MCP，客户端配一下就能用。以 HTTP 传输为例：</p>
+<div class="code"><div class="code-lang">json</div><pre><code>{
+  <span class="tok-s">&quot;mcpServers&quot;</span>: {
+    <span class="tok-s">&quot;boki&quot;</span>: {
+      <span class="tok-s">&quot;url&quot;</span>: <span class="tok-s">&quot;http://127.0.0.1:3000/api/mcp&quot;</span>,
+      <span class="tok-s">&quot;headers&quot;</span>: { <span class="tok-s">&quot;Authorization&quot;</span>: <span class="tok-s">&quot;Bearer &lt;你的 JWT&gt;&quot;</span> }
+    }
+  }
+}</code></pre></div>
+<p>Token 从网页端登录后拿（<code>localStorage.financial_token</code>），或者用 <code>/api/auth/login</code> 换。</p>
+<p>配完问它一句&quot;这个月收支怎么样&quot;，它会自己调 <code>books.trial_balance</code> 和 <code>voucher.search</code>。</p>
+<p><strong>几个实际踩过的点：</strong></p>
+<ol><li><strong>Token 会过期</strong>（默认 8 小时）。过期后调用返回 401，客户端一般表现为&quot;工具调用失败&quot;。建议专门建一个只读账号，用它登录换一个长效 token。</li><li><strong>部分客户端不支持自定义 header</strong>。那种情况要么用支持 HTTP 传输的客户端，要么在前面挂个带鉴权的反向代理。</li><li><strong>不要去开 <code>resources</code></strong>。有些客户端看到 <code>resources</code> 能力会尝试读文件系统语义的东西，我们本来就不提供，省得歧义。</li></ol>
+<hr>
+<h2 id="七-边界与残留风险">七、边界与残留风险</h2>
+<p>说清楚这套东西<strong>不能</strong>保证什么：</p>
+<p><strong>1）token 泄露 = 查询权限泄露。</strong> 只读也一样危险——科目余额、客户往来、员工借款，这些是商业信息。所以别把 token 提交到 Git，别在共享机器上开长有效期。</p>
+<p><strong>2）只读不等于&quot;无害&quot;。</strong> 高频查询会打满 CPU（尤其是试算平衡这种全表聚合）。我们没有做严格限流，单机场景觉得够用。如果要放到多人共用的服务器上，得加限流。</p>
+<p><strong>3）不防&quot;社工&quot;。</strong> 有人可以诱导模型把查询结果发到外部。这是模型侧的问题，服务端管不了——能做的是把 <code>instructions</code> 写清楚，以及让用户知道&quot;连了 MCP 就等于把查询权给出去了&quot;。</p>
+<p><strong>4）&quot;只读&quot;靠一层校验。</strong> 如果有人改 <code>readOnly !== true</code> 那行，护栏就没了。这是代码而非配置的必然——所以我把它放在最显眼的位置，并且写进了 README 的安全章节。</p>
+<hr>
+<h2 id="八-小结">八、小结</h2>
+<p>三句话：</p>
+<ol><li><strong>MCP 对财务软件的价值是&quot;查&quot;</strong>：让 AI 替你读账、算账、解释账，这个场景已经足够大；</li><li><strong>写操作不开放</strong>：不是权限配置，是注册表入口就拒绝，工具不存在；</li><li><strong>权限与审计复用网页端那套</strong>：外部客户端不是特权通道。</li></ol>
+<p>MCP 生态现在跑得很快，各种 server 在冒出来。我的判断是：<strong>to B 场景里，&quot;只读 + 明确的 instructions&quot;会成为默认姿势</strong>——不是能力不够，是责任边界必须清楚。</p>
+<hr>
+<p>附一张四类方案的边界对照（只列事实，可自行验证）：</p>
+<figure><img src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/articles/comparison.png" alt="云端 SaaS / 本地 ERP / 通用 AI 助手 / BOKI 四类方案对照" loading="lazy"></figure>
+<p>项目开源：GitHub <code>edrin09/boki</code>（内核 AGPL-3.0），MCP 实现在 <code>backend/src/modules/mcp/</code>。官网有 20 秒录屏，就是把上面这几条 curl 真跑一遍，包括&quot;调写工具返回工具不存在&quot;。</p>
+<p>想听的问题：你们在生产里接 MCP，是给只读还是给读写？中间加了几层确认？</p>
+  </article>
+  <div class="end">
+    <a class="btn" href="./index.html">← 全部技术文章</a>
+    <a class="btn primary" href="https://github.com/edrin09/boki" target="_blank" rel="noopener">在 GitHub 上看代码</a>
+  </div>
+</main>
+<footer>BOKI · 开源财务软件 · 内核 AGPL-3.0 / 官方插件 Apache-2.0 · 文中数据均可自行验证</footer>
+<script>
+(function () {
+  var btn = document.getElementById('copyMd')
+  if (!btn) return
+  btn.addEventListener('click', function () {
+    var label = btn.textContent
+    var done = function (ok) {
+      btn.textContent = ok ? '已复制' : '复制失败，请手动打开 md 文件'
+      setTimeout(function () { btn.textContent = label }, 1800)
+    }
+    fetch(btn.dataset.md).then(function (r) { return r.text() }).then(function (t) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(t).then(function () { done(true) }, function () { done(false) })
+      } else {
+        var ta = document.createElement('textarea')
+        ta.value = t; document.body.appendChild(ta); ta.select()
+        try { done(document.execCommand('copy')) } catch (e) { done(false) }
+        document.body.removeChild(ta)
+      }
+    }).catch(function () { done(false) })
+  })
+})()
+</script>
+</body>
+</html>

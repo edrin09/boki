@@ -6,4 +6,9 @@
   <url><loc>https://edrin09.github.io/boki/sponsor.html</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://edrin09.github.io/boki/docs-plugin.html</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://edrin09.github.io/boki/brand.html</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://edrin09.github.io/boki/articles/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://edrin09.github.io/boki/articles/01-three-locks.html</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://edrin09.github.io/boki/articles/02-draft-gate.html</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://edrin09.github.io/boki/articles/03-readonly-mcp.html</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://edrin09.github.io/boki/articles/09-token-vuln.html</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
 </urlset>

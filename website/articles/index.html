@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>技术文章 · BOKI</title>
+<meta name="description" content="BOKI 的技术写作：草稿闸门、只读 MCP、一次性确认令牌、一个真实漏洞的复盘。讲约束怎么被代码钉死，也讲代价。" />
+<link rel="canonical" href="https://edrin09.github.io/boki/articles/" />
+<style>
+:root{--indigo:#4f46e5;--indigo-deep:#3730a3;--slate:#64748b;--border:#e5e7eb;--bg-soft:#f8fafc;--text:#0f172a}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);line-height:1.75;background:#fff}
+header.bar{position:sticky;top:0;background:rgba(255,255,255,.92);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--border);padding:13px 20px;display:flex;align-items:center;gap:14px;z-index:20}
+header.bar a{color:var(--indigo);text-decoration:none;font-weight:600;font-size:14px}
+header.bar .logo{font-weight:800;color:var(--text)}
+header.bar .crumb{color:var(--slate);font-size:13px}
+main{max-width:920px;margin:0 auto;padding:48px 22px 80px}
+.eyebrow{color:var(--indigo);font-weight:700;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase}
+h1{font-size:34px;margin:10px 0 12px;letter-spacing:-.01em}
+.lede{color:#334155;font-size:16px;margin:0 0 10px;max-width:640px}
+.lede strong{color:var(--text)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;margin-top:36px}
+.card{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:14px;overflow:hidden;text-decoration:none;color:inherit;background:#fff;transition:.18s}
+.card:hover{border-color:#c7d2fe;box-shadow:0 10px 28px rgba(79,70,229,.1);transform:translateY(-2px)}
+.card-cover{aspect-ratio:1200/630;background:var(--bg-soft);overflow:hidden}
+.card-cover img{width:100%;height:100%;object-fit:cover;display:block}
+.card-body{padding:16px 18px 20px;display:flex;flex-direction:column;gap:6px}
+.card-meta{display:flex;align-items:center;gap:10px;color:var(--slate);font-size:12.5px}
+.card h2{font-size:18px;margin:2px 0 0;line-height:1.45}
+.card p{margin:0;color:var(--slate);font-size:13.5px;line-height:1.65}
+.tag{background:var(--bg-soft);border:1px solid var(--border);color:var(--slate);border-radius:999px;padding:1px 9px;font-size:12px}
+.note{margin-top:40px;padding:18px 20px;background:var(--bg-soft);border:1px solid var(--border);border-radius:12px;font-size:14px;color:#334155}
+.note a{color:var(--indigo);text-decoration:none}
+footer{text-align:center;color:var(--slate);font-size:13px;padding:28px 20px 40px;border-top:1px solid var(--border)}
+footer a{color:var(--slate)}
+@media(max-width:720px){.grid{grid-template-columns:1fr}h1{font-size:27px}main{padding:32px 18px 60px}}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a href="../index.html">← 官网</a>
+  <span class="logo">BOKI</span>
+  <span class="crumb">技术文章</span>
+</header>
+<main>
+  <span class="eyebrow">Writing</span>
+  <h1>技术文章</h1>
+  <p class="lede">我们把「AI 只能写草稿」这件事拆成了四篇：<strong>约束怎么被代码钉死</strong>，以及这么做的<strong>代价</strong>。代码全在 <a href="https://github.com/edrin09/boki" target="_blank" rel="noopener">GitHub</a> 上，文中每个结论都可以自己验一遍。</p>
+  <div class="grid">
+    <a class="card" href="./01-three-locks.html">
+      <div class="card-cover"><img src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/covers/cover-main.png" alt="我把 AI 接进财务软件，然后给它上了三道锁" loading="lazy"></div>
+      <div class="card-body">
+        <div class="card-meta"><span class="tag">AI</span><span>12 分钟</span></div>
+        <h2>我把 AI 接进财务软件，然后给它上了三道锁</h2>
+        <p>给财务软件接 AI，真正花时间的不是让它听懂，是让它别乱动。三道锁的实现与代价。</p>
+      </div>
+    </a>
+    <a class="card" href="./02-draft-gate.html">
+      <div class="card-cover"><img src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/covers/cover-02-draft-gate.png" alt="为什么我们不让 AI 直接改账：草稿闸门的设计" loading="lazy"></div>
+      <div class="card-body">
+        <div class="card-meta"><span class="tag">TypeScript</span><span>10 分钟</span></div>
+        <h2>为什么我们不让 AI 直接改账：草稿闸门的设计</h2>
+        <p>落点没有 direct 这个选项：注册期校验、执行期扫描、幂等确认，以及这套设计的三个局限。</p>
+      </div>
+    </a>
+    <a class="card" href="./03-readonly-mcp.html">
+      <div class="card-cover"><img src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/covers/cover-03-readonly-mcp.png" alt="只读 MCP：让 Claude 查你的账本，但改不了它" loading="lazy"></div>
+      <div class="card-body">
+        <div class="card-meta"><span class="tag">MCP</span><span>12 分钟</span></div>
+        <h2>只读 MCP：让 Claude 查你的账本，但改不了它</h2>
+        <p>让 Claude 查你的账本，但改不了它。MCP 服务端物理只读的实现与能力边界。</p>
+      </div>
+    </a>
+    <a class="card" href="./09-token-vuln.html">
+      <div class="card-cover"><img src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/covers/cover-09-token-vuln.png" alt="我们修了一个「任何人都能替你确认指令」的漏洞" loading="lazy"></div>
+      <div class="card-body">
+        <div class="card-meta"><span class="tag">安全</span><span>13 分钟</span></div>
+        <h2>我们修了一个「任何人都能替你确认指令」的漏洞</h2>
+        <p>一个「任何人都能替你确认指令」的漏洞：根因、影响版本范围、CVSS 3.1 自评 4.3 与修复。</p>
+      </div>
+    </a>
+  </div>
+  <div class="note">
+    转载与引用均可，请保留出处链接。文中性能数字来自本机实测（单机 CPU，非服务器环境），漏洞评分是自评 CVSS 3.1，不是 CNA 评估。
+    想先看效果？<a href="../index.html#showcase">官网有 72 秒真机录屏</a>。
+  </div>
+</main>
+<footer>BOKI · 开源财务软件 · 内核 AGPL-3.0 / 官方插件 Apache-2.0</footer>
+</body>
+</html>

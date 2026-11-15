@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>我们修了一个「任何人都能替你确认指令」的漏洞 · BOKI</title>
+<meta name="description" content="一个「任何人都能替你确认指令」的漏洞：根因、影响版本范围、CVSS 3.1 自评 4.3 与修复。" />
+<link rel="canonical" href="https://edrin09.github.io/boki/articles/09-token-vuln.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="我们修了一个「任何人都能替你确认指令」的漏洞" />
+<meta property="og:description" content="一个「任何人都能替你确认指令」的漏洞：根因、影响版本范围、CVSS 3.1 自评 4.3 与修复。" />
+<meta property="og:url" content="https://edrin09.github.io/boki/articles/09-token-vuln.html" />
+<style>
+:root{--indigo:#4f46e5;--indigo-deep:#3730a3;--slate:#64748b;--border:#e5e7eb;--bg-soft:#f8fafc;--text:#0f172a;--green:#16a34a;--amber:#d97706}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);line-height:1.8;background:#fff;-webkit-font-smoothing:antialiased}
+header.bar{position:sticky;top:0;background:rgba(255,255,255,.92);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--border);padding:13px 20px;display:flex;align-items:center;gap:14px;z-index:20}
+header.bar a{color:var(--indigo);text-decoration:none;font-weight:600;font-size:14px;white-space:nowrap;flex:none}
+header.bar .logo{font-weight:800;color:var(--text);letter-spacing:.02em;white-space:nowrap;flex:none}
+header.bar .crumb{color:var(--slate);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+header.bar .spacer{flex:1}
+header.bar .copy{border:1px solid var(--border);background:#fff;color:var(--slate);font-size:12.5px;line-height:1.2;padding:5px 12px;border-radius:999px;cursor:pointer;font-family:inherit;transition:.15s;white-space:nowrap;flex:none}
+header.bar .copy:hover{border-color:var(--indigo);color:var(--indigo)}
+main{max-width:760px;margin:0 auto;padding:44px 22px 72px}
+.eyebrow{color:var(--indigo);font-weight:700;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase}
+h1{font-size:32px;line-height:1.35;margin:10px 0 14px;letter-spacing:-.01em}
+.meta{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;color:var(--slate);font-size:13px;padding-bottom:22px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.meta .dot{width:3px;height:3px;border-radius:50%;background:#cbd5e1}
+.tag{background:var(--bg-soft);border:1px solid var(--border);color:var(--slate);border-radius:999px;padding:1px 9px;font-size:12px}
+h2{font-size:22px;margin:44px 0 14px;padding-left:12px;border-left:3px solid var(--indigo);line-height:1.5;scroll-margin-top:70px}
+h3{font-size:17px;margin:28px 0 10px;scroll-margin-top:70px}
+p{margin:16px 0;color:#334155}
+strong{color:var(--text);font-weight:700}
+a{color:var(--indigo);text-decoration:none;border-bottom:1px solid rgba(79,70,229,.28)}
+a:hover{border-bottom-color:var(--indigo)}
+ul,ol{padding-left:24px;margin:16px 0;color:#334155}
+li{margin:7px 0}
+li>ul,li>ol{margin:6px 0}
+hr{border:0;border-top:1px solid var(--border);margin:40px 0}
+blockquote{margin:24px 0;padding:14px 18px;background:var(--bg-soft);border-left:3px solid var(--indigo);border-radius:0 8px 8px 0}
+blockquote p{margin:0;color:#334155}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;font-size:.9em;background:#f1f5f9;color:#0f172a;padding:1.5px 5px;border-radius:4px;border:1px solid #e2e8f0}
+.code{margin:22px 0;border-radius:10px;overflow:hidden;border:1px solid #1e293b;background:#0f172a}
+.code-lang{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;padding:7px 14px;border-bottom:1px solid #1e293b;background:#111c2e}
+.code pre{margin:0;padding:15px 16px;overflow-x:auto;line-height:1.65}
+.code code{background:none;border:0;padding:0;color:#e2e8f0;font-size:13px}
+.tok-c{color:#64748b;font-style:italic}
+.tok-s{color:#fcd34d}
+.tok-k{color:#c4b5fd}
+.tok-n{color:#7dd3fc}
+figure{margin:26px 0}
+figure img,.article-img{width:100%;border-radius:10px;border:1px solid var(--border);display:block}
+figcaption{color:var(--slate);font-size:12.5px;text-align:center;margin-top:10px;line-height:1.6}
+p.caption{color:var(--slate);font-size:13px;text-align:center;margin-top:-8px}
+.table-wrap{overflow-x:auto;margin:22px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{border:1px solid var(--border);padding:9px 12px;text-align:left;vertical-align:top}
+th{background:var(--bg-soft);color:var(--indigo-deep);font-weight:600;white-space:nowrap}
+tbody tr:nth-child(even){background:#fcfdff}
+.toc{background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin:28px 0 8px}
+.toc-t{font-size:12.5px;font-weight:700;color:var(--slate);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.toc ol,.toc ul{margin:0;font-size:14px}
+.toc ol.num{padding-left:20px}
+.toc ul.plain{list-style:none;padding-left:2px}
+.toc li{margin:4px 0}
+.toc a{border:0;color:#334155}
+.toc a:hover{color:var(--indigo)}
+.end{margin-top:52px;padding-top:22px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.end .btn{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:8px 18px;font-size:14px;color:var(--text);background:#fff;cursor:pointer;font-family:inherit}
+.end .btn:hover{border-color:var(--indigo);color:var(--indigo)}
+.end .btn.primary{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.end .btn.primary:hover{background:var(--indigo-deep);color:#fff}
+footer{text-align:center;color:var(--slate);font-size:13px;padding:28px 20px 40px;border-top:1px solid var(--border)}
+footer a{color:var(--slate)}
+@media(max-width:600px){h1{font-size:26px}h2{font-size:19px}main{padding:30px 18px 56px}.code code{font-size:12px}header.bar .crumb{display:none}header.bar{gap:10px;padding:11px 14px}header.bar .copy{font-size:11.5px;padding:5px 9px}}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a href="../index.html">← 官网</a>
+  <span class="logo">BOKI</span>
+  <span class="crumb">我们修了一个「任何人都能替你确认指令」的漏洞</span>
+  <span class="spacer"></span>
+  <button class="copy" id="copyMd" data-md="md/09-token-vuln.md">复制 Markdown 原文</button>
+</header>
+<main>
+  <span class="eyebrow">掘金 / 安全社区</span>
+  <h1>我们修了一个「任何人都能替你确认指令」的漏洞</h1>
+  <div class="meta">
+    <span>2026-11-15</span><span class="dot"></span>
+    <span>约 13 分钟</span><span class="dot"></span>
+    <span>5520 字</span>
+    <span class="tag">安全</span><span class="tag">漏洞复盘</span><span class="tag">CVSS</span>
+  </div>
+  <nav class="toc"><div class="toc-t">本文目录</div><ul class="plain"><li><a href="#一-背景-什么是-一次性确认令牌">一、背景：什么是&quot;一次性确认令牌&quot;</a></li><li><a href="#二-根因-user-id-一直是-undefined">二、根因：user.id 一直是 undefined</a></li><li><a href="#三-为什么测试没抓到">三、为什么测试没抓到</a></li><li><a href="#四-修复">四、修复</a></li><li><a href="#五-影响面评估">五、影响面评估</a></li><li><a href="#六-影响版本范围与-cvss-自评">六、影响版本范围与 CVSS 自评</a></li><li><a href="#七-四条教训">七、四条教训</a></li><li><a href="#八-为什么把这件事写出来">八、为什么把这件事写出来</a></li><li><a href="#九-给自己留的三条自检清单">九、给自己留的三条自检清单</a></li></ul></nav>
+  <article>
+<p>这个漏洞是自查发现的，出现在我们自己写的代码里，影响的是&quot;AI 指令确认&quot;这条链路。</p>
+<p>结论先说：<strong>当时任何登录用户，只要拿到另一个用户待确认指令的令牌，就能替对方确认并落库。</strong> 修复是一行代码，但根因值得写下来——它是一个非常典型的&quot;安全校验依赖了一个约定存在、而实际为 <code>undefined</code> 的字段&quot;。</p>
+<hr>
+<h2 id="一-背景-什么是-一次性确认令牌">一、背景：什么是&quot;一次性确认令牌&quot;</h2>
+<p>我们的 AI 记账流程是这样的：</p>
+<ol><li>用户说一句&quot;陈晓报销打车费 128，现金&quot;；</li><li>模型解析成结构化参数，服务端<strong>预演</strong>出一张确认卡片（不落库）；</li><li>服务端签发一个<strong>一次性令牌</strong>，绑定：当前用户 + 当前账套 + 卡片载荷哈希；</li><li>用户点&quot;确认执行&quot;，前端带着令牌提交；</li><li>服务端校验令牌归属 → 执行 → 落草稿。</li></ol>
+<p>第 5 步的校验代码长这样：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code>require(token: <span class="tok-k">string</span>, companyId: <span class="tok-k">string</span>, userId: <span class="tok-k">string</span>): TokenPayload {
+  <span class="tok-k">const</span> found = <span class="tok-k">this</span>.entries.get(String(token ?? <span class="tok-s">''</span>))
+  <span class="tok-k">if</span> (!found) <span class="tok-k">throw</span> <span class="tok-k">new</span> BadRequestException(<span class="tok-s">'指令已失效，请重新说一遍'</span>)
+  <span class="tok-k">if</span> (found.expiresAt &lt; Date.now()) <span class="tok-k">throw</span> <span class="tok-k">new</span> BadRequestException(<span class="tok-s">'指令已超过 15 分钟，请重新说一遍再确认'</span>)
+  <span class="tok-k">if</span> (found.companyId !== companyId) <span class="tok-k">throw</span> <span class="tok-k">new</span> BadRequestException(<span class="tok-s">'该指令不属于当前账套，已拒绝执行'</span>)
+  <span class="tok-k">if</span> (found.userId !== userId) <span class="tok-k">throw</span> <span class="tok-k">new</span> BadRequestException(<span class="tok-s">'该指令由其他用户发起，不能代为确认'</span>)
+  <span class="tok-k">return</span> found
+}</code></pre></div>
+<p>逻辑看起来没问题：令牌里存了 <code>userId</code>，调用时传进来当前用户 <code>userId</code>，不等就拒。</p>
+<p>控制器里传的是：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-k">const</span> user = getCurrentUser(req)   <span class="tok-c">// 来自 JWT 守卫</span>
+<span class="tok-k">const</span> payload = <span class="tok-k">this</span>.tokenStore.require(body.token, companyId, user.id)</code></pre></div>
+<p>问题就出在这个 <code>user.id</code>。</p>
+<hr>
+<h2 id="二-根因-user-id-一直是-undefined">二、根因：<code>user.id</code> 一直是 <code>undefined</code></h2>
+<p>我们的认证用的是 <code>passport-jwt</code>。它的默认行为是：把解码后的 JWT 载荷<strong>原样</strong>挂到 <code>request.user</code> 上，不做任何字段映射。</p>
+<p>我们的 <code>JwtStrategy</code> 当时是这么写的：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-c">// 修复前</span>
+validate(payload: JwtPayload): CurrentUser {
+  <span class="tok-k">return</span> payload
+}</code></pre></div>
+<p>而我们的 JWT 载荷里，用户 ID 存在 <code>sub</code> 里（JWT 标准的 subject）：</p>
+<div class="code"><div class="code-lang">json</div><pre><code>{ <span class="tok-s">&quot;sub&quot;</span>: <span class="tok-s">&quot;4f19ee5b-e4f8-45f5-9ee8-5fa4b43d93a1&quot;</span>, <span class="tok-s">&quot;username&quot;</span>: <span class="tok-s">&quot;admin&quot;</span>, <span class="tok-s">&quot;companyId&quot;</span>: <span class="tok-s">&quot;...&quot;</span> }</code></pre></div>
+<p><strong>载荷里没有 <code>id</code> 字段。</strong></p>
+<p>于是 <code>user.id</code> 恒为 <code>undefined</code>。而业务代码里到处都在用 <code>user.id</code>：审计日志的操作人、数据隔离、令牌归属校验。</p>
+<p>那么第 5 步的校验实际发生了什么？</p>
+<div class="code"><div class="code-lang">ts</div><pre><code>found.userId  <span class="tok-c">// → undefined（签发时也是从 user.id 拿的！）</span>
+userId        <span class="tok-c">// → undefined</span>
+<span class="tok-k">undefined</span> !== <span class="tok-k">undefined</span>  <span class="tok-c">// → false，不抛错</span></code></pre></div>
+<p><strong>签发的时候也是 <code>undefined</code>，校验的时候也是 <code>undefined</code>，两边相等，校验通过。</strong></p>
+<p>这是最坏的一种失效：不是&quot;拒绝了所有人&quot;，也不是&quot;崩溃报错&quot;，而是<strong>安静地永远通过</strong>。看起来一切正常，功能好用，测试全绿。</p>
+<hr>
+<h2 id="三-为什么测试没抓到">三、为什么测试没抓到</h2>
+<p>诚实复盘，三个原因：</p>
+<p><strong>1）所有测试用的是同一个账号。</strong></p>
+<p>我们写了一批端到端脚本验证 AI 五类动作，全部用 <code>admin</code> 登录。同一个人签发、同一个人确认，<code>undefined !== undefined</code> 也是 false，通过。功能完全正常。</p>
+<p><strong>2）没有&quot;跨身份&quot;用例。</strong></p>
+<p>&quot;换个用户提交别人的指令应该被拒绝&quot;——这条用例当时不存在。而它恰好是唯一能暴露问题的用例。</p>
+<p><strong>3）没有任何地方断言&quot;用户身份必须完整&quot;。</strong></p>
+<p>如果有个中间件在入口就检查 <code>user.id</code> 是否存在，这个 bug 第一时间就会被发现（因为每个请求都会 500）。但我们没有——我们假设 JWT 守卫通过 = 身份完整。</p>
+<hr>
+<h2 id="四-修复">四、修复</h2>
+<p><strong>第一处，一行：</strong></p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-c">// 修复后</span>
+validate(payload: JwtPayload): CurrentUser {
+  <span class="tok-k">return</span> { ...payload, id: payload.sub }   <span class="tok-c">// 显式由 sub 派生 id</span>
+}</code></pre></div>
+<p><code>sub</code> 原样保留（建账等其他入口还在用它），同时补上 <code>id</code>。</p>
+<p><strong>第二处，把&quot;身份可能为空&quot;从类型上堵住 —— 以及它为什么没堵住：</strong></p>
+<p><code>JwtPayload.sub</code> 与 <code>CurrentUser.id</code> 现在都声明成必填 <code>string</code>，&quot;身份字段可能缺失&quot;这件事在业务侧应该是不成立的。但必须诚实补一句：<strong>项目的 <code>strictNullChecks</code> 目前是关着的</strong>（<code>backend/tsconfig.json</code>）。开关关着的时候，把一个没有 <code>id</code> 的对象赋给 <code>CurrentUser</code>，TypeScript 一声不响。</p>
+<p>所以类型在这里只是&quot;约定&quot;，不是&quot;保证&quot;。打开 <code>strictNullChecks</code> 已经列进重构清单——这类 bug 想靠编译器兜住，得先有那个开关。</p>
+<p><strong>第三处，补跨身份用例：</strong></p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-c">// A 签发、B 提交 —— 端到端脚本里的关键断言</span>
+<span class="tok-k">const</span> plan = <span class="tok-k">await</span> planAs(userA, <span class="tok-s">'记一笔 800 元的水电费'</span>)
+<span class="tok-k">const</span> res  = <span class="tok-k">await</span> commitAs(userB, plan.token)
+assert(res.status === <span class="tok-n">400</span>)                              <span class="tok-c">// 修复前是 200</span>
+assert(res.body.message.includes(<span class="tok-s">'不能代为确认'</span>))</code></pre></div>
+<p>同样诚实说：仓库现在<strong>没有引入单元测试框架</strong>，这批端到端验证是独立脚本，跑完不留痕。但这条用例本身是验证过的——把 <code>jwt.strategy.ts</code> 里的 <code>id: payload.sub</code> 改回 <code>return payload</code>，它立刻变红。把它固化进 CI 是待办，不是已完成。</p>
+<hr>
+<h2 id="五-影响面评估">五、影响面评估</h2>
+<p>修完要回答一个问题：<strong>这个 bug 还影响哪里？</strong></p>
+<p>我们顺着 <code>user.id</code> 全量扫了一遍，受影响的只有三处：</p>
+<div class="table-wrap"><table><thead><tr><th>位置</th><th>影响</th><th>严重程度</th></tr></thead><tbody><tr><td>一次性令牌归属校验</td><td>可替他人确认指令</td><td>高（本漏洞）</td></tr><tr><td>审计日志操作人</td><td>记录为 null</td><td>中（可追溯性受损）</td></tr><tr><td>数据隔离（按用户过滤账套）</td><td>若依赖 <code>user.id</code> 会失效</td><td>需逐处确认</td></tr></tbody></table></div>
+<p>第三条最值得警惕。我们的账套隔离主要走 <code>companyId</code>（也来自 JWT 载荷，字段名对得上，没受影响），但只要有任何一个查询用 <code>user.id</code> 做过滤，那一处就是越权读。逐处确认后，没有发现越权读路径。</p>
+<p><strong>没有发现被利用的痕迹</strong>：审计表里那段时间没有异常的「操作人为空」的跨账号提交记录（<code>user_id</code> / <code>user_name</code> 同时为空的行）。这个漏洞从引入到修复都存在于本地开发分支，两个公开版本都不含这条链路——版本层面的核对写在第六节。</p>
+<hr>
+<h2 id="六-影响版本范围与-cvss-自评">六、影响版本范围与 CVSS 自评</h2>
+<h3 id="6-1-哪些版本受影响">6.1 哪些版本受影响</h3>
+<div class="table-wrap"><table><thead><tr><th>版本</th><th>是否含「AI 指令确认」链路</th><th>可利用性</th></tr></thead><tbody><tr><td><code>v1.0.0</code>（2026-10-23）</td><td>否</td><td>不可利用</td></tr><tr><td><code>v1.1.0</code>（2026-11-13）</td><td>否（后端尚无 AI 内核模块）</td><td>不可利用</td></tr><tr><td>本地开发分支，2026-11-11 → 11-15</td><td>是</td><td>可利用（仅自用环境）</td></tr><tr><td><code>801381f</code> 及之后</td><td>是（已修复）</td><td>不可利用</td></tr></tbody></table></div>
+<p>两个公开版本都能自己查：<code>git show v1.1.0:backend/src/modules/auth/jwt.strategy.ts</code> 里确实是 <code>return payload</code>——但 <code>git ls-tree --name-only v1.1.0:backend/src/modules</code> 也能看到，那一版后端只有 accounts / books / closing / vouchers 等十来个模块，没有 AI 指令确认链路，<code>token.store.ts</code> 根本不在里面。</p>
+<p><strong>没有令牌，就没有「替别人确认」这条路。</strong> 缺陷随 AI 记账功能进入本地分支，随 <code>801381f</code> 一起修掉，没有进过任何带该功能的发布包。</p>
+<h3 id="6-2-cvss-3-1-自评">6.2 CVSS 3.1 自评</h3>
+<p>向量：<code>CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N</code> → <strong>4.3（Medium）</strong></p>
+<p>逐项理由（自己给自己打分，就得把理由摆出来让人反驳）：</p>
+<div class="table-wrap"><table><thead><tr><th>指标</th><th>取值</th><th>理由</th></tr></thead><tbody><tr><td>AV</td><td>N（网络）</td><td>走 HTTP API，不需要物理接触或同一局域网</td></tr><tr><td>AC</td><td>L（容易）</td><td>拿到令牌即可，无竞态、无特殊配置、无需猜参数</td></tr><tr><td>PR</td><td>L（低权限）</td><td>需要先登录（任意普通账号），不是匿名可利用</td></tr><tr><td>UI</td><td>N（无需交互）</td><td>受害者点不点那张卡片无所谓，攻击者直接 POST 提交</td></tr><tr><td>S</td><td>U（范围不变）</td><td>影响局限在本应用内，不波及宿主或下游系统</td></tr><tr><td>C</td><td>N（无泄露）</td><td>令牌不携带业务数据，越权确认也读不到他人账目</td></tr><tr><td>I</td><td>L（低完整性影响）</td><td>只能写<strong>草稿</strong>，草稿要人工审核才入账，账实不符的最终风险有限</td></tr><tr><td>A</td><td>N（无可用性影响）</td><td>不删除、不锁定、不消耗资源</td></tr></tbody></table></div>
+<p><strong>为什么不是更高。</strong> 如果这套系统存在「自动审核」开关，<code>I</code> 会升到 <code>H</code>，总分变 <strong>6.9</strong>。我们没有这个开关——AI 的落地动作只有 <code>draft</code> / <code>list</code> / <code>archive</code>，没有 <code>direct</code>，这是草稿闸门的另一面价值：它把越权写入的爆炸半径压到了「一堆待审草稿」。</p>
+<p><strong>为什么不是更低。</strong> <code>PR</code> 不能取 <code>H</code>：确实只要一个普通登录账号；<code>AC</code> 不能取 <code>H</code>：不需要口令、不需要会话固定、不需要任何前置条件。</p>
+<p><strong>Temporal / Environmental 不评。</strong> 没有公开利用代码，也没有因部署环境不同而产生的缓解差异，评了只是自己给自己加分。</p>
+<p>最后强调一次：<strong>这是自评</strong>，不是 CNA 或第三方评估。有不同意见，欢迎照上面这张表逐项反驳。</p>
+<hr>
+<h2 id="七-四条教训">七、四条教训</h2>
+<p><strong>1）安全校验必须 fail-closed，不能靠&quot;字段应该存在&quot;。</strong></p>
+<p><code>if (a !== b) throw</code> 这种写法，前提是 a、b 都是有效值。只要有一边可能是 <code>undefined</code>，这个校验就等于没有。正确姿势是先断言再比较：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-k">if</span> (!user?.id) <span class="tok-k">throw</span> <span class="tok-k">new</span> UnauthorizedException(<span class="tok-s">'身份信息不完整'</span>)   <span class="tok-c">// 先断言</span>
+<span class="tok-k">if</span> (found.userId !== user.id) <span class="tok-k">throw</span> <span class="tok-k">new</span> BadRequestException(...)   <span class="tok-c">// 再比较</span></code></pre></div>
+<p><strong>2）&quot;永远通过&quot;比&quot;永远失败&quot;危险得多。</strong></p>
+<p>永远失败会被立刻发现（功能不能用）；永远通过会活到线上。所以做安全校验时，我会刻意想一个问题：<strong>这个判断在什么输入下会静默通过？</strong> 然后为那个输入写用例。</p>
+<p><strong>3）跨身份用例是必测项。</strong></p>
+<p>凡是涉及&quot;归属&quot;的逻辑——资源属于谁、令牌属于谁、数据属于哪个租户——必须有&quot;换个身份来访问&quot;的用例。同账号测试再多也覆盖不到这类问题。</p>
+<p><strong>4）异常信号别放过。</strong></p>
+<p>当时如果注意到&quot;审计日志里操作人一栏经常是空的&quot;，可能会更早发现。空值、默认值、<code>null</code> 展示——这些&quot;看起来无害的小问题&quot;经常是更严重问题的影子。</p>
+<hr>
+<h2 id="八-为什么把这件事写出来">八、为什么把这件事写出来</h2>
+<p>有人劝我别写：一个已经修好的、没被利用的漏洞，公开出去只会让人怀疑产品。</p>
+<p>我不这么看，两个理由：</p>
+<p><strong>第一，这是可验证的坦诚。</strong> 我在 README 和官网都在说&quot;AI 改不了账、令牌绑人绑载荷&quot;。如果连自己修过什么漏洞都不敢写，那些声明就只是文案。修复的那行代码在公开仓库里，<code>jwt.strategy.ts</code> 的注释就写着这段来历，谁都能查——包括查我上面哪句话写大了。</p>
+<p><strong>第二，这类 bug 太常见了。</strong> <code>passport-jwt</code> 不补 <code>id</code> 这件事，我在搜资料时看到过不止一个人踩。写出来至少能让人在自己项目里 <code>grep</code> 一下 <code>user.id</code>。</p>
+<p>顺便说一句，这也是我们坚持&quot;安全靠代码不靠文案&quot;的原因：<strong>任何安全声明都应该能对应到一段可执行、可测试的代码</strong>，否则就是营销。</p>
+<hr>
+<h2 id="九-给自己留的三条自检清单">九、给自己留的三条自检清单</h2>
+<p>贴在 issue 里，每次改认证相关代码时过一遍：</p>
+<ol><li><strong>JWT 载荷里的每一个字段，业务侧用的是不是同一个名字？</strong> 不一致就显式映射，别依赖侥幸。</li><li><strong>所有&quot;归属校验&quot;是否都有跨身份用例？</strong></li><li><strong>审计字段出现空值，是不是有更深的原因？</strong></li></ol>
+<hr>
+<p>项目：GitHub <code>edrin09/boki</code>（AGPL-3.0）。修复提交和回归用例都在仓库里，欢迎来审计——包括来找出上面第五节&quot;影响面评估&quot;里我可能漏掉的路径。</p>
+  </article>
+  <div class="end">
+    <a class="btn" href="./index.html">← 全部技术文章</a>
+    <a class="btn primary" href="https://github.com/edrin09/boki" target="_blank" rel="noopener">在 GitHub 上看代码</a>
+  </div>
+</main>
+<footer>BOKI · 开源财务软件 · 内核 AGPL-3.0 / 官方插件 Apache-2.0 · 文中数据均可自行验证</footer>
+<script>
+(function () {
+  var btn = document.getElementById('copyMd')
+  if (!btn) return
+  btn.addEventListener('click', function () {
+    var label = btn.textContent
+    var done = function (ok) {
+      btn.textContent = ok ? '已复制' : '复制失败，请手动打开 md 文件'
+      setTimeout(function () { btn.textContent = label }, 1800)
+    }
+    fetch(btn.dataset.md).then(function (r) { return r.text() }).then(function (t) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(t).then(function () { done(true) }, function () { done(false) })
+      } else {
+        var ta = document.createElement('textarea')
+        ta.value = t; document.body.appendChild(ta); ta.select()
+        try { done(document.execCommand('copy')) } catch (e) { done(false) }
+        document.body.removeChild(ta)
+      }
+    }).catch(function () { done(false) })
+  })
+})()
+</script>
+</body>
+</html>

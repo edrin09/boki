@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>我把 AI 接进财务软件，然后给它上了三道锁 · BOKI</title>
+<meta name="description" content="给财务软件接 AI，真正花时间的不是让它听懂，是让它别乱动。三道锁的实现与代价。" />
+<link rel="canonical" href="https://edrin09.github.io/boki/articles/01-three-locks.html" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="我把 AI 接进财务软件，然后给它上了三道锁" />
+<meta property="og:description" content="给财务软件接 AI，真正花时间的不是让它听懂，是让它别乱动。三道锁的实现与代价。" />
+<meta property="og:url" content="https://edrin09.github.io/boki/articles/01-three-locks.html" />
+<style>
+:root{--indigo:#4f46e5;--indigo-deep:#3730a3;--slate:#64748b;--border:#e5e7eb;--bg-soft:#f8fafc;--text:#0f172a;--green:#16a34a;--amber:#d97706}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);line-height:1.8;background:#fff;-webkit-font-smoothing:antialiased}
+header.bar{position:sticky;top:0;background:rgba(255,255,255,.92);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--border);padding:13px 20px;display:flex;align-items:center;gap:14px;z-index:20}
+header.bar a{color:var(--indigo);text-decoration:none;font-weight:600;font-size:14px;white-space:nowrap;flex:none}
+header.bar .logo{font-weight:800;color:var(--text);letter-spacing:.02em;white-space:nowrap;flex:none}
+header.bar .crumb{color:var(--slate);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+header.bar .spacer{flex:1}
+header.bar .copy{border:1px solid var(--border);background:#fff;color:var(--slate);font-size:12.5px;line-height:1.2;padding:5px 12px;border-radius:999px;cursor:pointer;font-family:inherit;transition:.15s;white-space:nowrap;flex:none}
+header.bar .copy:hover{border-color:var(--indigo);color:var(--indigo)}
+main{max-width:760px;margin:0 auto;padding:44px 22px 72px}
+.eyebrow{color:var(--indigo);font-weight:700;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase}
+h1{font-size:32px;line-height:1.35;margin:10px 0 14px;letter-spacing:-.01em}
+.meta{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;color:var(--slate);font-size:13px;padding-bottom:22px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.meta .dot{width:3px;height:3px;border-radius:50%;background:#cbd5e1}
+.tag{background:var(--bg-soft);border:1px solid var(--border);color:var(--slate);border-radius:999px;padding:1px 9px;font-size:12px}
+h2{font-size:22px;margin:44px 0 14px;padding-left:12px;border-left:3px solid var(--indigo);line-height:1.5;scroll-margin-top:70px}
+h3{font-size:17px;margin:28px 0 10px;scroll-margin-top:70px}
+p{margin:16px 0;color:#334155}
+strong{color:var(--text);font-weight:700}
+a{color:var(--indigo);text-decoration:none;border-bottom:1px solid rgba(79,70,229,.28)}
+a:hover{border-bottom-color:var(--indigo)}
+ul,ol{padding-left:24px;margin:16px 0;color:#334155}
+li{margin:7px 0}
+li>ul,li>ol{margin:6px 0}
+hr{border:0;border-top:1px solid var(--border);margin:40px 0}
+blockquote{margin:24px 0;padding:14px 18px;background:var(--bg-soft);border-left:3px solid var(--indigo);border-radius:0 8px 8px 0}
+blockquote p{margin:0;color:#334155}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;font-size:.9em;background:#f1f5f9;color:#0f172a;padding:1.5px 5px;border-radius:4px;border:1px solid #e2e8f0}
+.code{margin:22px 0;border-radius:10px;overflow:hidden;border:1px solid #1e293b;background:#0f172a}
+.code-lang{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;padding:7px 14px;border-bottom:1px solid #1e293b;background:#111c2e}
+.code pre{margin:0;padding:15px 16px;overflow-x:auto;line-height:1.65}
+.code code{background:none;border:0;padding:0;color:#e2e8f0;font-size:13px}
+.tok-c{color:#64748b;font-style:italic}
+.tok-s{color:#fcd34d}
+.tok-k{color:#c4b5fd}
+.tok-n{color:#7dd3fc}
+figure{margin:26px 0}
+figure img,.article-img{width:100%;border-radius:10px;border:1px solid var(--border);display:block}
+figcaption{color:var(--slate);font-size:12.5px;text-align:center;margin-top:10px;line-height:1.6}
+p.caption{color:var(--slate);font-size:13px;text-align:center;margin-top:-8px}
+.table-wrap{overflow-x:auto;margin:22px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{border:1px solid var(--border);padding:9px 12px;text-align:left;vertical-align:top}
+th{background:var(--bg-soft);color:var(--indigo-deep);font-weight:600;white-space:nowrap}
+tbody tr:nth-child(even){background:#fcfdff}
+.toc{background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin:28px 0 8px}
+.toc-t{font-size:12.5px;font-weight:700;color:var(--slate);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.toc ol,.toc ul{margin:0;font-size:14px}
+.toc ol.num{padding-left:20px}
+.toc ul.plain{list-style:none;padding-left:2px}
+.toc li{margin:4px 0}
+.toc a{border:0;color:#334155}
+.toc a:hover{color:var(--indigo)}
+.end{margin-top:52px;padding-top:22px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.end .btn{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:8px 18px;font-size:14px;color:var(--text);background:#fff;cursor:pointer;font-family:inherit}
+.end .btn:hover{border-color:var(--indigo);color:var(--indigo)}
+.end .btn.primary{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.end .btn.primary:hover{background:var(--indigo-deep);color:#fff}
+footer{text-align:center;color:var(--slate);font-size:13px;padding:28px 20px 40px;border-top:1px solid var(--border)}
+footer a{color:var(--slate)}
+@media(max-width:600px){h1{font-size:26px}h2{font-size:19px}main{padding:30px 18px 56px}.code code{font-size:12px}header.bar .crumb{display:none}header.bar{gap:10px;padding:11px 14px}header.bar .copy{font-size:11.5px;padding:5px 9px}}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a href="../index.html">← 官网</a>
+  <span class="logo">BOKI</span>
+  <span class="crumb">我把 AI 接进财务软件，然后给它上了三道锁</span>
+  <span class="spacer"></span>
+  <button class="copy" id="copyMd" data-md="md/01-three-locks.md">复制 Markdown 原文</button>
+</header>
+<main>
+  <span class="eyebrow">V2EX / 分享创造</span>
+  <h1>我把 AI 接进财务软件，然后给它上了三道锁</h1>
+  <div class="meta">
+    <span>2026-11-15</span><span class="dot"></span>
+    <span>约 12 分钟</span><span class="dot"></span>
+    <span>4988 字</span>
+    <span class="tag">AI</span><span class="tag">架构设计</span><span class="tag">安全</span>
+  </div>
+  <nav class="toc"><div class="toc-t">本文目录</div><ol class="num"><li><a href="#第一版-非常天真">第一版：非常天真</a></li><li><a href="#锁一-草稿闸门-让-ai-直接过账-写不出来">锁一：草稿闸门 —— 让「AI 直接过账」写不出来</a></li><li><a href="#锁二-一次性令牌-让-替别人确认-失效">锁二：一次性令牌 —— 让「替别人确认」失效</a></li><li><a href="#锁三-只读-mcp-让外部-ai-能查不能改">锁三：只读 MCP —— 让外部 AI 能查不能改</a></li><li><a href="#代价">代价</a></li><li><a href="#现在做到哪了">现在做到哪了</a></li><li><a href="#你可以自己验三条">你可以自己验三条</a></li></ol></nav>
+  <article>
+<p>先交代背景：我做了个开源财务软件（BOKI，复式记账 + 凭证 + 报表），去年底开始琢磨着把 AI 接进去。</p>
+<p>动机特别朴素——我自己记账最烦的不是做账，是<strong>录入</strong>。一张报销单，摘要、科目、金额、日期、往来单位，五个字段来回点。如果有 AI，我说一句「陈晓报销客户拜访打车费 128，现金付的」，它把卡片填好，我点一下确认，这事就完了。</p>
+<p>做完之后效果确实可以。但真正花时间的地方不是「让它听懂」，而是<strong>让它别乱动</strong>。这篇就聊后面这段。</p>
+<hr>
+<h2 id="第一版-非常天真">第一版：非常天真</h2>
+<p>最开始的实现，现在回头看简直是灾难：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-c">// 第一版伪代码</span>
+<span class="tok-k">const</span> plan = <span class="tok-k">await</span> llm.parse(text)
+<span class="tok-k">if</span> (plan.action === <span class="tok-s">'voucher.create'</span>) {
+  <span class="tok-k">return</span> <span class="tok-k">await</span> voucherService.create(plan.args)   <span class="tok-c">// 直接落库</span>
+}</code></pre></div>
+<p>问题一眼可见：<strong>模型 hallucinate 一次，你的账就多一张凭证</strong>。金额错一位、科目选错、日期跑到上个月——这些都不会报错，因为从数据库角度看它就是一张合法凭证。等你发现，可能已经结账了。</p>
+<p>更隐蔽的是：如果哪天有人往这个分支里加一句 <code>autoApprove: true</code>（比如为了「体验更顺滑」），AI 就真的能自己过账了。而这类改动在 code review 里非常不起眼——它看起来只是少了一次点击。</p>
+<p>所以我给自己定了个规矩，后来变成了整个项目的架构原则：</p>
+<blockquote><strong>开放的是接口和意图，收紧的是落点。</strong></blockquote>
+<p>模型随你换、话随你说、外部 AI 客户端也能连进来查账；但<strong>所有写入只能落在草稿上</strong>，人点了确认才算数，审核永远是人做的。</p>
+<p>这个原则落地成三道锁。</p>
+<hr>
+<h2 id="锁一-草稿闸门-让-ai-直接过账-写不出来">锁一：草稿闸门 —— 让「AI 直接过账」写不出来</h2>
+<p>我把 AI 动作的终点抽象成一个字段：<code>landing</code>（落点）。它只有三个合法值：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-k">export</span> <span class="tok-k">const</span> AI_LANDINGS = [<span class="tok-s">'draft'</span>, <span class="tok-s">'list'</span>, <span class="tok-s">'archive'</span>] <span class="tok-k">as</span> <span class="tok-k">const</span></code></pre></div>
+<p>注意这里<strong>故意没有 <code>direct</code></strong>。不是「先不做」，是类型层面就不给这个选项。</p>
+<figure><img src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/articles/open-flow.png" alt="AI 动作的五步链路：人说一句 → 模型听懂 → 服务端只读预演 → 人点确认 → 只落草稿" loading="lazy"></figure>
+<p class="caption">这条链路上没有分支：第 5 步的落点被写死在三个值里。</p>
+<p>然后是两道校验。</p>
+<p><strong>注册期</strong>：插件注册 AI 动作时，必须声明合法 landing，否则注册直接失败、进程起不来：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-k">export</span> <span class="tok-k">function</span> assertLanding(manifest: ActionManifest): AiLanding {
+  <span class="tok-k">const</span> landing = manifest?.landing
+  <span class="tok-k">if</span> (!landing || !AI_LANDINGS.includes(landing)) {
+    <span class="tok-k">throw</span> <span class="tok-k">new</span> Error(
+      <span class="tok-s">`动作「${manifest?.id}」未声明合法 landing（只允许 ${AI_LANDINGS.join(' / ')}），注册已拒绝`</span>
+    )
+  }
+  <span class="tok-k">return</span> landing
+}</code></pre></div>
+<p><strong>运行期</strong>：适配器返回结果里如果出现「已生效」状态，直接抛错，不静默接受：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code><span class="tok-k">const</span> FORBIDDEN_STATES = <span class="tok-k">new</span> <span class="tok-k">Set</span>([
+  <span class="tok-s">'approved'</span>, <span class="tok-s">'audited'</span>, <span class="tok-s">'paid'</span>, <span class="tok-s">'posted'</span>,
+  <span class="tok-s">'issued'</span>, <span class="tok-s">'settled'</span>, <span class="tok-s">'confirmed'</span>, <span class="tok-s">'completed'</span>,
+])
+
+<span class="tok-k">export</span> <span class="tok-k">function</span> assertDraftOnly(result: <span class="tok-k">unknown</span>, actionId = <span class="tok-s">''</span>) {
+  <span class="tok-k">const</span> hit = scan(result, <span class="tok-n">0</span>)
+  <span class="tok-k">if</span> (hit) {
+    <span class="tok-k">throw</span> <span class="tok-k">new</span> DraftGateViolation(
+      <span class="tok-s">`动作「${actionId}」返回了 ${hit.key}=${hit.value}，AI 路径不允许产生已生效数据`</span>
+    )
+  }
+}</code></pre></div>
+<p><code>scan</code> 递归遍历结果（深度上限 5 层，只查 <code>status</code> / <code>state</code> / <code>newStatus</code> 这类约定键名），发现 <code>approved</code>、<code>posted</code>、<code>paid</code> 就地拦截。</p>
+<p>这套东西的价值不在于「拦截了一个坏结果」，而在于<strong>把「顺手写个直通分支」变成启动即失败</strong>。有人真想绕过，得同时改白名单、改禁用状态表、再改校验——那已经不是「顺手」了，是明目张胆。</p>
+<hr>
+<h2 id="锁二-一次性令牌-让-替别人确认-失效">锁二：一次性令牌 —— 让「替别人确认」失效</h2>
+<p>AI 出卡片的时候，服务端会签一个令牌。这个令牌绑了三样东西：</p>
+<ol><li><strong>当前用户</strong>（<code>userId</code>）</li><li><strong>当前账套</strong>（<code>companyId</code>）</li><li><strong>载荷哈希</strong>（<code>previewHash</code>，卡片上所有字段算出来的）</li></ol>
+<p>有效期 15 分钟，<code>commit</code> 一次即作废；重复提交不重复入账，直接返回上次结果（幂等）。</p>
+<div class="code"><div class="code-lang">ts</div><pre><code>require(token, companyId, userId): TokenPayload {
+  <span class="tok-k">const</span> found = <span class="tok-k">this</span>.entries.get(token)
+  <span class="tok-k">if</span> (!found) <span class="tok-k">throw</span> <span class="tok-k">new</span> BadRequestException(<span class="tok-s">'指令已失效，请重新说一遍'</span>)
+  <span class="tok-k">if</span> (found.expiresAt &lt; Date.now()) <span class="tok-k">throw</span> <span class="tok-k">new</span> BadRequestException(<span class="tok-s">'已超过 15 分钟'</span>)
+  <span class="tok-k">if</span> (found.companyId !== companyId) <span class="tok-k">throw</span> <span class="tok-k">new</span> BadRequestException(<span class="tok-s">'...'</span>)
+  <span class="tok-k">if</span> (found.userId !== userId) <span class="tok-k">throw</span> <span class="tok-k">new</span> BadRequestException(<span class="tok-s">'...'</span>)
+  <span class="tok-c">// ...</span>
+}</code></pre></div>
+<p>设计意图很直白：<strong>卡片是「你」的，不是「这一条请求」的</strong>。别人拿到 token 也没用——换个人提交直接被拒。</p>
+<p>顺便说个坑：这套校验里我埋过一个真漏洞，属于「安全校验依赖一个约定存在的字段，而那个字段当时是 <code>undefined</code>」，导致 <code>undefined === undefined</code> 恒成立，任何人都能替别人确认指令。细节我单独写了一篇复盘（链接在文末），这里只说教训：<strong>参与安全判断的字段，必须 fail-closed</strong>。</p>
+<hr>
+<h2 id="锁三-只读-mcp-让外部-ai-能查不能改">锁三：只读 MCP —— 让外部 AI 能查不能改</h2>
+<p>MCP（Model Context Protocol）是现在 AI 客户端接外部工具的通用协议。Claude Desktop、Cursor、各种 Agent 框架都支持。</p>
+<p>财务场景里，这东西的诱惑很大：让你的 AI 助手直接查「这个月收支怎么样」「谁还欠我钱」，体验非常好。但风险同样直白：<strong>如果 AI 客户端能写，那它就等于拿到了一把能改账的钥匙</strong>。</p>
+<p>我的做法是把 MCP 服务端做成<strong>物理只读</strong>：</p>
+<div class="code"><div class="code-lang">ts</div><pre><code>register(tool: McpTool) {
+  <span class="tok-k">if</span> (tool.readOnly !== <span class="tok-k">true</span>) {
+    <span class="tok-k">throw</span> <span class="tok-k">new</span> Error(<span class="tok-s">`MCP 工具「${tool.name}」必须声明 readOnly: true`</span>)
+  }
+  <span class="tok-c">// ...</span>
+}</code></pre></div>
+<p>注册表在入口就拒绝任何非只读工具。现在一共 8 个工具，全是查询：凭证查询、凭证详情、科目查询、科目余额、试算平衡表、明细账、借款单查询、报销单查询。</p>
+<p>试试写操作会怎样：</p>
+<div class="code"><div class="code-lang">bash</div><pre><code>$ curl -s -X POST http://<span class="tok-n">127.0</span>.<span class="tok-n">0.1</span>:<span class="tok-n">3000</span>/api/mcp \
+    -H <span class="tok-s">&quot;Authorization: Bearer $TOKEN&quot;</span> -H <span class="tok-s">'Content-Type: application/json'</span> \
+    -d '{<span class="tok-s">&quot;jsonrpc&quot;</span>:<span class="tok-s">&quot;2.0&quot;</span>,<span class="tok-s">&quot;id&quot;</span>:<span class="tok-n">4</span>,<span class="tok-s">&quot;method&quot;</span>:<span class="tok-s">&quot;tools/call&quot;</span>,
+         <span class="tok-s">&quot;params&quot;</span>:{<span class="tok-s">&quot;name&quot;</span>:<span class="tok-s">&quot;voucher.approve&quot;</span>,<span class="tok-s">&quot;arguments&quot;</span>:{<span class="tok-s">&quot;id&quot;</span>:<span class="tok-s">&quot;v-0005&quot;</span>}}}'
+
+{<span class="tok-s">&quot;jsonrpc&quot;</span>:<span class="tok-s">&quot;2.0&quot;</span>,<span class="tok-s">&quot;id&quot;</span>:<span class="tok-n">4</span>,<span class="tok-s">&quot;error&quot;</span>:{<span class="tok-s">&quot;code&quot;</span>:-<span class="tok-n">32603</span>,<span class="tok-s">&quot;message&quot;</span>:<span class="tok-s">&quot;工具不存在：voucher.approve&quot;</span>}}</code></pre></div>
+<p>不是「权限不足」，是<strong>工具不存在</strong>。这条链路上根本没有「让外部 AI 改账」的能力——它不是一个配置开关，是代码里没写。</p>
+<figure><img src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/articles/mcp-notfound.png" alt="真实 JSON-RPC 会话：8 个工具全带 readOnly: true，试算平衡查得出来，voucher.approve 返回「工具不存在」" loading="lazy"></figure>
+<p class="caption">这是外部 AI 客户端连进来的一次真实会话，不是示意图。</p>
+<p>另外每个工具还带自己的 permission，调用时按当前用户再校验一次，和网页端的 RBAC 是同一套。</p>
+<hr>
+<h2 id="代价">代价</h2>
+<p>说点不好听的。</p>
+<p><strong>第一，AI 不能全自动。</strong> 用户点两下：确认卡片、审核凭证。我知道有人想要「全自动记账」，但那是另一个产品，不是财务软件。</p>
+<p><strong>第二，模型能力受限于本地硬件。</strong> 全离线的代价是没有 GPT-4 级别的理解力。我的实测是 30B MoE 在纯 CPU 上 13.67 tok/s、内存 18.5GB——写代码、读长文够用，但语感不如云端大模型。所以产品里把模型做成可切换的：想接 DeepSeek / 通义 / Kimi 随时切，接口全兼容 OpenAI 协议，换模型不改业务代码。</p>
+<p><strong>第三，只读 MCP 的能力边界很窄。</strong> 只能查，不能改。有人问我为什么不放几个写工具、加个「二次确认」——因为「二次确认」在客户端，客户端是别人写的，我控制不了。</p>
+<hr>
+<h2 id="现在做到哪了">现在做到哪了</h2>
+<ul><li>一句话记账 / 发工资 / 加员工档案 / 改凭证 / 审凭证 / 申请借款 / 申请报销，7 类动作已交付；架构上扩到 40 类单据不用动内核（插件在启动期注册单据类型就行）</li><li>8 个只读 MCP 工具，Claude Desktop / Cursor 可直接连</li><li>本地 OCR（约 25MB）+ 本地流式语音识别（约 160MB）+ 可选本地大模型，断网全流程可用</li><li>SQLCipher 整库加密，库文件拷走打不开（密钥 <code>vault.key</code> 不和库放一起）</li><li>内核 AGPL-3.0，官方插件 Apache-2.0</li></ul>
+<figure><img src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/boki/articles/site-hero.png" alt="BOKI 首屏：模型你选，账本不出门" loading="lazy"></figure>
+<p>项目开源：GitHub <code>edrin09/boki</code>，Gitee <code>edrin/boki</code>。官网有 70 秒真机录屏，包含「本地模型测试连接 156ms」和「AI 出草稿 → 人工审核」的完整流程。</p>
+<hr>
+<h2 id="你可以自己验三条">你可以自己验三条</h2>
+<p>不用信我，装完自己敲：</p>
+<div class="code"><div class="code-lang">bash</div><pre><code><span class="tok-c"># 1) 库里有没有「AI 直通过账」的落点？</span>
+$ grep -rn <span class="tok-s">&quot;landing.*direct&quot;</span> backend/src/    <span class="tok-c"># 无输出</span>
+
+<span class="tok-c"># 2) 写工具进不进得来 MCP 注册表？</span>
+$ grep -n <span class="tok-s">&quot;readOnly !== true&quot;</span> backend/src/modules/mcp/mcp-tool.registry.ts
+
+<span class="tok-c"># 3) 试着让外部 AI 审一张凭证</span>
+$ curl -s -X POST .../api/mcp -d '{<span class="tok-s">&quot;method&quot;</span>:<span class="tok-s">&quot;tools/call&quot;</span>,
+    <span class="tok-s">&quot;params&quot;</span>:{<span class="tok-s">&quot;name&quot;</span>:<span class="tok-s">&quot;voucher.approve&quot;</span>}}'
+<span class="tok-c"># → {&quot;error&quot;:{&quot;message&quot;:&quot;工具不存在：voucher.approve&quot;}}</span></code></pre></div>
+<p>第 3 条最直接：不是拒绝你，是根本没有这个工具。</p>
+<hr>
+<p>写完发现这篇更像「设计权衡记录」而不是产品介绍，就这样吧。评论区想听两件事：</p>
+<ol><li>你觉得「AI 记账」到底该不该有全自动模式？如果该，边界在哪？</li><li>只读 MCP 这个方向值不值得继续扩（比如加「导出」类工具）？</li></ol>
+<blockquote>补充说明：文中数字都来自项目内的证据表（端到端复测 41/41、48/48、51/51；召回 8/8；30B MoE CPU 13.67 tok/s）。竞品我只做能力对比，不点名。</blockquote>
+  </article>
+  <div class="end">
+    <a class="btn" href="./index.html">← 全部技术文章</a>
+    <a class="btn primary" href="https://github.com/edrin09/boki" target="_blank" rel="noopener">在 GitHub 上看代码</a>
+  </div>
+</main>
+<footer>BOKI · 开源财务软件 · 内核 AGPL-3.0 / 官方插件 Apache-2.0 · 文中数据均可自行验证</footer>
+<script>
+(function () {
+  var btn = document.getElementById('copyMd')
+  if (!btn) return
+  btn.addEventListener('click', function () {
+    var label = btn.textContent
+    var done = function (ok) {
+      btn.textContent = ok ? '已复制' : '复制失败，请手动打开 md 文件'
+      setTimeout(function () { btn.textContent = label }, 1800)
+    }
+    fetch(btn.dataset.md).then(function (r) { return r.text() }).then(function (t) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(t).then(function () { done(true) }, function () { done(false) })
+      } else {
+        var ta = document.createElement('textarea')
+        ta.value = t; document.body.appendChild(ta); ta.select()
+        try { done(document.execCommand('copy')) } catch (e) { done(false) }
+        document.body.removeChild(ta)
+      }
+    }).catch(function () { done(false) })
+  })
+})()
+</script>
+</body>
+</html>
