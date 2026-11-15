@@ -249,7 +249,8 @@ export class CoreMcpTools implements OnModuleInit {
           ...(int(args.startPeriod) ? { startPeriod: int(args.startPeriod) } : period ? { startPeriod: period } : {}),
           ...(int(args.endPeriod) ? { endPeriod: int(args.endPeriod) } : period ? { endPeriod: period } : {}),
         })
-        return ok(`试算平衡 ${data?.startPeriod}-${data?.endPeriod}`, data)
+        const p = (data as any)?.period ?? {}
+        return ok(`试算平衡 ${p.startPeriod}-${p.endPeriod}`, data)
       },
     }
   }

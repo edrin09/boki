@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>BOKI 与三类替代方案对比</title>
+<style>
+  @page { size: A4; margin: 14mm 13mm; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    color: #0f172a;
+    font-size: 10.4pt;
+    line-height: 1.52;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 2.2px solid #0f172a; padding-bottom: 9px; }
+  .brand { display: flex; align-items: center; gap: 9px; }
+  .mark { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg,#2563eb,#7c3aed); }
+  .brand b { font-size: 15pt; letter-spacing: .5px; }
+  h1 { font-size: 15.5pt; margin: 0; line-height: 1.25; }
+  .sub { color: #475569; font-size: 9pt; margin-top: 3px; }
+  .meta { text-align: right; color: #64748b; font-size: 8.2pt; line-height: 1.6; white-space: nowrap; }
+
+  .lead { margin: 12px 0 10px; font-size: 10.2pt; color: #1e293b; }
+  .lead b { color: #0f172a; }
+
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  col.dim { width: 17%; }
+  thead th {
+    background: #0f172a; color: #fff; font-weight: 600; font-size: 9.9pt;
+    padding: 7px 9px; text-align: left; border-right: 1px solid rgba(255,255,255,.14);
+  }
+  thead th:last-child { border-right: none; }
+  thead th.ours { background: linear-gradient(135deg,#2563eb,#6d28d9); }
+  tbody td { padding: 7px 9px; border-bottom: 1px solid #e2e8f0; vertical-align: top; font-size: 9.9pt; }
+  tbody tr:nth-child(even) td { background: #f8fafc; }
+  tbody td:first-child { font-weight: 600; color: #0f172a; background: #f1f5f9; }
+  tbody td.ours { background: #eef2ff; font-weight: 600; color: #1e1b4b; }
+  tbody tr:nth-child(even) td.ours { background: #e6ebff; }
+  .no { color: #b91c1c; font-weight: 700; }
+  .yes { color: #047857; font-weight: 700; }
+  .mid { color: #b45309; font-weight: 700; }
+
+  .pillars { display: flex; gap: 10px; margin: 13px 0 0; }
+  .pillar { flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 11px; background: #fff; }
+  .pillar h3 { margin: 0 0 4px; font-size: 10pt; }
+  .pillar h3 span { color: #2563eb; }
+  .pillar p { margin: 0; font-size: 9.1pt; color: #475569; line-height: 1.5; }
+  .pillar .k { display: block; font-family: Consolas, monospace; font-size: 8.2pt; color: #334155; background: #f1f5f9; border-radius: 4px; padding: 2px 5px; margin-top: 5px; }
+
+  .who { display: flex; gap: 9px; margin-top: 11px; }
+  .who > div { flex: 1; border-left: 3px solid #cbd5e1; padding: 3px 0 3px 10px; font-size: 9.3pt; color: #475569; line-height: 1.5; }
+  .who b { display: block; color: #0f172a; font-size: 9.6pt; margin-bottom: 2px; }
+
+  .foot { margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 8px; display: flex; justify-content: space-between; gap: 14px; color: #64748b; font-size: 8pt; }
+  .foot b { color: #334155; }
+  .rule { margin-top: 8px; padding: 8px 10px; background: #f1f5f9; border-left: 3px solid #2563eb; color: #334155; font-size: 8.9pt; border-radius: 0 5px 5px 0; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <div>
+      <div class="brand"><span class="mark"></span><b>BOKI</b></div>
+      <h1 style="margin-top:8px">四类方案的差别，一页说清</h1>
+      <div class="sub">只列事实，不做竞品点名 —— 每一行都可以在自己的机器上验证</div>
+    </div>
+    <div class="meta">
+      v1.1.0 · 2026-11<br />AGPL-3.0 开源<br />edrin09.github.io/boki
+    </div>
+  </div>
+
+  <p class="lead">
+    小微企业想用 AI 提效，卡点通常不是「模型够不够强」，而是<b>账本、发票、客户名单要不要交出去</b>。
+    下面这张表把四类方案放在同一把尺子上量：数据在哪、断网能不能用、AI 能不能动账、能不能换模型。
+  </p>
+
+  <table>
+    <colgroup><col class="dim" /><col /><col /><col /><col style="width:27%" /></colgroup>
+    <thead>
+      <tr>
+        <th>维度</th>
+        <th>云端 SaaS 记账</th>
+        <th>传统本地 ERP</th>
+        <th>通用 AI 助手</th>
+        <th class="ours">BOKI（开源 · 本地优先）</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>数据存在哪</td>
+        <td>厂商服务器</td>
+        <td>你的服务器</td>
+        <td>模型厂商</td>
+        <td class="ours">你的电脑，单文件</td>
+      </tr>
+      <tr>
+        <td>断网可用</td>
+        <td><span class="no">✗</span> 基本不可用</td>
+        <td><span class="mid">部分</span> 依赖部署方式</td>
+        <td><span class="no">✗</span> 不可用</td>
+        <td class="ours"><span class="yes">✓</span> 记账 / 查账 / AI 全部照跑</td>
+      </tr>
+      <tr>
+        <td>库文件被拷走</td>
+        <td>—</td>
+        <td><span class="mid">多为明文</span> 看配置</td>
+        <td>—</td>
+        <td class="ours">SQLCipher 整库加密，打不开</td>
+      </tr>
+      <tr>
+        <td>AI 能直接改账吗</td>
+        <td>平台代劳，你看不见</td>
+        <td>基本没有 AI</td>
+        <td>只能聊，接不进账</td>
+        <td class="ours">只能出草稿，人点了才生效</td>
+      </tr>
+      <tr>
+        <td>模型可换</td>
+        <td><span class="no">✗</span></td>
+        <td><span class="no">✗</span></td>
+        <td><span class="no">✗</span></td>
+        <td class="ours"><span class="yes">✓</span> 本地 Ollama / llama.cpp / 内网 / 云端 API</td>
+      </tr>
+      <tr>
+        <td>外部 AI 可接</td>
+        <td><span class="no">✗</span></td>
+        <td><span class="no">✗</span></td>
+        <td><span class="no">✗</span></td>
+        <td class="ours"><span class="yes">✓</span> 只读 MCP，8 个查询工具</td>
+      </tr>
+      <tr>
+        <td>可审计</td>
+        <td>厂商说了算</td>
+        <td>有日志但封闭</td>
+        <td>无</td>
+        <td class="ours"><span class="yes">✓</span> 源码 + 操作日志 + AI 指令审计表</td>
+      </tr>
+      <tr>
+        <td>部署成本</td>
+        <td>订阅费，逐年涨</td>
+        <td>一次性实施 + 运维</td>
+        <td>按 token 计费</td>
+        <td class="ours">装完即用；模型本地跑，无 token 费</td>
+      </tr>
+      <tr>
+        <td>退出成本</td>
+        <td>导出有限，格式封闭</td>
+        <td>迁移靠厂商</td>
+        <td>无数据</td>
+        <td class="ours">SQLite 单文件 + 全量导出，随时拿走</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="pillars">
+    <div class="pillar">
+      <h3><span>①</span> 模型你选</h3>
+      <p>OpenAI 兼容协议，本地 / 内网 / 云端随时切换。换模型不改业务代码，也不改数据格式。</p>
+      <span class="k">baseURL = http://127.0.0.1:9527/v1</span>
+    </div>
+    <div class="pillar">
+      <h3><span>②</span> 数据不出门</h3>
+      <p>整库加密、本地 OCR、本地语音识别、本地大模型。零云端依赖、零第三方 SDK、零埋点。</p>
+      <span class="k">sqlcipher · no telemetry · no CDN</span>
+    </div>
+    <div class="pillar">
+      <h3><span>③</span> AI 只写草稿</h3>
+      <p>草稿闸门 + 一次性令牌 + 只读 MCP。代码里没有「AI 直接过账」这条分支。</p>
+      <span class="k">landing ∈ {draft, list, archive}</span>
+    </div>
+  </div>
+
+  <div class="rule">
+    <b>验证方式</b>：以上不是路线图。装上后用「AI 模型接入」把 baseURL 指向本机模型，点「测试连接」看返回耗时；
+    再看凭证列表 —— AI 生成的单据状态永远是「草稿」，审核按钮只有人点得动。
+  </div>
+
+  <div class="who">
+    <div><b>小微企业 / 个体户</b>自己记几十笔账，不想为这点量付年费，更不想把客户名单交出去</div>
+    <div><b>代理记账公司</b>多家账套，客户数据必须相互隔离，一台机器一套库</div>
+    <div><b>内网 / 离线场景</b>车间、工地、涉密环境，断网也得能记账、能问 AI</div>
+  </div>
+
+  <div class="foot">
+    <div>
+      <b>BOKI</b> · 离线优先的开源财务软件 · 复式记账内核 + 插件化 · AGPL-3.0<br />
+      GitHub <b>edrin09/boki</b> · Gitee <b>edrin/boki</b> · 官网 <b>edrin09.github.io/boki</b>
+    </div>
+    <div style="text-align:right">
+      西安市未央区鹏云智码软件开发部<br />本文档可自由转载，请保留出处
+    </div>
+  </div>
+</body>
+</html>

@@ -100,7 +100,8 @@ desktop/scripts/receipts-verify.mjs
 desktop/scripts/output/
 
 # 内部文档：整目录不入库
-docs/
+# 仅仓库根目录的 docs/（内部文档不入库）；不要写成 docs/，那会连 assets/docs 一起忽略
+/docs/
 
 # 本机已安装的插件（运行时由「插件市场」装入，不属于源码）
 # 客户端不随包任何插件：新克隆的仓库插件目录为空，需要什么自己从市场装

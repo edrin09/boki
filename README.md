@@ -40,19 +40,33 @@
 
 ---
 
-## 🎬 30 秒演示：AI 一句话记账
+## 🎬 演示：真实运行实例，一条不剪
 
-> 打字或说话都行。AI 解析成凭证草稿，你确认后才入账 —— 本演示由真实运行实例录制。
+> 两段录屏都是在本机跑起来的真实实例上录的：本地模型（llama.cpp）+ 本机数据库，全程没有云端参与。
 
-<video src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/assets/ai-bookkeeping-demo.mp4" autoplay muted loop playsinline></video>
+**① 一句话记账（1 分 12 秒）** — 本地模型 → 确认卡片 → 改字段 → 草稿 → 人工审核
 
-🔍 [下载高清版 MP4（1440p，15 秒）](https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/assets/ai-bookkeeping-demo.mp4)
+![AI 一句话记账演示](assets/demo/ai-bookkeeping-demo.gif)
+
+<video src="assets/demo/ai-bookkeeping-demo.mp4" autoplay muted loop playsinline></video>
+
+📥 [下载完整 MP4（1440×900，含字幕）](assets/demo/ai-bookkeeping-demo.mp4)
+
+**② 只读 MCP（20 秒）** — 外部 AI 客户端连进来查账，写工具根本不存在
+
+<video src="assets/demo/mcp-readonly-demo.mp4" autoplay muted loop playsinline></video>
+
+📥 [下载 MP4](assets/demo/mcp-readonly-demo.mp4)
+
+📄 一页看清差异：[BOKI 与三类替代方案对比（PDF）](assets/pdf/boki-comparison.pdf) —— 云端 SaaS / 本地 ERP / 通用 AI / BOKI 四列，只列事实。
 
 流程只有三步：
 
-1. **说一句话** ——「记一笔 800 的水电费，银行付的」，支持语音（按住 Alt）或直接打字
-2. **改确认卡片** —— AI 生成凭证草稿：科目、金额、往来单位全部可改，科目只能从科目表选，不会写错
+1. **说一句话** ——「记一笔 800 的水电费，银行付的」，支持语音（按住 Alt）或直接打字；模型是本机 llama.cpp，接口地址 `127.0.0.1:9527`
+2. **改确认卡片** —— AI 生成凭证草稿：科目、金额、往来单位全部可改，科目只能从科目表选，不会写错；改完分录立即重算
 3. **确认执行** —— 一律生成**草稿凭证**，在凭证列表复核、审核后才正式入账，AI 永远不直接动账
+
+录屏里的「测试连接」耗时 156 毫秒 —— 这个延迟本身就说明请求没出过网卡。
 
 同一套能力还覆盖：**发工资、添加员工、修改凭证、审核凭证、申请借款单、申请报销单**，以及上传发票 PDF / 扫描件自动识别生成凭证（本地 OCR）。七类操作全部先预演、再人工确认，操作留审计记录。
 

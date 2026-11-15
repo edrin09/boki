@@ -727,7 +727,7 @@
             <span class="dots"><i></i><i></i><i></i></span>
             <span class="url">boki · AI 智能记账 — 一句话到凭证</span>
           </div>
-          <video src="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/assets/ai-bookkeeping-demo.mp4" poster="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/assets/ai-bookkeeping-demo-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="AI 一句话记账演示：输入「记一笔 800 的水电费，银行付的」→ AI 生成确认卡片 → 确认执行 → 草稿凭证进入凭证列表"></video>
+          <video src="assets/demo/ai-bookkeeping-demo.mp4" poster="assets/demo/ai-bookkeeping-demo-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="AI 一句话记账演示（1 分 12 秒，真机无剪辑）：本地模型 127.0.0.1 测试连接 156ms → 输入「记一笔 800 的水电费，银行付的」→ 生出确认卡片 → 改金额 860 → 确认执行 → 草稿凭证 → 人工审核"></video>
         </div>
         <p class="show-note">按住 Alt 说话或直接打字都行 · 全程无剪辑 · <a href="https://boki-assets-1258912300.cos.ap-chengdu.myqcloud.com/assets/ai-bookkeeping-demo.mp4" target="_blank" rel="noopener">下载高清版 MP4</a></p>
         <div class="show-cta">
@@ -867,6 +867,13 @@
         <p class="open-note">
           <b>三道锁</b>：草稿闸门（落点只有 <code>draft</code> / <code>list</code> / <code>archive</code>，<b>没有 direct</b>，启动期拒绝、运行期扫描）·
           一次性确认令牌（绑当前用户 + 载荷哈希，15 分钟过期，换账号提交直接拒绝）· 只读 MCP（这条链路上物理不存在「让外部 AI 改账」）。
+        </p>
+
+        <p class="open-note" style="margin-top:16px">
+          📄 <a href="assets/pdf/boki-comparison.pdf" download><b>一页对比表（PDF）</b></a>
+          —— 云端 SaaS / 本地 ERP / 通用 AI / BOKI 四列，只列事实，可自行验证。<br />
+          🎬 <a href="assets/demo/mcp-readonly-demo.mp4">只读 MCP 真机录屏（20 秒）</a>
+          —— 外部 AI 客户端连进来查账，调写工具时返回「工具不存在」。
         </p>
 
         <div class="mcp-box">
