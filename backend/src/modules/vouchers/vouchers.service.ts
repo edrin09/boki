@@ -12,7 +12,7 @@ import { Partner } from '../../entities/partner.entity'
 import { Department } from '../../entities/department.entity'
 import { Project } from '../../entities/project.entity'
 import { Employee } from '../../entities/hr.entity'
-import { VoucherSource, VoucherStatus } from '../../common/enums'
+import { ReceiptStatus, VoucherSource, VoucherStatus } from '../../common/enums'
 import { toCents, fromCents } from '../../common/utils/money.util'
 import { toPeriod } from '../../common/utils/date.util'
 import { recoverFilename } from '../../common/utils/filename.util'
@@ -497,7 +497,25 @@ export class VouchersService {
     await this.assertPeriodOpen(voucher.period, Boolean(options?.allowClosing))
     await this.entryRepo.delete({ voucherId: id })
     await this.voucherRepo.delete({ id } as any)
+    // 联动释放引用该凭证的票据：清关联、状态回退，票据可重新归类入账
+    // （否则票据记录带着旧 sha256 悬空，重新上传同一文件会被查重拦截，票据列表里也删不掉）
+    await this.releaseReceiptsByVoucher(id)
     return { message: '删除成功' }
+  }
+
+  /** 删除凭证后释放引用它的票据：解除 voucherId 关联，状态回退到已解析 */
+  private async releaseReceiptsByVoucher(voucherId: string): Promise<void> {
+    const receipts = await this.receiptRepo.find({ where: { voucherId } })
+    for (const r of receipts) {
+      r.voucherId = null
+      if (r.status === ReceiptStatus.CONFIRMED || r.status === ReceiptStatus.DRAFTED) {
+        r.status = ReceiptStatus.PARSED
+      }
+      r.confirmedBy = null
+      r.confirmedByName = null
+      r.confirmedAt = null
+      await this.receiptRepo.save(r)
+    }
   }
 
   /** 审核 */
