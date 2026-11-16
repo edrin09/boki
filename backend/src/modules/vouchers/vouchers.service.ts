@@ -12,7 +12,9 @@ import { Partner } from '../../entities/partner.entity'
 import { Department } from '../../entities/department.entity'
 import { Project } from '../../entities/project.entity'
 import { Employee } from '../../entities/hr.entity'
-import { ReceiptStatus, VoucherSource, VoucherStatus } from '../../common/enums'
+import { CashFlow } from '../../entities/business.entity'
+import { BankAccount } from '../../entities/bank-account.entity'
+import { ReceiptStatus, CashBankBizType, VoucherSource, VoucherStatus } from '../../common/enums'
 import { toCents, fromCents } from '../../common/utils/money.util'
 import { toPeriod } from '../../common/utils/date.util'
 import { recoverFilename } from '../../common/utils/filename.util'
@@ -35,6 +37,8 @@ interface NormalizedEntry {
   debit: number
   credit: number
   sort: number
+  isBank: boolean
+  isCash: boolean
 }
 
 @Injectable()
@@ -48,6 +52,8 @@ export class VouchersService {
     @InjectCompanyRepo(Project) private readonly projectRepo: CompanyScopedRepository<Project>,
     @InjectCompanyRepo(Employee) private readonly employeeRepo: CompanyScopedRepository<Employee>,
     @InjectCompanyRepo(Receipt) private readonly receiptRepo: CompanyScopedRepository<Receipt>,
+    @InjectCompanyRepo(CashFlow) private readonly cashFlowRepo: CompanyScopedRepository<CashFlow>,
+    @InjectCompanyRepo(BankAccount) private readonly bankAccountRepo: CompanyScopedRepository<BankAccount>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -241,7 +247,7 @@ export class VouchersService {
   /**
    * 员工辅助核算选项。
    *
-   * 「其他应收款」等科目声明了 employee 辅助核算，凭证录入必须能选到人；
+   * 「备用金」等科目声明了 employee 辅助核算，凭证录入必须能选到人；
    * 员工档案表属于内核实体（插件未装也存在），这里提供只读选项接口，
    * 避免内核页面依赖 hr 插件。
    */
@@ -409,10 +415,17 @@ export class VouchersService {
       })
       const savedVoucher = await manager.save(Voucher, voucher)
 
-      const rows = entries.map((e) =>
-        manager.create(VoucherEntry, { ...e, companyId, voucherId: savedVoucher.id }),
-      )
+      const rows = entries.map((e) => {
+        const { isBank, isCash, ...rest } = e as NormalizedEntry
+        return manager.create(VoucherEntry, { ...rest, companyId, voucherId: savedVoucher.id })
+      })
       await manager.save(VoucherEntry, rows)
+
+      // 资金类凭证（分录含银行存款/现金科目）自动同步生成「现金银行」单据，
+      // 保证资金台账完整。仅当来源不是 cash_bank 时联动（cash_bank 自身已建单据，避免重复/递归）。
+      if (source?.type !== VoucherSource.CASH_BANK) {
+        await this.syncCashFlowIfBank(savedVoucher, entries, companyId, operator, manager)
+      }
 
       return this.toVo(savedVoucher, rows)
     }
@@ -748,6 +761,8 @@ export class VouchersService {
         debit: fromCents(d),
         credit: fromCents(c),
         sort: rowNo,
+        isBank: account.isBank,
+        isCash: account.isCash,
       })
     })
 
@@ -773,6 +788,73 @@ export class VouchersService {
       credit += toCents(e.credit)
     }
     return { debit: fromCents(debit), credit: fromCents(credit) }
+  }
+
+  /**
+   * 资金类凭证联动生成「现金银行」单据。
+   *
+   * 背景：现金银行页面（fin_cash_flow）只展示「现金银行单据」，而票据记账（OCR）、
+   * AI 语音记账、工资、借款等业务路径直接调 create() 生成凭证、从不写 CashFlow，
+   * 导致资金台账缺失。这里在凭证落库后统一补一条 CashFlow，保证「凭证 ↔ 资金单据」一致。
+   *
+   * 规则：
+   * - 仅当分录含资金类科目（isBank/isCash）时联动；
+   * - 资金科目在借方 → 收款（receipt），在贷方 → 付款（payment）；
+   * - 对方科目取凭证中「非资金」的另一条分录；
+   * - 反查 BankAccount（accountCode 匹配）拿资金账户；现金类无账户则跳过；
+   * - 内部转账（两笔都是资金类）不在此处理（由现金银行手工录入）；
+   * - 结转/期末等无资金分录的凭证自然不触发。
+   */
+  private async syncCashFlowIfBank(
+    voucher: Voucher,
+    entries: NormalizedEntry[],
+    companyId: string,
+    operator: { id: string; nickname: string },
+    manager: EntityManager,
+  ): Promise<void> {
+    const bankEntries = entries.filter((e) => e.isBank || e.isCash)
+    if (bankEntries.length === 0) return
+    // 内部转账（两笔及以上资金分录，如 银行↔现金/银行↔银行）不在此联动，避免方向误判
+    if (bankEntries.length > 1) return
+
+    const bankEntry = bankEntries[0]
+    const counter = entries.find((e) => e !== bankEntry)
+    if (!counter) return
+
+    // 方向：资金科目借方 = 流入(收款)；贷方 = 流出(付款)
+    const isInflow = toCents(bankEntry.debit) > 0
+    const bizType = isInflow ? CashBankBizType.RECEIPT : CashBankBizType.PAYMENT
+    const amount = isInflow ? bankEntry.debit : bankEntry.credit
+
+    // 反查资金账户（仅银行存款/现金科目关联了 BankAccount 时才建单据）
+    // CompanyScopedRepository 会自动追加 company_id 过滤，无需显式传 companyId
+    const bank = await this.bankAccountRepo.findOne({
+      where: { accountCode: bankEntry.accountCode },
+    })
+    if (!bank) return
+
+    const cashFlow = manager.create(CashFlow, {
+      companyId,
+      bizType,
+      bizDate: voucher.voucherDate,
+      bankAccountId: bank.id,
+      bankAccountName: bank.name,
+      accountId: counter.accountId,
+      accountName: counter.accountName,
+      toBankAccountId: null,
+      toBankAccountName: null,
+      toAccountId: null,
+      partnerId: counter.partnerId,
+      departmentId: counter.departmentId,
+      projectId: counter.projectId,
+      amount: fromCents(toCents(amount)),
+      summary: counter.summary || voucher.remark || '',
+      voucherId: voucher.id,
+      createdBy: operator.id,
+      createdByName: operator.nickname,
+      remark: voucher.remark ?? null,
+    })
+    await manager.save(CashFlow, cashFlow)
   }
 
   private async loadAuxNames(entries: VoucherEntry[]): Promise<{

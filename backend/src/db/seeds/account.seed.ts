@@ -45,7 +45,7 @@ export const ACCOUNT_SEED: SeedAccountNode[] = [
     // 员工垫付/借款等场景对手方是员工，挂「员工」辅助核算以便按员工拆分往来余额
     // （不强制「往来单位」辅助核算：对手方不是往来单位）
     code: '1221',
-    name: '其他应收款',
+    name: '备用金',
     direction: D,
     auxiliaryTypes: [AuxiliaryType.EMPLOYEE],
     sort: 20,
@@ -114,11 +114,19 @@ export const ACCOUNT_SEED: SeedAccountNode[] = [
   { code: '2231', name: '应付利息', direction: C, sort: 15 },
   { code: '2232', name: '应付利润', direction: C, sort: 16 },
   {
-    // 不强制「往来单位」辅助核算：工资代扣社保/公积金等挂账场景对手方不是往来单位
+    // 法人垫付（法人代付税款、垫付经营款等），挂往来单位辅助核算
     code: '2241',
+    name: '法人垫付款',
+    direction: C,
+    auxiliaryTypes: [AuxiliaryType.PARTNER],
+    sort: 17,
+  },
+  {
+    // 工资代扣社保/公积金等挂账场景、报销超出借款转「欠员工」款项，对手方不是往来单位
+    code: '2242',
     name: '其他应付款',
     direction: C,
-    sort: 17,
+    sort: 18,
   },
   { code: '2401', name: '递延收益', direction: C, sort: 20 },
   { code: '2701', name: '长期借款', direction: C, sort: 30 },

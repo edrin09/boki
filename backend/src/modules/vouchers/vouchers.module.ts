@@ -6,6 +6,8 @@ import { Account } from '../../entities/account.entity'
 import { Partner } from '../../entities/partner.entity'
 import { Department } from '../../entities/department.entity'
 import { Project } from '../../entities/project.entity'
+import { CashFlow } from '../../entities/business.entity'
+import { BankAccount } from '../../entities/bank-account.entity'
 import { VouchersService } from './vouchers.service'
 import { VouchersController } from './vouchers.controller'
 
@@ -18,6 +20,8 @@ import { VouchersController } from './vouchers.controller'
       Partner,
       Department,
       Project,
+      CashFlow,
+      BankAccount,
     ]),
   ],
   controllers: [VouchersController],

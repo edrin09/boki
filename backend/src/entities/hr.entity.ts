@@ -347,7 +347,7 @@ export class Payroll extends BaseEntity {
   @Column({ name: 'payable_account_name', length: 100, nullable: true })
   payableAccountName: string | null
 
-  /** 其他应付款（代扣社保/公积金）科目 */
+  /** 其他应付款（代扣社保/公积金等，默认 2242）科目 */
   @Column({ name: 'deduct_account_id', type: 'varchar', nullable: true })
   deductAccountId: string | null
 
@@ -516,7 +516,7 @@ export class PayrollItem extends BaseEntity {
   })
   otherDeduct: number
 
-  /** 借款扣回（从工资中扣回员工借款，贷：其他应收款-员工） */
+  /** 借款扣回（从工资中扣回员工借款，贷：备用金-员工） */
   @Column({
     name: 'loan_deduct',
     type: 'decimal',
@@ -550,8 +550,8 @@ export class PayrollItem extends BaseEntity {
  * 员工借款单（备用金 / 差旅费借款等）
  *
  * 链路：草稿 → 审核（发放借款，生成借款凭证）→ 还款（生成还款凭证）
- * 借款凭证：借 其他应收款-员工借款 / 贷 库存现金或银行存款
- * 还款凭证：借 库存现金或银行存款 / 贷 其他应收款-员工借款
+ * 借款凭证：借 备用金-员工借款 / 贷 库存现金或银行存款
+ * 还款凭证：借 库存现金或银行存款 / 贷 备用金-员工借款
  */
 @Entity('fin_loan')
 @Index('uk_loan_no', ['companyId', 'loanNo'], { unique: true })
@@ -647,7 +647,7 @@ export class Loan extends BaseEntity {
 }
 
 /**
- * 员工往来核销记录（其他应收款-员工借款的贷方核销流水）
+ * 员工往来核销记录（备用金-员工借款的贷方核销流水）
  *
  * 借款的「还款」有多种途径，每一笔都登记一条核销记录，并回写借款单：
  * - cash/bank          现金、银行实际还款      借 资金科目 / 贷 1221

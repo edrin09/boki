@@ -124,12 +124,22 @@
                 <span v-if="!row.partnerId && !row.departmentId && !row.projectId && !row.employeeId">
                   -
                 </span>
-                <el-tag v-if="row.partnerId" size="small" class="aux-tag">{{ row.partnerName }}</el-tag>
+                <el-tooltip v-if="row.partnerId" content="点击查看往来单位档案" placement="top">
+                  <el-tag size="small" class="aux-tag aux-tag--link" @click="openAux('partner', row.partnerId, row.partnerName)">
+                    {{ row.partnerName }}
+                  </el-tag>
+                </el-tooltip>
                 <el-tag v-if="row.departmentId" size="small" class="aux-tag">{{ row.departmentName }}</el-tag>
-                <el-tag v-if="row.projectId" size="small" class="aux-tag">{{ row.projectName }}</el-tag>
-                <el-tag v-if="row.employeeId" size="small" type="warning" class="aux-tag">
-                  {{ row.employeeName || '员工' }}
-                </el-tag>
+                <el-tooltip v-if="row.projectId" content="点击查看项目档案与关联合同" placement="top">
+                  <el-tag size="small" class="aux-tag aux-tag--link" @click="openAux('project', row.projectId, row.projectName)">
+                    {{ row.projectName }}
+                  </el-tag>
+                </el-tooltip>
+                <el-tooltip v-if="row.employeeId" content="点击查看员工档案" placement="top">
+                  <el-tag v-if="row.employeeId" size="small" type="warning" class="aux-tag aux-tag--link" @click="openAux('employee', row.employeeId, row.employeeName)">
+                    {{ row.employeeName || '员工' }}
+                  </el-tag>
+                </el-tooltip>
               </template>
             </el-table-column>
             <el-table-column label="借方金额" width="140" align="right">
@@ -186,15 +196,129 @@
         :preview-src-list="[receiptUrl]"
       />
     </el-dialog>
+
+    <!-- 辅助核算档案抽屉：点分录上的往来单位 / 项目 / 员工标签进入 -->
+    <el-drawer v-model="auxDrawer.visible" :title="auxTitle" size="580px" destroy-on-close>
+      <div v-loading="auxDrawer.loading" class="aux-drawer__body">
+        <!-- 往来单位（公司）档案 -->
+        <template v-if="auxDrawer.kind === 'partner' && auxDrawer.data">
+          <el-descriptions :column="1" border size="small">
+            <el-descriptions-item label="编码">{{ auxDrawer.data.code || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="名称">{{ auxDrawer.data.name || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="类型">{{ partnerTypeLabel(auxDrawer.data.type) }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.taxNo" label="税号">{{ auxDrawer.data.taxNo }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.legalPerson" label="法定代表人">{{ auxDrawer.data.legalPerson }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.contact" label="联系人">{{ auxDrawer.data.contact }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.phone" label="电话">{{ auxDrawer.data.phone }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.email" label="邮箱">{{ auxDrawer.data.email }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.address" label="地址">{{ auxDrawer.data.address }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.bankName || auxDrawer.data.bankAccount" label="开户行 / 账号">
+              {{ [auxDrawer.data.bankName, auxDrawer.data.bankAccount].filter(Boolean).join(' / ') || '-' }}
+            </el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.remark" label="备注">{{ auxDrawer.data.remark }}</el-descriptions-item>
+          </el-descriptions>
+          <div class="aux-drawer__hint">往来单位信息在「基础资料 - 往来单位」中维护</div>
+        </template>
+
+        <!-- 员工档案 -->
+        <template v-if="auxDrawer.kind === 'employee' && auxDrawer.data">
+          <el-descriptions :column="1" border size="small">
+            <el-descriptions-item label="工号">{{ auxDrawer.data.code || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="姓名">{{ auxDrawer.data.name || '-' }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.position" label="岗位">{{ auxDrawer.data.position }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.departmentName" label="部门">{{ auxDrawer.data.departmentName }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.phone" label="电话">{{ auxDrawer.data.phone }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.hireDate" label="入职日期">{{ auxDrawer.data.hireDate }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.leaveDate" label="离职日期">{{ auxDrawer.data.leaveDate }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.baseSalary" label="基本工资（月）">{{ formatAmount(auxDrawer.data.baseSalary) }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.bankName || auxDrawer.data.bankAccount" label="开户行 / 卡号">
+              {{ [auxDrawer.data.bankName, auxDrawer.data.bankAccount].filter(Boolean).join(' / ') || '-' }}
+            </el-descriptions-item>
+          </el-descriptions>
+          <div class="aux-drawer__hint">员工信息在「人事」插件中维护</div>
+        </template>
+
+        <!-- 项目档案 + 关联合同 -->
+        <template v-if="auxDrawer.kind === 'project' && auxDrawer.data">
+          <el-descriptions :column="1" border size="small">
+            <el-descriptions-item label="编码">{{ auxDrawer.data.code || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="名称">{{ auxDrawer.data.name || '-' }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.partnerName" label="客户">
+              <el-link type="primary" :underline="false" @click="openAux('partner', auxDrawer.data.partnerId, auxDrawer.partnerName)">
+                {{ auxDrawer.partnerName }}
+              </el-link>
+            </el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.manager" label="负责人">{{ auxDrawer.data.manager }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.contractNo" label="合同编号">{{ auxDrawer.data.contractNo }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.contractAmount" label="合同金额">{{ formatAmount(auxDrawer.data.contractAmount) }}</el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.startDate || auxDrawer.data.endDate" label="项目周期">
+              {{ [auxDrawer.data.startDate, auxDrawer.data.endDate].filter(Boolean).join(' ~ ') }}
+            </el-descriptions-item>
+            <el-descriptions-item v-if="auxDrawer.data.remark" label="备注">{{ auxDrawer.data.remark }}</el-descriptions-item>
+          </el-descriptions>
+
+          <div class="aux-drawer__section-title">
+            关联合同
+            <span class="aux-drawer__section-sub">合同关联项目、项目关联账目</span>
+          </div>
+          <div v-if="auxDrawer.contractsState === 'loading'" v-loading="true" class="aux-drawer__loading" />
+          <template v-else-if="auxDrawer.contractsState === 'ok'">
+            <el-empty
+              v-if="auxDrawer.contracts.length === 0"
+              description="该项目暂无登记的合同"
+              :image-size="60"
+            />
+            <el-table v-else :data="auxDrawer.contracts" size="small" border>
+              <el-table-column prop="code" label="编码" width="80" />
+              <el-table-column prop="name" label="合同名称" min-width="140" show-overflow-tooltip />
+              <el-table-column label="合同金额" width="100" align="right">
+                <template #default="{ row }">{{ formatAmount(row.contractAmount) }}</template>
+              </el-table-column>
+              <el-table-column label="预收/应收" width="120" align="right">
+                <template #default="{ row }">
+                  <span v-if="row.summary">
+                    预收 {{ formatAmount(row.summary.advanceReceived) }} / 应收 {{ formatAmount(row.summary.receivable) }}
+                  </span>
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="原件" width="90" align="center">
+                <template #default="{ row }">
+                  <el-button v-if="row.hasFile" link type="primary" size="small" @click="onAuxContractPreview(row)">预览</el-button>
+                  <span v-else class="aux-drawer__muted">未上传</span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </template>
+          <div v-else-if="auxDrawer.contractsState === 'denied'" class="aux-drawer__hint">
+            当前角色无合同管理权限或未安装合同插件，无法显示关联合同
+          </div>
+        </template>
+      </div>
+    </el-drawer>
+
+    <!-- 关联合同原件预览（同票据预览：PDF iframe / 图片直显） -->
+    <el-dialog v-model="contractPreview.visible" :title="contractPreview.title" width="860px" top="4vh" destroy-on-close @closed="onContractPreviewClosed">
+      <div v-loading="contractPreview.loading" class="aux-contract-preview__body">
+        <iframe v-if="contractPreview.url && contractPreview.isPdf" :src="contractPreview.url" style="width: 100%; height: 70vh; border: none" />
+        <el-image
+          v-else-if="contractPreview.url"
+          :src="contractPreview.url"
+          fit="contain"
+          style="width: 100%; max-height: 70vh"
+          :preview-src-list="[contractPreview.url]"
+        />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Download, Paperclip } from '@element-plus/icons-vue'
-import { voucherApi, receiptApi } from '@/api'
+import { voucherApi, receiptApi, partnerApi, employeeApi, projectApi, pluginApi, get, download as downloadFile } from '@/api'
 import service from '@/api/http'
 import { confirmDelete, ok, usePagedList } from '@/composables/useList'
 import { exportExcel } from '@/utils/export'
@@ -435,6 +559,138 @@ function onReceiptClosed() {
   }
 }
 
+// ============ 辅助核算档案抽屉：往来单位 / 项目（含关联合同）/ 员工 ============
+const auxDrawer = reactive({
+  visible: false,
+  kind: '' as 'partner' | 'project' | 'employee' | '',
+  id: '',
+  name: '',
+  loading: false,
+  data: null as any,
+  /** 项目详情解析出的客户往来单位名 */
+  partnerName: '',
+  /** 关联合同（contracts 插件） */
+  contracts: [] as any[],
+  contractsState: 'hidden' as 'hidden' | 'loading' | 'ok' | 'denied',
+})
+
+const auxTitle = computed(() => {
+  const label =
+    ({ partner: '往来单位档案', project: '项目档案', employee: '员工档案' } as Record<string, string>)[auxDrawer.kind] ??
+    '辅助核算'
+  return `${label}${auxDrawer.name ? ` · ${auxDrawer.name}` : ''}`
+})
+
+const partnerTypeLabel = (t?: string) =>
+  (({ customer: '客户', supplier: '供应商', both: '客户兼供应商' }) as Record<string, string>)[t ?? ''] ?? t ?? '-'
+
+/** 合同插件是否可用（installed + enabled），只检测一次 */
+const contractsPluginOk = ref<boolean | null>(null)
+async function ensureContractsPlugin(): Promise<boolean> {
+  if (contractsPluginOk.value !== null) return contractsPluginOk.value
+  try {
+    const installed = await pluginApi.installed()
+    const c = (installed ?? []).find((p: any) => p.manifest?.id === 'contracts')
+    contractsPluginOk.value = Boolean(c && c.enabled !== false && !(c as any).missingDependencies?.length)
+  } catch {
+    contractsPluginOk.value = false
+  }
+  return contractsPluginOk.value
+}
+
+async function openAux(kind: 'partner' | 'project' | 'employee', id: string, name?: string) {
+  if (!id) return
+  Object.assign(auxDrawer, {
+    visible: true,
+    kind,
+    id,
+    name: name ?? '',
+    loading: true,
+    data: null,
+    partnerName: '',
+    contracts: [],
+    contractsState: 'hidden',
+  })
+  try {
+    if (kind === 'partner') {
+      auxDrawer.data = await partnerApi.detail(id)
+    } else if (kind === 'employee') {
+      auxDrawer.data = await employeeApi.detail(id)
+    } else if (kind === 'project') {
+      auxDrawer.data = await projectApi.detail(id)
+      // 项目客户 → 顺手解析往来单位名，可继续点进去
+      if (auxDrawer.data?.partnerId) {
+        partnerApi
+          .detail(auxDrawer.data.partnerId)
+          .then((p: any) => (auxDrawer.partnerName = p?.name ?? ''))
+          .catch(() => {})
+      }
+      // 关联合同（需安装 contracts 插件且有权限；否则降级为提示）
+      const pluginOk = await ensureContractsPlugin()
+      const permOk = userStore.hasPermission('contracts') || userStore.hasRole('admin')
+      if (pluginOk && permOk) {
+        auxDrawer.contractsState = 'loading'
+        try {
+          const res: any = await get('/contracts', { projectId: id, page: 1, pageSize: 50 })
+          auxDrawer.contracts = res?.list ?? res?.items ?? []
+          auxDrawer.contractsState = 'ok'
+        } catch {
+          auxDrawer.contractsState = 'denied'
+        }
+      } else if (pluginOk) {
+        auxDrawer.contractsState = 'denied'
+      }
+    }
+  } catch {
+    auxDrawer.data = null
+    ElMessage.error('档案加载失败')
+  } finally {
+    auxDrawer.loading = false
+  }
+}
+
+// ---- 关联合同原件预览（加密落盘 → 解密流式输出 → blob 内嵌查看） ----
+const contractPreview = reactive({
+  visible: false,
+  loading: false,
+  url: '',
+  title: '',
+  isPdf: false,
+})
+
+async function onAuxContractPreview(row: any) {
+  if (!row?.hasFile) return
+  contractPreview.title = `${row.code} ${row.name}${row.fileName ? ` — ${row.fileName}` : ''}`
+  contractPreview.visible = true
+  contractPreview.loading = true
+  try {
+    const res = await service.get(`/contracts/${row.id}/download`, { responseType: 'blob' })
+    const blob = res.data instanceof Blob ? res.data : new Blob([res.data])
+    const isPdf = blob.type === 'application/pdf' || /\.pdf$/i.test(row.fileName ?? '')
+    const isImage = blob.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp)$/i.test(row.fileName ?? '')
+    if (!isPdf && !isImage) {
+      contractPreview.visible = false
+      await downloadFile(`/contracts/${row.id}/download`, undefined, row.fileName || `${row.code}.pdf`)
+      ElMessage.info('该格式暂不支持在线预览，已为您下载原件')
+      return
+    }
+    contractPreview.isPdf = isPdf
+    contractPreview.url = URL.createObjectURL(blob)
+  } catch {
+    contractPreview.visible = false
+    ElMessage.error('合同原件加载失败')
+  } finally {
+    contractPreview.loading = false
+  }
+}
+
+function onContractPreviewClosed() {
+  if (contractPreview.url) {
+    URL.revokeObjectURL(contractPreview.url)
+    contractPreview.url = ''
+  }
+}
+
 function onExport() {
   const rows: any[] = []
   for (const v of list.value as any[]) {
@@ -562,5 +818,45 @@ onMounted(load)
 
 .aux-tag {
   margin-right: 4px;
+
+  &--link {
+    cursor: pointer;
+    &:hover {
+      opacity: 0.8;
+    }
+  }
+}
+
+// 辅助核算档案抽屉
+.aux-drawer__body {
+  min-height: 200px;
+}
+.aux-drawer__section-title {
+  margin: 16px 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.aux-drawer__section-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--app-text-secondary);
+}
+.aux-drawer__loading {
+  height: 120px;
+}
+.aux-drawer__hint {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+.aux-drawer__muted {
+  color: var(--app-text-secondary);
+  font-size: 12px;
+}
+.aux-contract-preview__body {
+  min-height: 200px;
 }
 </style>

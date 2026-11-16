@@ -291,6 +291,7 @@ export const projectApi = {
   list: (params?: Record<string, any>) => get<any>('/projects', params),
   options: () => get<any[]>('/projects/options'),
   ledger: () => get<any[]>('/projects/ledger'),
+  detail: (id: string) => get<any>(`/projects/${id}`),
   /** 导入合同 PDF，自动识别合同编号/金额/客户 */
   parseContract: (file: File) => {
     const form = new FormData()
@@ -368,6 +369,8 @@ export const bankStmtApi = {
   },
   list: (params?: Record<string, any>) => get<any>('/bank-stmt', params),
   summary: () => get<any>('/bank-stmt/summary'),
+  reconcile: (bankAccountId: string, endPeriod?: number) =>
+    get<any>('/bank-stmt/reconcile', { bankAccountId, endPeriod }),
   book: (id: string, data: { bizType: string; accountId: string; summary?: string; employeeId?: string; partnerId?: string }) =>
     post<any>(`/bank-stmt/${id}/book`, data),
   batchBook: () => post<any>('/bank-stmt/batch-book', {}),

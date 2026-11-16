@@ -11,7 +11,11 @@ export function readSheetGrid(buffer: Buffer, originalName: string): SheetGrid {
   if (/\.csv$/i.test(originalName) || /^text\/csv/.test(originalName)) {
     return parseCsvGrid(buffer)
   }
-  const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true })
+  // 注意：不能用 cellDates: true —— xlsx 会把日期序列号按本地时区转 Date，产生约 -8h 偏移，
+  // 导致「纯日期」单元格（如借款日期 9-29）被转成前一天 23:59，取日期时早 1 天。
+  // 保持 cellDates: false（日期以序列号 number 形式保留），由 excelDateToStr 用
+  // (serial - 25569) * 86400000 精确换算，杜绝时区偏差。
+  const wb = XLSX.read(buffer, { type: 'buffer', cellDates: false })
   const ws = wb.Sheets[wb.SheetNames[0]]
   if (!ws) return []
   return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true }) as SheetGrid
