@@ -517,6 +517,7 @@ export const reportApi = {
   expenseAnalysis: (params?: Record<string, any>) => get<any>('/reports/expense-analysis', params),
   monthlyClose: (params?: Record<string, any>) => get<any>('/reports/monthly-close', params),
   overview: (params?: Record<string, any>) => get<any>('/reports/overview', params),
+  cockpit: (params?: Record<string, any>) => get<any>('/reports/cockpit', params),
 }
 
 // ============ 插件市场 ============

@@ -91,7 +91,7 @@
                 作废
               </el-button>
               <el-button
-                v-if="voucher.status === 'draft'"
+                v-if="voucher.status !== 'cancelled'"
                 v-permission="'voucher:update'"
                 link
                 type="primary"
@@ -190,7 +190,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Download, Paperclip } from '@element-plus/icons-vue'
@@ -199,10 +199,16 @@ import service from '@/api/http'
 import { confirmDelete, ok, usePagedList } from '@/composables/useList'
 import { exportExcel } from '@/utils/export'
 import { currentPeriod, formatAmount, formatDate, voucherStatusMeta } from '@/utils/format'
+import { useUserStore } from '@/stores/user'
 import PeriodPicker from '@/components/common/PeriodPicker.vue'
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
+/** 已审核凭证改数必须走「反审核 → 改 → 重新审核」，没权限就别把人带到死胡同 */
+const canUnapprove = computed(
+  () => userStore.hasRole('admin') || userStore.hasPermission('voucher:unapprove'),
+)
 
 /**
  * 支持外部带筛选跳进来（如语音助手执行完「查看草稿凭证」）：
@@ -322,6 +328,29 @@ async function onCancel(voucher: any) {
 }
 
 async function onEdit(voucher: any) {
+  // 已审核凭证不能直接改（账簿可追溯性要求：改数必须先退出账簿）。
+  // 这里不放开限制，只把关卡前移成一次确认，避免用户找不到修改入口以为系统坏了。
+  if (voucher.status === 'approved') {
+    if (!canUnapprove.value) {
+      ElMessage.warning('已审核凭证需先反审核才能修改，当前账号没有反审核权限')
+      return
+    }
+    try {
+      await ElMessageBox.confirm(
+        `「${voucher.word} 第 ${pad(voucher.voucherNo)} 号」已审核，已审核凭证不能直接改数。请先反审核（会退出账簿与报表），改完再重新审核。`,
+        '修改已审核凭证',
+        { type: 'warning', confirmButtonText: '反审核并修改', cancelButtonText: '取消' },
+      )
+    } catch {
+      return
+    }
+    try {
+      await voucherApi.unapprove(voucher.id)
+      ElMessage.success('已反审核，修改完成后请重新审核')
+    } catch {
+      return
+    }
+  }
   router.push({ path: '/voucher/create', query: { id: voucher.id } })
 }
 

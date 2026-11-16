@@ -77,10 +77,11 @@
             <td>
               <div class="cell">
                 <el-select
-                  v-if="auxOf(entry).includes('partner')"
+                  v-if="auxOf(entry).includes('partner') || !!entry.partnerId"
                   v-model="entry.partnerId"
                   filterable
-                  placeholder="必选"
+                  clearable
+                  :placeholder="auxOf(entry).includes('partner') ? '必选' : '可选'"
                   style="width: 100%"
                 >
                   <el-option v-for="p in basicStore.partners" :key="p.id" :label="p.name" :value="p.id" />
@@ -91,10 +92,11 @@
             <td>
               <div class="cell">
                 <el-select
-                  v-if="auxOf(entry).includes('department')"
+                  v-if="auxOf(entry).includes('department') || !!entry.departmentId || taggable(entry)"
                   v-model="entry.departmentId"
                   filterable
-                  placeholder="必选"
+                  clearable
+                  :placeholder="auxOf(entry).includes('department') ? '必选' : '可选'"
                   style="width: 100%"
                 >
                   <el-option v-for="d in basicStore.departments" :key="d.id" :label="d.name" :value="d.id" />
@@ -105,10 +107,11 @@
             <td>
               <div class="cell">
                 <el-select
-                  v-if="auxOf(entry).includes('project')"
+                  v-if="auxOf(entry).includes('project') || !!entry.projectId"
                   v-model="entry.projectId"
                   filterable
-                  placeholder="必选"
+                  clearable
+                  :placeholder="auxOf(entry).includes('project') ? '必选' : '可选'"
                   style="width: 100%"
                 >
                   <el-option v-for="p in basicStore.projects" :key="p.id" :label="p.name" :value="p.id" />
@@ -119,7 +122,7 @@
             <td>
               <div class="cell">
                 <el-select
-                  v-if="auxOf(entry).includes('employee') || !!entry.employeeId"
+                  v-if="auxOf(entry).includes('employee') || !!entry.employeeId || taggable(entry)"
                   v-model="entry.employeeId"
                   filterable
                   clearable
@@ -163,7 +166,7 @@
               </div>
             </td>
             <td class="text-center">
-              <el-button link type="danger" :disabled="entries.length <= 2" @click="removeEntry(index)">
+              <el-button link type="danger" :disabled="entries.length <= 1" @click="removeEntry(index)">
                 删除
               </el-button>
             </td>
@@ -213,7 +216,7 @@
         :closable="false"
         show-icon
         class="voucher-tip"
-        title="记账规则：每张凭证至少两条分录，且借方合计必须等于贷方合计；科目若声明了辅助核算，对应的往来单位/部门/项目必须选择。"
+        title="记账规则：每张凭证至少两条分录，且借方合计必须等于贷方合计；科目声明了辅助核算的，对应往来单位/部门/项目/员工必须选择。费用、成本、收入类科目可另挂部门与员工用于按部门、按人分析（非必填）；如需强制必填，请到「设置-会计科目」勾选对应辅助核算。"
       />
     </div>
   </div>
@@ -297,6 +300,19 @@ function auxOf(entry: EntryRow): string[] {
   return acc?.auxiliaryTypes ?? []
 }
 
+/**
+ * 费用/成本/收入类科目允许「可选」挂部门与员工。
+ *
+ * 理由：按部门、按人看费用是记账的基本诉求；科目没勾选部门辅助核算时，
+ * 如果凭证里完全不给出入口，用户只能改科目设置（改完全表都变必填），
+ * 成本远大于收益。后端只对「科目声明过」的维度做强校验，没有声明时
+ * 允许带值，因此这里放开为可选不影响借贷平衡与账簿口径。
+ */
+function taggable(entry: EntryRow): boolean {
+  const acc = accountOptions.value.find((a) => a.id === entry.accountId)
+  return acc?.category === 'profit' || acc?.category === 'cost'
+}
+
 function onAccountChange(entry: EntryRow) {
   entry.partnerId = ''
   entry.departmentId = ''
@@ -332,8 +348,10 @@ function addEntry() {
 }
 
 function removeEntry(index: number) {
-  if (entries.value.length <= 2) {
-    ElMessage.warning('记账凭证至少需要两条分录')
+  // 编辑时可以删到只剩一行：先删错的、再补正确的是最常见的改法。
+  // 「至少两条有效分录」在保存时由 validate() 兜底（空行不计入）。
+  if (entries.value.length <= 1) {
+    ElMessage.warning('至少保留一行分录；凭证保存时需要两条及以上有效分录')
     return
   }
   entries.value.splice(index, 1)
@@ -457,6 +475,8 @@ async function save(approveNow: boolean) {
 
 async function loadVoucherDetail(id: string) {
   const detail = await voucherApi.detail(id)
+  // 编辑时凭证号是既成事实，不能显示「下一个可用号」（那是新建凭证的语义）
+  nextNo.value = detail.voucherNo ?? null
   form.word = detail.word
   form.voucherDate = String(detail.voucherDate).slice(0, 10)
   form.attachments = detail.attachments ?? 0
