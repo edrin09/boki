@@ -172,17 +172,16 @@
         </div>
       </div>
 
-      <div v-if="list.length > 0" class="page-pagination">
-        <el-pagination
-          v-model:current-page="query.page"
-          v-model:page-size="query.pageSize"
-          :page-sizes="[10, 20, 50]"
-          :total="total"
-          layout="total, sizes, prev, pager, next"
-          @current-change="load"
-          @size-change="handleSize"
-        />
-      </div>
+      <AppPagination
+        v-if="list.length > 0"
+        v-model:page="query.page"
+        v-model:page-size="query.pageSize"
+        :total="total"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next"
+        @change="load"
+        @size-change="handleSize"
+      />
     </div>
 
     <!-- 原始票据预览（复用票据预览逻辑：PDF 用 iframe，图片用 el-image） -->
@@ -198,7 +197,7 @@
     </el-dialog>
 
     <!-- 辅助核算档案抽屉：点分录上的往来单位 / 项目 / 员工标签进入 -->
-    <el-drawer v-model="auxDrawer.visible" :title="auxTitle" size="580px" destroy-on-close>
+    <el-drawer v-model="auxDrawer.visible" :title="auxTitle" size="820px" destroy-on-close>
       <div v-loading="auxDrawer.loading" class="aux-drawer__body">
         <!-- 往来单位（公司）档案 -->
         <template v-if="auxDrawer.kind === 'partner' && auxDrawer.data">
@@ -268,7 +267,7 @@
               description="该项目暂无登记的合同"
               :image-size="60"
             />
-            <el-table v-else :data="auxDrawer.contracts" size="small" border>
+            <el-table v-else :data="auxPage(auxDrawer.contracts, 'contracts')" size="small" border>
               <el-table-column prop="code" label="编码" width="80" />
               <el-table-column prop="name" label="合同名称" min-width="140" show-overflow-tooltip />
               <el-table-column label="合同金额" width="100" align="right">
@@ -289,11 +288,273 @@
                 </template>
               </el-table-column>
             </el-table>
+            <AppPagination
+              v-model:page="auxPager.contracts.page"
+              v-model:page-size="auxPager.contracts.pageSize"
+              :total="auxDrawer.contracts.length"
+              :page-sizes="AUX_PAGE_SIZES"
+              layout="total, sizes, prev, pager, next"
+              size="small"
+              align="left"
+              hide-on-single-page
+              class="aux-pager"
+            />
           </template>
           <div v-else-if="auxDrawer.contractsState === 'denied'" class="aux-drawer__hint">
             当前角色无合同管理权限或未安装合同插件，无法显示关联合同
           </div>
         </template>
+
+        <!-- ===== 历史业务：光看档案没用，要看这家单位 / 这个人发生过什么 ===== -->
+        <div v-if="auxDrawer.kind" class="aux-history">
+          <div class="aux-drawer__section-title">
+            往来汇总
+            <span class="aux-drawer__section-sub">与本档案相关的全部业务单据</span>
+          </div>
+          <div class="aux-summary">
+            <span class="aux-summary__item">
+              相关凭证 <b>{{ auxDrawer.history.vouchers.length }}</b> 张
+              <em>借 {{ formatAmount(auxDrawer.history.totals.debit) }} / 贷 {{ formatAmount(auxDrawer.history.totals.credit) }}</em>
+            </span>
+            <span v-if="auxDrawer.kind !== 'employee'" class="aux-summary__item">
+              收款 <b>{{ formatAmount(auxFlowTotals.receipt) }}</b>
+              <em>{{ auxFlowTotals.receiptCount }} 笔</em>
+            </span>
+            <span v-if="auxDrawer.kind !== 'employee'" class="aux-summary__item">
+              付款 <b>{{ formatAmount(auxFlowTotals.payment) }}</b>
+              <em>{{ auxFlowTotals.paymentCount }} 笔</em>
+            </span>
+            <span v-if="auxDrawer.kind === 'employee'" class="aux-summary__item">
+              借款 <b>{{ formatAmount(auxLoanTotals.amount) }}</b>
+              <em>未还 {{ formatAmount(auxLoanTotals.outstanding) }}</em>
+            </span>
+            <span v-if="auxDrawer.kind === 'employee'" class="aux-summary__item">
+              报销 <b>{{ formatAmount(auxClaimTotal) }}</b>
+              <em>{{ auxDrawer.history.claims.length }} 笔</em>
+            </span>
+          </div>
+
+          <!-- 收付款单（往来单位 / 项目） -->
+          <template v-if="auxDrawer.kind !== 'employee'">
+            <div class="aux-drawer__section-title">收付款单 <span class="aux-drawer__section-sub">来自「现金银行」，点金额看摘要</span></div>
+            <el-empty v-if="auxDrawer.history.cashFlows.length === 0" description="暂无收付款单据" :image-size="52" />
+            <el-table v-else :data="auxPage(auxDrawer.history.cashFlows, 'cashFlows')" size="small" border>
+              <el-table-column prop="bizDate" label="日期" width="100" />
+              <el-table-column label="类型" width="86">
+                <template #default="{ row }">
+                  <el-tag :type="AUX_BIZ_TAG[row.bizType] ?? 'info'" size="small">
+                    {{ AUX_BIZ_TYPES[row.bizType] ?? row.bizType }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="金额" width="110" align="right">
+                <template #default="{ row }">{{ formatAmount(row.amount) }}</template>
+              </el-table-column>
+              <el-table-column prop="summary" label="摘要" min-width="150" show-overflow-tooltip />
+              <el-table-column prop="bankAccountName" label="资金账户" min-width="110" show-overflow-tooltip />
+              <el-table-column label="凭证" width="72" align="center">
+                <template #default="{ row }">
+                  <el-tag v-if="row.voucherId" type="success" size="small">已生成</el-tag>
+                  <span v-else class="aux-drawer__muted">-</span>
+                </template>
+              </el-table-column>
+            </el-table>
+            <AppPagination
+              v-if="auxDrawer.history.cashFlows.length > 0"
+              v-model:page="auxPager.cashFlows.page"
+              v-model:page-size="auxPager.cashFlows.pageSize"
+              :total="auxDrawer.history.cashFlows.length"
+              :page-sizes="AUX_PAGE_SIZES"
+              layout="total, sizes, prev, pager, next"
+              size="small"
+              align="left"
+              hide-on-single-page
+              class="aux-pager"
+            />
+          </template>
+
+          <!-- 借款单（员工） -->
+          <template v-if="auxDrawer.kind === 'employee'">
+            <div class="aux-drawer__section-title">借款单 <span class="aux-drawer__section-sub">备用金 / 差旅费借款</span></div>
+            <el-empty v-if="auxDrawer.history.loans.length === 0" description="暂无借款单" :image-size="52" />
+            <el-table v-else :data="auxPage(auxDrawer.history.loans, 'loans')" size="small" border>
+              <el-table-column prop="loanNo" label="单号" width="110" />
+              <el-table-column prop="loanDate" label="日期" width="100" />
+              <el-table-column label="借款金额" width="100" align="right">
+                <template #default="{ row }">{{ formatAmount(row.amount) }}</template>
+              </el-table-column>
+              <el-table-column label="已还 / 未还" width="130" align="right">
+                <template #default="{ row }">
+                  {{ formatAmount(row.repaidAmount) }} / <b>{{ formatAmount(row.outstanding) }}</b>
+                </template>
+              </el-table-column>
+              <el-table-column prop="reason" label="事由" min-width="120" show-overflow-tooltip />
+              <el-table-column label="状态" width="80" align="center">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="AUX_STATUS_TAG[row.status] ?? 'info'">
+                    {{ AUX_LOAN_STATUS[row.status] ?? row.status }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+            <AppPagination
+              v-if="auxDrawer.history.loans.length > 0"
+              v-model:page="auxPager.loans.page"
+              v-model:page-size="auxPager.loans.pageSize"
+              :total="auxDrawer.history.loans.length"
+              :page-sizes="AUX_PAGE_SIZES"
+              layout="total, sizes, prev, pager, next"
+              size="small"
+              align="left"
+              hide-on-single-page
+              class="aux-pager"
+            />
+          </template>
+
+          <!-- 报销单（员工） -->
+          <template v-if="auxDrawer.kind === 'employee'">
+            <div class="aux-drawer__section-title">报销单 <span class="aux-drawer__section-sub">含冲抵借款的报销</span></div>
+            <el-empty v-if="auxDrawer.history.claims.length === 0" description="暂无报销单" :image-size="52" />
+            <el-table v-else :data="auxPage(auxDrawer.history.claims, 'claims')" size="small" border>
+              <el-table-column prop="claimNo" label="单号" width="110" />
+              <el-table-column prop="claimDate" label="日期" width="100" />
+              <el-table-column label="金额" width="100" align="right">
+                <template #default="{ row }">{{ formatAmount(row.amount) }}</template>
+              </el-table-column>
+              <el-table-column label="方式" width="130" show-overflow-tooltip>
+                <template #default="{ row }">
+                  {{ row.claimType === 'loan_offset' ? `冲抵借款${row.loanNo ? ` ${row.loanNo}` : ''}` : '直接付款' }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
+              <el-table-column label="状态" width="80" align="center">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="AUX_STATUS_TAG[row.status] ?? 'info'">
+                    {{ AUX_CLAIM_STATUS[row.status] ?? row.status }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+            <AppPagination
+              v-if="auxDrawer.history.claims.length > 0"
+              v-model:page="auxPager.claims.page"
+              v-model:page-size="auxPager.claims.pageSize"
+              :total="auxDrawer.history.claims.length"
+              :page-sizes="AUX_PAGE_SIZES"
+              layout="total, sizes, prev, pager, next"
+              size="small"
+              align="left"
+              hide-on-single-page
+              class="aux-pager"
+            />
+          </template>
+
+          <!-- 工资发放（员工） -->
+          <template v-if="auxDrawer.kind === 'employee' && auxDrawer.history.payrolls.length > 0">
+            <div class="aux-drawer__section-title">工资发放 <span class="aux-drawer__section-sub">应发 / 实发</span></div>
+            <el-table :data="auxPage(auxDrawer.history.payrolls, 'payrolls')" size="small" border>
+              <el-table-column label="工资期间" width="100">
+                <template #default="{ row }">{{ periodLabel(row.period) }}</template>
+              </el-table-column>
+              <el-table-column prop="payDate" label="发放日期" width="100" />
+              <el-table-column label="应发" width="100" align="right">
+                <template #default="{ row }">{{ formatAmount(row.gross) }}</template>
+              </el-table-column>
+              <el-table-column label="借款扣回" width="100" align="right">
+                <template #default="{ row }">{{ formatAmount(row.loanDeduct) }}</template>
+              </el-table-column>
+              <el-table-column label="实发" width="110" align="right">
+                <template #default="{ row }"><b>{{ formatAmount(row.net) }}</b></template>
+              </el-table-column>
+              <el-table-column label="状态" width="80" align="center">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="AUX_STATUS_TAG[row.status] ?? 'info'">
+                    {{ AUX_PAYROLL_STATUS[row.status] ?? row.status }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+            <AppPagination
+              v-model:page="auxPager.payrolls.page"
+              v-model:page-size="auxPager.payrolls.pageSize"
+              :total="auxDrawer.history.payrolls.length"
+              :page-sizes="AUX_PAGE_SIZES"
+              layout="total, sizes, prev, pager, next"
+              size="small"
+              align="left"
+              hide-on-single-page
+              class="aux-pager"
+            />
+          </template>
+
+          <!-- 相关凭证（展开看分录） -->
+          <div class="aux-drawer__section-title">
+            相关凭证
+            <span class="aux-drawer__section-sub">点行首箭头展开该凭证的全部分录</span>
+          </div>
+          <el-empty v-if="auxDrawer.history.vouchers.length === 0" description="暂无相关凭证" :image-size="52" />
+          <el-table
+            v-else
+            :data="auxPage(auxDrawer.history.vouchers, 'vouchers')"
+            row-key="id"
+            size="small"
+            border
+          >
+            <el-table-column type="expand">
+              <template #default="{ row }">
+                <div class="aux-voucher-entries">
+                  <div v-for="(e, i) in row.entries" :key="i" class="aux-voucher-entries__line">
+                    <span class="aux-voucher-entries__summary">{{ e.summary || '-' }}</span>
+                    <span class="aux-voucher-entries__account">{{ e.accountCode }} {{ e.accountName }}</span>
+                    <span class="aux-voucher-entries__amount">
+                      <em v-if="e.debit">借 {{ formatAmount(e.debit) }}</em>
+                      <em v-if="e.credit">贷 {{ formatAmount(e.credit) }}</em>
+                    </span>
+                  </div>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="voucherDate" label="日期" width="100" />
+            <el-table-column label="凭证号" width="150">
+              <template #default="{ row }">
+                <span>{{ row.word }}-{{ pad(row.voucherNo) }}</span>
+                <el-tag v-if="row.isReversal" type="danger" size="small" class="aux-reversal-tag">红冲</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="摘要" min-width="150" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.entries[0]?.summary || row.remark || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="借方" width="105" align="right">
+              <template #default="{ row }">{{ row.debit ? formatAmount(row.debit) : '' }}</template>
+            </el-table-column>
+            <el-table-column label="贷方" width="105" align="right">
+              <template #default="{ row }">{{ row.credit ? formatAmount(row.credit) : '' }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="76" align="center">
+              <template #default="{ row }">
+                <el-tag size="small" :type="voucherStatusMeta(row.status).type">
+                  {{ voucherStatusMeta(row.status).label }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+          <AppPagination
+            v-if="auxDrawer.history.vouchers.length > 0"
+            v-model:page="auxPager.vouchers.page"
+            v-model:page-size="auxPager.vouchers.pageSize"
+            :total="auxDrawer.history.vouchers.length"
+            :page-sizes="AUX_PAGE_SIZES"
+            layout="total, sizes, prev, pager, next"
+            size="small"
+            align="left"
+            hide-on-single-page
+            class="aux-pager"
+          />
+
+          <div v-if="auxDrawer.historyState === 'denied'" class="aux-drawer__hint">
+            历史单据加载失败（可能是权限不足），档案信息仍可查看
+          </div>
+        </div>
       </div>
     </el-drawer>
 
@@ -324,6 +585,7 @@ import { confirmDelete, ok, usePagedList } from '@/composables/useList'
 import { exportExcel } from '@/utils/export'
 import { currentPeriod, formatAmount, formatDate, voucherStatusMeta } from '@/utils/format'
 import { useUserStore } from '@/stores/user'
+import AppPagination from '@/components/common/AppPagination.vue'
 import PeriodPicker from '@/components/common/PeriodPicker.vue'
 
 const router = useRouter()
@@ -560,6 +822,56 @@ function onReceiptClosed() {
 }
 
 // ============ 辅助核算档案抽屉：往来单位 / 项目（含关联合同）/ 员工 ============
+/** 收付款单类型（与现金银行插件保持一致） */
+const AUX_BIZ_TYPES: Record<string, string> = {
+  receipt: '收款单',
+  payment: '付款单',
+  transfer: '转账单',
+  expense: '费用报销',
+  income: '营业收入',
+}
+const AUX_BIZ_TAG: Record<string, string> = {
+  receipt: 'success',
+  payment: 'warning',
+  transfer: 'primary',
+  expense: 'danger',
+  income: 'info',
+}
+const AUX_STATUS_TAG: Record<string, string> = {
+  draft: 'info',
+  approved: 'success',
+  paid: 'success',
+  repaid: 'success',
+  rejected: 'danger',
+  cancelled: 'danger',
+}
+const AUX_LOAN_STATUS: Record<string, string> = {
+  draft: '草稿',
+  approved: '已放款',
+  repaid: '已还清',
+  rejected: '已驳回',
+}
+const AUX_CLAIM_STATUS: Record<string, string> = {
+  draft: '草稿',
+  approved: '已审核',
+  paid: '已付款',
+  rejected: '已驳回',
+}
+const AUX_PAYROLL_STATUS: Record<string, string> = {
+  draft: '草稿',
+  approved: '已计提',
+  paid: '已发放',
+}
+
+const emptyAuxHistory = () => ({
+  totals: { debit: 0, credit: 0, net: 0 },
+  vouchers: [] as any[],
+  cashFlows: [] as any[],
+  loans: [] as any[],
+  claims: [] as any[],
+  payrolls: [] as any[],
+})
+
 const auxDrawer = reactive({
   visible: false,
   kind: '' as 'partner' | 'project' | 'employee' | '',
@@ -572,7 +884,72 @@ const auxDrawer = reactive({
   /** 关联合同（contracts 插件） */
   contracts: [] as any[],
   contractsState: 'hidden' as 'hidden' | 'loading' | 'ok' | 'denied',
+  /** 历史单据：凭证 / 收付款单 / 借款 / 报销 / 工资 */
+  history: emptyAuxHistory() as ReturnType<typeof emptyAuxHistory>,
+  historyState: 'hidden' as 'hidden' | 'loading' | 'ok' | 'denied',
 })
+
+const periodLabel = (p?: number) => (p ? `${Math.floor(p / 100)}年${p % 100}月` : '-')
+
+/**
+ * 抽屉内各列表的本地分页状态。
+ *
+ * 历史单据是一次性聚合返回的（单档案量级有限），所以在内存里切片，
+ * 不额外打接口；每页 10 条，切到别的档案时统一回到第 1 页。
+ */
+const AUX_PAGE_SIZES = [10, 20, 50]
+const auxPager = reactive({
+  contracts: { page: 1, pageSize: 10 },
+  cashFlows: { page: 1, pageSize: 10 },
+  loans: { page: 1, pageSize: 10 },
+  claims: { page: 1, pageSize: 10 },
+  payrolls: { page: 1, pageSize: 10 },
+  vouchers: { page: 1, pageSize: 10 },
+})
+type AuxPagerKey = keyof typeof auxPager
+
+/** 按当前分页状态切出当前页数据（模板里直接调用） */
+function auxPage<T>(list: T[] | undefined, key: AuxPagerKey): T[] {
+  const { page, pageSize } = auxPager[key]
+  const rows = list ?? []
+  const start = (page - 1) * pageSize
+  return rows.slice(start, start + pageSize)
+}
+
+/** 切换档案 / 重新加载时回到第 1 页，避免停在越界页码上看空白表 */
+function resetAuxPager(): void {
+  for (const pager of Object.values(auxPager)) pager.page = 1
+}
+
+/** 收付款单小计：收款 / 付款分别累计笔数与金额 */
+const auxFlowTotals = computed(() => {
+  const t = { receipt: 0, payment: 0, receiptCount: 0, paymentCount: 0 }
+  for (const f of auxDrawer.history.cashFlows) {
+    const amount = Number(f.amount) || 0
+    if (f.bizType === 'receipt' || f.bizType === 'income') {
+      t.receipt += amount
+      t.receiptCount += 1
+    } else if (f.bizType === 'payment' || f.bizType === 'expense') {
+      t.payment += amount
+      t.paymentCount += 1
+    }
+  }
+  return t
+})
+
+const auxLoanTotals = computed(() => {
+  let amount = 0
+  let outstanding = 0
+  for (const l of auxDrawer.history.loans) {
+    amount += Number(l.amount) || 0
+    outstanding += Number(l.outstanding) || 0
+  }
+  return { amount, outstanding }
+})
+
+const auxClaimTotal = computed(() =>
+  auxDrawer.history.claims.reduce((s: number, c: any) => s + (Number(c.amount) || 0), 0),
+)
 
 const auxTitle = computed(() => {
   const label =
@@ -600,6 +977,7 @@ async function ensureContractsPlugin(): Promise<boolean> {
 
 async function openAux(kind: 'partner' | 'project' | 'employee', id: string, name?: string) {
   if (!id) return
+  resetAuxPager()
   Object.assign(auxDrawer, {
     visible: true,
     kind,
@@ -610,7 +988,11 @@ async function openAux(kind: 'partner' | 'project' | 'employee', id: string, nam
     partnerName: '',
     contracts: [],
     contractsState: 'hidden',
+    history: emptyAuxHistory(),
+    historyState: 'hidden',
   })
+  // 档案信息与历史单据互不阻塞：档案先到先看，历史单据并行加载
+  const historyTask = loadAuxHistory(kind, id)
   try {
     if (kind === 'partner') {
       auxDrawer.data = await partnerApi.detail(id)
@@ -646,6 +1028,23 @@ async function openAux(kind: 'partner' | 'project' | 'employee', id: string, nam
     ElMessage.error('档案加载失败')
   } finally {
     auxDrawer.loading = false
+  }
+  await historyTask
+}
+
+/**
+ * 历史单据：这个单位 / 这个人 / 这个项目名下发生过的凭证、收付款单、
+ * 借款、报销、工资。内核一次聚合返回；失败只降级提示，不影响档案展示。
+ */
+async function loadAuxHistory(kind: 'partner' | 'project' | 'employee', id: string) {
+  auxDrawer.historyState = 'loading'
+  try {
+    const res: any = await voucherApi.auxHistory(kind, id)
+    auxDrawer.history = { ...emptyAuxHistory(), ...(res ?? {}) }
+    auxDrawer.historyState = 'ok'
+  } catch {
+    auxDrawer.history = emptyAuxHistory()
+    auxDrawer.historyState = 'denied'
   }
 }
 
@@ -831,6 +1230,10 @@ onMounted(load)
 .aux-drawer__body {
   min-height: 200px;
 }
+// 抽屉内分页条贴紧所属表格（全局 .page-pagination 默认 12px 间距）
+.page-pagination.aux-pager {
+  margin-top: 6px;
+}
 .aux-drawer__section-title {
   margin: 16px 0 8px;
   font-size: 14px;
@@ -855,6 +1258,87 @@ onMounted(load)
 .aux-drawer__muted {
   color: var(--app-text-secondary);
   font-size: 12px;
+}
+
+// 历史业务汇总条
+.aux-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 8px 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 4px;
+  background: #f8fafc;
+  font-size: 12px;
+  color: var(--app-text-secondary);
+
+  &__item {
+    b {
+      color: #111827;
+      font-size: 13px;
+      margin: 0 2px;
+    }
+
+    em {
+      font-style: normal;
+      color: var(--app-text-secondary);
+
+      // 模板里 </b> 与 <em> 之间的换行会被 Vue 压缩，靠 CSS 补分隔，避免「14,137.604 笔」黏连
+      &::before {
+        content: '·';
+        margin: 0 6px 0 4px;
+      }
+    }
+  }
+}
+
+// 展开后的凭证分录
+.aux-reversal-tag {
+  margin-left: 4px;
+}
+.aux-voucher-entries {
+  padding: 2px 16px 6px 48px;
+  background: #fafafa;
+
+  &__line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 200px 190px;
+    gap: 10px;
+    align-items: baseline;
+    padding: 3px 0;
+    font-size: 12px;
+    border-bottom: 1px dashed #eef0f3;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__summary {
+    color: #374151;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__account {
+    color: var(--app-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__amount {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    font-variant-numeric: tabular-nums;
+    color: #1f2937;
+
+    em {
+      font-style: normal;
+    }
+  }
 }
 .aux-contract-preview__body {
   min-height: 200px;

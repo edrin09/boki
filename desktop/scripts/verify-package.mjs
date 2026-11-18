@@ -48,6 +48,16 @@ function check(name, ok, detail = '') {
   }
 }
 
+/**
+ * 警告项：计入输出但不影响退出码。
+ *
+ * 用于「可选组件不在本机」这类情形——例如票据冒烟脚本只存在于打包机，
+ * 不该让整条打包流水线红掉；但它同样不该被悄悄吞掉，必须留在输出里。
+ */
+function warn(name, detail = '') {
+  console.log(`  [警告] ${name}${detail ? ` — ${detail}` : ''}`)
+}
+
 function request(urlPath, { method = 'GET', body, token } = {}) {
   return new Promise((resolve) => {
     const payload = body ? JSON.stringify(body) : null
@@ -381,18 +391,22 @@ async function main() {
     // 旧路径保留兜底，两处都没有时该项降级为警告而非失败。
     const receiptsTest = path.join(desktopDir, 'scripts', 'receipts-verify.mjs')
     const receiptsTestLegacy = path.join(repoRoot, 'backend', 'test', 'receipts-verify.mjs')
-    if (fs.existsSync(receiptsTest)) {
-      const result = spawnSync(process.execPath, [receiptsTest, BASE], { encoding: 'utf8' })
+    const receiptsTestPath = fs.existsSync(receiptsTest)
+      ? receiptsTest
+      : fs.existsSync(receiptsTestLegacy)
+        ? receiptsTestLegacy
+        : null
+    if (receiptsTestPath) {
+      const result = spawnSync(process.execPath, [receiptsTestPath, BASE], { encoding: 'utf8' })
       const output = `${result.stdout || ''}${result.stderr || ''}`
       const tail = output.split('\n').filter((l) => /通过|失败|PASS|FAIL|✓|✗/.test(l)).slice(-6).join('\n')
       check('票据上传识别端到端', result.status === 0, tail || `退出码 ${result.status}`)
-    } else if (fs.existsSync(receiptsTestLegacy)) {
-      const result = spawnSync(process.execPath, [receiptsTestLegacy, BASE], { encoding: 'utf8' })
-      const output = `${result.stdout || ''}${result.stderr || ''}`
-      const tail = output.split('\n').filter((l) => /通过|失败|PASS|FAIL|✓|✗/.test(l)).slice(-6).join('\n')
-      check('票据上传识别端到端', result.status === 0, tail || `退出码 ${result.status}`)
+      if (result.status !== 0) {
+        console.log('--- 票据验证输出 ---\n' + output.slice(-2000))
+      }
     } else {
-      check('票据上传识别端到端', false, `未找到 ${receiptsTest}（也未找到旧路径 ${receiptsTestLegacy}）`)
+      // 脚本不在本机（如换台机器打包）→ 只警告，不让整条流水线失败
+      warn('票据上传识别端到端', `未找到 ${receiptsTest}（也未找到旧路径 ${receiptsTestLegacy}），本项跳过`)
     }
   } finally {
     await stop()

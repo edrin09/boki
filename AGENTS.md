@@ -1,7 +1,5 @@
 # BOKI 开源财务软件
 
-单品牌 BOKI，内核 AGPL-3.0 + 官方插件 Apache-2.0。单体仓库：`backend`（NestJS + TypeORM + SQLite）、`frontend`（Vue3 + Element Plus + Vite）、`desktop`（Electron，仅本地不入库）、`boki-market`（远程插件市场 + 14 个官方插件源码）、`website`/`docs`/`brand`（本地维护）。
-
 ## 环境
 - **开发环境**：`D:\wwwroot\financial`（本仓库，改代码只在这里）。
 - **生产环境**：`C:\ProgramData\BOKI`，含 `config.json`、`data`（SQLite 主库 + backup）、`logs`、`plugins`、`vault.key`。**禁止在开发调试时写入或覆盖该目录**；只有发布安装包后由用户实际运行才会用到。
@@ -13,6 +11,8 @@
 3. 插件唯一来源是远程市场：客户端不随包任何插件、无本地插件目录，缺 `PLUGIN_MARKET_URL`/`PLUGIN_MARKET_PUBLIC_KEYS` 一律报错，不加兜底。
 4. 插件包禁止 import 内核组件（会把 AppLayout 等拖进产物）；同一模块类不得在两个父模块重复导入。
 5. 数据访问走实体/仓库；改表结构与线上对齐。**恢复主库必须走 `backend/src/vault/pending-restore.ts` 的启动期换文件链路**，运行期不得直接 copy 覆盖主库（WAL 残留会导致库损坏）；恢复前安全备份用 `createBackupSnapshot`（VACUUM INTO）。
+6. 没有明说：提交代码，不进行提交代码
+7. 每个任务完成后，删除测试、调试的代码和数据
 
 ## 业务数据约定（财务口径，记账/对账必读）
 - **唯一权威数据源 = 银行对账单**。生产账套「西安市未央区鹏云智码软件开发部」公户为**兴业银行（尾号6452）**，全量流水以此为准；凭证日期一律对齐银行流水**实际到账/付款日**，不按开票日、人为录入日。

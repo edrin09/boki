@@ -336,6 +336,9 @@ export const voucherApi = {
     get<Array<{ id: string; code: string; name: string; departmentName?: string | null }>>(
       '/vouchers/employee-options',
     ),
+  /** 辅助核算历史：该往来单位 / 员工 / 项目名下的凭证、收付款单、借款、报销、工资 */
+  auxHistory: (kind: 'partner' | 'employee' | 'project', id: string) =>
+    get<any>('/vouchers/aux-history', { kind, id }),
 }
 
 // ============ 期末结转 ============

@@ -7,6 +7,7 @@ import { Partner } from '../../entities/partner.entity'
 import { Department } from '../../entities/department.entity'
 import { Project } from '../../entities/project.entity'
 import { CashFlow } from '../../entities/business.entity'
+import { ExpenseClaim, Loan, Payroll, PayrollItem } from '../../entities/hr.entity'
 import { BankAccount } from '../../entities/bank-account.entity'
 import { VouchersService } from './vouchers.service'
 import { VouchersController } from './vouchers.controller'
@@ -22,6 +23,10 @@ import { VouchersController } from './vouchers.controller'
       Project,
       CashFlow,
       BankAccount,
+      Loan,
+      ExpenseClaim,
+      Payroll,
+      PayrollItem,
     ]),
   ],
   controllers: [VouchersController],

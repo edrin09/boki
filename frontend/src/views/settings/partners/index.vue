@@ -56,17 +56,14 @@
         </el-table-column>
       </el-table>
 
-      <div class="page-pagination">
-        <el-pagination
-          v-model:current-page="query.page"
-          v-model:page-size="query.pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          :total="total"
-          layout="total, sizes, prev, pager, next, jumper"
-          @current-change="load"
-          @size-change="handleSize"
-        />
-      </div>
+      <AppPagination
+        v-model:page="query.page"
+        v-model:page-size="query.pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="total"
+        @change="load"
+        @size-change="handleSize"
+      />
     </div>
 
     <el-dialog
@@ -174,6 +171,7 @@ import { exportExcel } from '@/utils/export'
 import { useBasicStore } from '@/stores/basic'
 import OcrUpload from '@/components/OcrUpload/index.vue'
 import BatchDialog from '@/components/OcrUpload/BatchDialog.vue'
+import AppPagination from '@/components/common/AppPagination.vue'
 
 const basicStore = useBasicStore()
 

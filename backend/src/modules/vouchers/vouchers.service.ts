@@ -11,11 +11,18 @@ import { Account } from '../../entities/account.entity'
 import { Partner } from '../../entities/partner.entity'
 import { Department } from '../../entities/department.entity'
 import { Project } from '../../entities/project.entity'
-import { Employee } from '../../entities/hr.entity'
+import {
+  Employee,
+  ExpenseClaim,
+  Loan,
+  Payroll,
+  PayrollItem,
+} from '../../entities/hr.entity'
 import { CashFlow } from '../../entities/business.entity'
 import { BankAccount } from '../../entities/bank-account.entity'
 import { ReceiptStatus, CashBankBizType, VoucherSource, VoucherStatus } from '../../common/enums'
 import { toCents, fromCents } from '../../common/utils/money.util'
+import { composeCashSummary, isGenericSummary } from '../../common/utils/cash-summary.util'
 import { toPeriod } from '../../common/utils/date.util'
 import { recoverFilename } from '../../common/utils/filename.util'
 import { CompanyScopedRepository } from '../../common/company/company.repository'
@@ -54,6 +61,10 @@ export class VouchersService {
     @InjectCompanyRepo(Receipt) private readonly receiptRepo: CompanyScopedRepository<Receipt>,
     @InjectCompanyRepo(CashFlow) private readonly cashFlowRepo: CompanyScopedRepository<CashFlow>,
     @InjectCompanyRepo(BankAccount) private readonly bankAccountRepo: CompanyScopedRepository<BankAccount>,
+    @InjectCompanyRepo(Loan) private readonly loanRepo: CompanyScopedRepository<Loan>,
+    @InjectCompanyRepo(ExpenseClaim) private readonly claimRepo: CompanyScopedRepository<ExpenseClaim>,
+    @InjectCompanyRepo(Payroll) private readonly payrollRepo: CompanyScopedRepository<Payroll>,
+    @InjectCompanyRepo(PayrollItem) private readonly payrollItemRepo: CompanyScopedRepository<PayrollItem>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -268,6 +279,179 @@ export class VouchersService {
       name: e.name,
       departmentName: e.departmentId ? (deptMap.get(e.departmentId) ?? null) : null,
     }))
+  }
+
+  // ==================== 辅助核算历史 ====================
+
+  /**
+   * 辅助核算档案的「往来历史」聚合。
+   *
+   * 凭证列表里点分录上的往来单位 / 员工 / 项目标签，光有档案信息（电话、税号）
+   * 没有业务价值；用户真正要看的是这家单位、这个人历史上发生过哪些单据。
+   * 这里一次把「相关凭证明细 + 收付款单 + 借款单 + 报销单 + 工资记录」聚合返回，
+   * 避免前端为了一个抽屉连打四五个插件接口、还要各自处理权限降级。
+   *
+   * 纯只读聚合，不写库、不生成凭证。
+   */
+  async auxHistory(kind: string, id: string): Promise<any> {
+    if (!id) throw new BadRequestException('缺少档案 ID')
+    const rule: Record<string, { entryCol: 'partnerId' | 'employeeId' | 'projectId'; flowCol?: 'partnerId' | 'projectId' }> = {
+      partner: { entryCol: 'partnerId', flowCol: 'partnerId' },
+      employee: { entryCol: 'employeeId' },
+      project: { entryCol: 'projectId', flowCol: 'projectId' },
+    }
+    const conf = rule[kind]
+    if (!conf) throw new BadRequestException('不支持的辅助核算类型')
+
+    const round2 = (n: number) => Number((Number(n) || 0).toFixed(2))
+
+    // ---- 1. 相关凭证明细（按凭证归集） ----
+    const entries = await this.entryRepo.find({
+      where: { [conf.entryCol]: id } as any,
+      order: { sort: 'ASC' } as any,
+    })
+    const voucherIds = Array.from(new Set(entries.map((e) => e.voucherId)))
+    const vouchers = voucherIds.length
+      ? await this.voucherRepo.find({ where: { id: In(voucherIds) } })
+      : []
+    const voucherMap = new Map(vouchers.map((v) => [v.id, v]))
+
+    const grouped = new Map<string, any>()
+    for (const e of entries) {
+      const v = voucherMap.get(e.voucherId)
+      // 期末结转损益是系统按损益类科目自动生成的，不是这家单位 / 这个人的业务，
+      // 混在历史里只会让人以为「这个月又跟对方发生了一笔」
+      if (!v || v.sourceType === VoucherSource.CLOSING) continue
+      let item = grouped.get(v.id)
+      if (!item) {
+        item = {
+          id: v.id,
+          voucherDate: v.voucherDate,
+          word: v.word,
+          voucherNo: v.voucherNo,
+          status: v.status,
+          isReversal: Boolean(v.isReversal),
+          remark: v.remark ?? '',
+          debit: 0,
+          credit: 0,
+          entries: [],
+        }
+        grouped.set(v.id, item)
+      }
+      const debit = Number(e.debit) || 0
+      const credit = Number(e.credit) || 0
+      item.debit = round2(item.debit + debit)
+      item.credit = round2(item.credit + credit)
+      item.entries.push({
+        summary: e.summary,
+        accountCode: e.accountCode,
+        accountName: e.accountName,
+        debit,
+        credit,
+      })
+    }
+    const voucherList = Array.from(grouped.values()).sort((a, b) =>
+      a.voucherDate === b.voucherDate ? b.voucherNo - a.voucherNo : a.voucherDate < b.voucherDate ? 1 : -1,
+    )
+    const totalDebit = round2(voucherList.reduce((s, v) => s + v.debit, 0))
+    const totalCredit = round2(voucherList.reduce((s, v) => s + v.credit, 0))
+
+    // ---- 2. 收付款单据（现金银行流水，往来单位 / 项目维度才有） ----
+    let cashFlows: any[] = []
+    if (conf.flowCol) {
+      const rows = await this.cashFlowRepo.find({ where: { [conf.flowCol]: id } as any })
+      cashFlows = rows
+        .map((r) => ({
+          id: r.id,
+          bizDate: r.bizDate,
+          bizType: r.bizType,
+          amount: Number(r.amount) || 0,
+          summary: r.summary ?? '',
+          remark: r.remark ?? '',
+          bankAccountName: r.bankAccountName ?? '',
+          accountName: r.accountName ?? '',
+          voucherId: r.voucherId ?? null,
+        }))
+        .sort((a, b) => (a.bizDate === b.bizDate ? 0 : a.bizDate < b.bizDate ? 1 : -1))
+    }
+
+    // ---- 3. 员工：借款单 / 报销单 / 工资发放 ----
+    let loans: any[] = []
+    let claims: any[] = []
+    let payrolls: any[] = []
+    if (kind === 'employee') {
+      const loanRows = await this.loanRepo.find({ where: { employeeId: id } as any })
+      loans = loanRows
+        .map((l) => {
+          const amount = Number(l.amount) || 0
+          const repaid = Number(l.repaidAmount) || 0
+          return {
+            id: l.id,
+            loanNo: l.loanNo,
+            loanDate: l.loanDate,
+            amount,
+            repaidAmount: repaid,
+            outstanding: l.status === 'repaid' ? 0 : round2(Math.max(amount - repaid, 0)),
+            reason: l.reason ?? '',
+            status: l.status,
+            bankAccountName: l.bankAccountName ?? '',
+            voucherId: l.voucherId ?? null,
+            repayVoucherId: l.repayVoucherId ?? null,
+          }
+        })
+        .sort((a, b) => (a.loanDate === b.loanDate ? 0 : a.loanDate < b.loanDate ? 1 : -1))
+
+      const claimRows = await this.claimRepo.find({ where: { employeeId: id } as any })
+      claims = claimRows
+        .map((c) => ({
+          id: c.id,
+          claimNo: c.claimNo,
+          claimDate: c.claimDate,
+          amount: Number(c.totalAmount) || 0,
+          claimType: c.claimType,
+          loanNo: c.loanNo ?? '',
+          status: c.status,
+          remark: c.remark ?? '',
+          voucherId: c.voucherId ?? null,
+          payVoucherId: c.payVoucherId ?? null,
+        }))
+        .sort((a, b) => (a.claimDate === b.claimDate ? 0 : a.claimDate < b.claimDate ? 1 : -1))
+
+      const itemRows = await this.payrollItemRepo.find({ where: { employeeId: id } as any })
+      if (itemRows.length) {
+        const payrollIds = Array.from(new Set(itemRows.map((i) => i.payrollId)))
+        const payrollRows = await this.payrollRepo.find({ where: { id: In(payrollIds) } })
+        const payrollMap = new Map(payrollRows.map((p) => [p.id, p]))
+        payrolls = itemRows
+          .map((i) => {
+            const p = payrollMap.get(i.payrollId)
+            return {
+              id: i.id,
+              payrollNo: p?.payrollNo ?? '',
+              period: p?.period ?? 0,
+              payDate: p?.payDate ?? '',
+              gross: Number(i.gross) || 0,
+              net: Number(i.net) || 0,
+              loanDeduct: Number(i.loanDeduct) || 0,
+              status: p?.status ?? '',
+              voucherId: p?.voucherId ?? null,
+              payVoucherId: p?.payVoucherId ?? null,
+            }
+          })
+          .sort((a, b) => (a.period === b.period ? 0 : a.period < b.period ? 1 : -1))
+      }
+    }
+
+    return {
+      kind,
+      id,
+      totals: { debit: totalDebit, credit: totalCredit, net: round2(totalDebit - totalCredit) },
+      vouchers: voucherList,
+      cashFlows,
+      loans,
+      claims,
+      payrolls,
+    }
   }
 
   // ==================== 复制 / 红冲 ====================
@@ -833,6 +1017,21 @@ export class VouchersService {
     })
     if (!bank) return
 
+    // 摘要：分录摘要优先；若只是「汇款汇入」这类银行原文，按「动作+往来单位+款项性质」兜底
+    let cashSummary = counter.summary || voucher.remark || ''
+    if (isGenericSummary(cashSummary)) {
+      const partnerName = counter.partnerId
+        ? ((await this.partnerRepo.findOne({ where: { id: counter.partnerId } }))?.name ?? '')
+        : ''
+      cashSummary = composeCashSummary({
+        bizType,
+        partnerName,
+        counterAccountCode: counter.accountCode,
+        counterAccountName: counter.accountName,
+        rawSummary: cashSummary,
+      })
+    }
+
     const cashFlow = manager.create(CashFlow, {
       companyId,
       bizType,
@@ -848,7 +1047,7 @@ export class VouchersService {
       departmentId: counter.departmentId,
       projectId: counter.projectId,
       amount: fromCents(toCents(amount)),
-      summary: counter.summary || voucher.remark || '',
+      summary: cashSummary,
       voucherId: voucher.id,
       createdBy: operator.id,
       createdByName: operator.nickname,

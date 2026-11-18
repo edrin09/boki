@@ -65,6 +65,17 @@ export class VouchersController {
     return this.vouchersService.employeeOptions()
   }
 
+  /**
+   * 辅助核算档案的往来历史（凭证 / 收付款单 / 借款 / 报销 / 工资）。
+   * 必须放在 `:id` 路由之前，否则会被当成凭证 ID 解析。
+   */
+  @Get('aux-history')
+  @RequirePermissions('voucher:list')
+  @Operation('查询辅助核算历史')
+  auxHistory(@Query('kind') kind: string, @Query('id') id: string) {
+    return this.vouchersService.auxHistory(kind, id)
+  }
+
   @Get(':id')
   @RequirePermissions('voucher:list')
   @Operation('查询凭证详情')
