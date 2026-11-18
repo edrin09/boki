@@ -53,6 +53,23 @@ export function ensureRuntimeLinks(): void {
   }
 }
 
+/**
+ * 把 ai-runtime 插件的 node_modules 前置到 NODE_PATH。
+ *
+ * OCR / 语音插件里的 onnxruntime-node、sherpa-onnx-node 由 ai-runtime 统一提供。
+ * 插件装在 ProgramData 下，自身向上逐级查找够不到别人的 node_modules，
+ * 因此必须由内核显式补一条解析路径。NODE_PATH 在进程启动时会被缓存，
+ * 改动后需重建解析路径；且必须在扫描任何插件入口之前完成。
+ */
+function ensureSharedRuntime(): void {
+  const runtimeModules = path.join(pluginsRootDir(), 'ai-runtime', 'node_modules')
+  if (!fs.existsSync(runtimeModules)) return
+  const current = (process.env.NODE_PATH || '').split(path.delimiter).filter(Boolean)
+  if (current.includes(runtimeModules)) return
+  process.env.NODE_PATH = [runtimeModules, ...current].join(path.delimiter)
+  ;(require('node:module') as { _initPaths(): void })._initPaths()
+}
+
 function validateManifest(manifest: PluginManifest): string[] {
   const errors: string[] = []
   if (!manifest.id || !/^[a-z0-9][a-z0-9-]*$/.test(manifest.id)) {
@@ -118,15 +135,22 @@ function sortByDependencies(items: LoadedPlugin[]): LoadedPlugin[] {
  */
 export function loadPluginRuntime(): PluginRuntime {
   ensureRuntimeLinks()
+  ensureSharedRuntime()
   const state = readState()
   const installedRoot = pluginsRootDir()
   const loadedEntries = new Map<string, LoadedPlugin>()
   const errors: Array<{ id: string; message: string }> = []
 
   if (fs.existsSync(installedRoot)) {
-    for (const dirent of fs.readdirSync(installedRoot, { withFileTypes: true })) {
-      if (!dirent.isDirectory() || dirent.name === 'node_modules' || dirent.name.startsWith('.')) continue
-      const id = dirent.name
+    const ids = fs
+      .readdirSync(installedRoot, { withFileTypes: true })
+      .filter((dirent) => dirent.isDirectory() && dirent.name !== 'node_modules' && !dirent.name.startsWith('.'))
+      .map((dirent) => dirent.name)
+    // ai-runtime 必须最先加载：它负责抢在 sherpa 之前把 ONNX Runtime DLL 载入进程，
+    // 不能依赖目录枚举顺序（Windows 下同名 DLL 先加载者胜）。
+    ids.sort((a, b) => (a === 'ai-runtime' ? -1 : b === 'ai-runtime' ? 1 : 0))
+
+    for (const id of ids) {
       const dir = path.join(installedRoot, id)
       const manifest = readJson<PluginManifest>(path.join(dir, 'manifest.json'))
       if (!manifest) {

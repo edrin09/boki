@@ -35,7 +35,6 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "dayjs": "^1.11.13",
-    "onnxruntime-node": "^1.30.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pdfjs-dist": "^6.4.299",
@@ -43,7 +42,6 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sharp": "^0.35.5",
-    "sherpa-onnx-node": "^1.13.8",
     "typeorm": "^0.3.20",
     "ws": "^8.22.0",
     "xlsx": "^0.18.5"
@@ -58,7 +56,9 @@
     "@types/node": "^22.10.2",
     "@types/passport-jwt": "^4.0.1",
     "@types/pdfkit": "^0.17.6",
+    "onnxruntime-node": "^1.30.0",
     "prettier": "^3.4.2",
+    "sherpa-onnx-node": "^1.13.8",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.2"

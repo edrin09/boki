@@ -1,6 +1,4 @@
 import 'reflect-metadata'
-// 必须早于 AppModule：避免 sherpa-onnx 抢先加载 ONNX Runtime DLL
-import './plugins/ocr-native.preload'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { Logger, ValidationPipe } from '@nestjs/common'

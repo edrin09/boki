@@ -22,6 +22,10 @@ const ASSETS = [
     file: 'det.onnx',
     url: `${RAPIDOCR}onnx/PP-OCRv4/det/ch_PP-OCRv4_det_mobile.onnx`,
     sha256: 'd2a7720d45a54257208b1e13e36a8479894cb74155a5efe29462512d42f49da9',
+    // 已存在时不覆盖：装机实测（2026-11-17，17 张真实发票）表明 mobile det 会把
+    // 「购买方/销售方」双栏表头并成一行，导致 5 张个人抬头发票抽不到购销方名称
+    // （个人抬头方向判定直接失效）。因此原地保留更高精度的 det，只做缺失兜底。
+    keepIfPresent: true,
   },
   {
     file: 'cls.onnx',
@@ -50,6 +54,15 @@ async function download(url) {
 async function ensureAsset(asset) {
   const target = path.join(targetDir, asset.file)
   if (fs.existsSync(target)) {
+    if (asset.keepIfPresent) {
+      const actual = sha256(fs.readFileSync(target))
+      if (actual === asset.sha256) {
+        console.log(`  ⚠ ${asset.file} 当前为 mobile 版，双栏表头易并行（个人抬头发票购销方名称会抽不到）；建议换回高精度 det`)
+      } else {
+        console.log(`  跳过 ${asset.file}（保留现有高精度检测模型）`)
+      }
+      return
+    }
     const actual = sha256(fs.readFileSync(target))
     if (actual === asset.sha256) {
       console.log(`  跳过 ${asset.file}（已存在且校验通过）`)

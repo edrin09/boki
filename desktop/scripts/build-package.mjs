@@ -9,7 +9,6 @@
  *   node scripts/build-package.mjs --skip-deps  # 复用已裁剪的 node_modules（最快）
  */
 import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -152,36 +151,14 @@ function dirSizeMB(dir) {
 /**
  * 瘦身：只保留 win32-x64 的 CPU 推理能力。
  *
- * 这些包默认携带全平台二进制，实测可裁掉约 260MB：
- * - onnxruntime-node：自带 linux/darwin/win32-arm64 全套 + DirectML GPU 库，
- *   我们只用默认 CPU 执行提供器，跨平台产物与 DirectML/dxcompiler/dxil 均无用；
+ * AI 原生运行时（onnxruntime-node / sherpa-onnx）与模型已随 ai-runtime / ocr / voice
+ * 插件分发，安装包内不再出现，这里只处理其余随包依赖：
  * - @img/sharp-wasm32：Windows x64 已有原生 sharp，wasm 回退不需要；
  * - typescript / ts-node / @types：被 typeorm 的 optional peer 带入，
  *   运行时跑的是 dist 编译产物，不做 TS 即时编译。
  */
 function trimStage() {
   const nm = path.join(stageServer, 'node_modules')
-
-  const ortBin = path.join(nm, 'onnxruntime-node', 'bin', 'napi-v6')
-  if (fs.existsSync(ortBin)) {
-    for (const platform of fs.readdirSync(ortBin)) {
-      if (platform !== 'win32') rmrf(path.join(ortBin, platform))
-    }
-    const winDir = path.join(ortBin, 'win32')
-    rmrf(path.join(winDir, 'arm64'))
-    for (const dll of ['DirectML.dll', 'dxcompiler.dll', 'dxil.dll']) {
-      rmrf(path.join(winDir, 'x64', dll))
-    }
-  }
-
-  // sherpa-onnx-node（语音识别）：可选依赖自带多平台二进制，
-  // 正常只在 Windows 上安装出 sherpa-onnx-win-x64；这里按当前平台裁剪兜底
-  const sherpaKeep = `sherpa-onnx-${os.platform() === 'win32' ? 'win' : os.platform()}-${os.arch()}`
-  for (const dir of fs.readdirSync(nm)) {
-    if (dir.startsWith('sherpa-onnx-') && dir !== sherpaKeep && dir !== 'sherpa-onnx-node') {
-      rmrf(path.join(nm, dir))
-    }
-  }
 
   rmrf(path.join(nm, '@img', 'sharp-wasm32'))
   rmrf(path.join(nm, '@img', 'sharp-freebsd-wasm32'))
@@ -190,7 +167,52 @@ function trimStage() {
     rmrf(path.join(nm, pkg))
   }
 
-  console.log('  已剔除跨平台二进制、GPU 推理库与 TS 运行时')
+  // 文件级裁剪：运行期不读的 sourcemap / 类型声明 / 文档。
+  // 用 cmd del /s 而不是 fs 批量删除：安全壳会拦截 Node 进程内的大批量递归删除。
+  // 文件数从 ~1.7 万降到 0.4 万上下，安装耗时下降主要来自这一步。
+  const before = dirSizeMB(stageServer)
+  let removedFiles = 0
+  for (const pattern of ['*.map', '*.d.ts', '*.d.mts', '*.d.cts', '*.md', '*.markdown']) {
+    const r = spawnSync('cmd.exe', ['/d', '/c', 'del', '/f', '/q', '/s', path.join(nm, pattern)], { encoding: 'utf8' })
+    if (r.status === 0 && r.stdout) {
+      // del 输出 "已删除文件 - D:\..." 一类行，逐行计数
+      removedFiles += r.stdout.split('\n').filter((l) => l.trim()).length
+    }
+  }
+
+  // 只给打包器用的目录 / 源码缓存 / 多余构建产物
+  for (const rel of [
+    ['typeorm', 'browser'],
+    ['better-sqlite3', 'deps'],
+    ['pdfkit', '.yarn'],
+    ['libphonenumber-js', 'bundle'],
+    ['libphonenumber-js', 'es6'],
+    ['libphonenumber-js', 'es6-modern'],
+    ['libphonenumber-js', 'source'],
+  ]) {
+    rmrf(path.join(nm, ...rel))
+  }
+
+  // 各包自带的测试/示例/文档目录：体积小但文件数多，顺手清掉
+  const NOISE_DIRS = new Set(['test', 'tests', '__tests__', 'example', 'examples', 'docs'])
+  for (const entry of fs.readdirSync(nm, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const pkgDirs = entry.name.startsWith('@')
+      ? fs.readdirSync(path.join(nm, entry.name), { withFileTypes: true })
+          .filter((d) => d.isDirectory())
+          .map((d) => path.join(nm, entry.name, d.name))
+      : [path.join(nm, entry.name)]
+    for (const pkgDir of pkgDirs) {
+      for (const noise of NOISE_DIRS) {
+        const target = path.join(pkgDir, noise)
+        if (fs.existsSync(target)) rmrf(target, true)
+      }
+    }
+  }
+
+  console.log(
+    `  已剔除跨平台二进制、GPU 推理库、TS 运行时、sourcemap/类型声明/文档（${before.toFixed(1)} MB → ${dirSizeMB(stageServer).toFixed(1)} MB，删除约 ${removedFiles} 个文件）`,
+  )
 }
 
 // ---------- 0.5 应用身份与联系方式（仓库根 .env → 安装页 / 关于对话框 / 签名信息） ----------
@@ -348,22 +370,6 @@ if (process.version !== nodeVersion) {
   console.log(`  构建脚本由 ${process.version} 执行，依赖安装统一改用随包的 ${nodeVersion}，避免 ABI 错配`)
 }
 
-const modelsDir = path.join(backendDir, 'models', 'ocr')
-for (const f of ['det.onnx', 'cls.onnx', 'rec.onnx', 'ppocrv6_dict.txt']) {
-  if (!fs.existsSync(path.join(modelsDir, f))) {
-    fail(`缺少 OCR 模型文件 ${f}，请先执行 cd backend && npm run models:fetch`)
-  }
-}
-console.log('  OCR 模型齐全')
-
-const asrModelsDir = path.join(backendDir, 'models', 'asr', 'zipformer-zh-streaming-int8')
-for (const f of ['encoder.int8.onnx', 'decoder.onnx', 'joiner.int8.onnx', 'tokens.txt']) {
-  if (!fs.existsSync(path.join(asrModelsDir, f))) {
-    fail(`缺少 ASR 模型文件 ${f}，请先执行 cd backend && npm run models:fetch-asr`)
-  }
-}
-console.log('  ASR 模型齐全')
-
 // ---------- 1. 构建前端 ----------
 
 if (skipWeb) {
@@ -405,13 +411,11 @@ console.log(`  ${dirSizeMB(stageWeb).toFixed(1)} MB`)
 log('暂存后端产物 → stage/server')
 fs.mkdirSync(stageServer, { recursive: true })
 
-// 4.1 构建产物与模型（每次覆盖）
+// 4.1 构建产物（模型与 AI 运行时由插件市场分发，安装包内不再携带）
 rmrf(path.join(stageServer, 'dist'))
 copyDir(path.join(backendDir, 'dist'), path.join(stageServer, 'dist'))
-
+// 清掉历史构建残留的模型目录，否则会被原样带进安装包
 rmrf(path.join(stageServer, 'models'))
-copyDir(modelsDir, path.join(stageServer, 'models', 'ocr'))
-copyDir(asrModelsDir, path.join(stageServer, 'models', 'asr', 'zipformer-zh-streaming-int8'))
 
 // 4.1.5 不随包任何插件与本地市场目录。
 // 新装客户端插件目录为空，插件一律由用户在「插件市场」里从远程市场自行安装；
@@ -479,10 +483,8 @@ const probeScript = [
   "d2.close()",
   "rm()",
   "if(!row||row.a!=='ok')throw new Error('加密分支功能验证失败：带 key 读不回数据')",
-  "require('onnxruntime-node')",
   "require('sharp')",
   "require('@napi-rs/canvas')",
-  "require('sherpa-onnx-node')",
   "console.log('NATIVE_OK','sqlcipher-functional')",
 ].join(';')
 const probe = spawnSync(path.join(stageServer, 'node.exe'), ['-e', probeScript], {
@@ -608,12 +610,8 @@ const requiredInPackage = [
   'server/node.exe',
   'server/dist/main.js',
   'server/dist/config/database.config.js',
-  'server/models/ocr/det.onnx',
-  'server/models/asr/zipformer-zh-streaming-int8/encoder.int8.onnx',
-  'server/models/asr/zipformer-zh-streaming-int8/tokens.txt',
   'server/node_modules/@nestjs/core/package.json',
   'server/node_modules/better-sqlite3/build/Release/better_sqlite3.node',
-  'server/node_modules/onnxruntime-node/bin/napi-v6/win32/x64/onnxruntime.dll',
   'server/node_modules/sharp/package.json',
   'web/index.html',
   'icon.ico',
@@ -621,6 +619,18 @@ const requiredInPackage = [
 const missing = requiredInPackage.filter((rel) => !fs.existsSync(path.join(unpacked, rel)))
 if (missing.length) {
   fail(`打包产物缺少以下文件，安装后无法运行：\n  ${missing.join('\n  ')}`)
+}
+// AI 运行时与模型必须由插件市场分发：一旦重新混入安装包，瘦身成果会被静默回退
+const forbiddenInPackage = [
+  'server/models',
+  'server/node_modules/onnxruntime-node',
+  'server/node_modules/onnxruntime-common',
+  'server/node_modules/sherpa-onnx-node',
+  'server/node_modules/sherpa-onnx-win-x64',
+]
+const leakedAi = forbiddenInPackage.filter((rel) => fs.existsSync(path.join(unpacked, rel)))
+if (leakedAi.length) {
+  fail(`打包产物混入了应由插件分发的 AI 运行时/模型：\n  ${leakedAi.join('\n  ')}`)
 }
 // 出厂包必须是零插件：残留种子目录会让新装机器带上「自己的包」，掩盖市场问题
 const bundledPluginDirs = [

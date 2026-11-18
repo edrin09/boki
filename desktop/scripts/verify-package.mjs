@@ -32,8 +32,8 @@ const serverDir = path.join(resources, 'server')
 const PORT = Number(process.env.VERIFY_PORT || 19300)
 const BASE = `http://127.0.0.1:${PORT}/api`
 
-/** 出厂必装插件：多公司（建账入口）+ 票据（自动带出 ocr / hr 依赖） */
-const MARKET_INSTALL = ['multi-company', 'receipts']
+/** 出厂必装插件：多公司（建账入口）+ 票据（自动带出 ocr / hr / ai / ai-runtime）+ 语音（ASR） */
+const MARKET_INSTALL = ['multi-company', 'receipts', 'voice']
 
 let passed = 0
 let failed = 0
@@ -245,6 +245,8 @@ async function main() {
   const marketConfig = require(path.join(desktopDir, 'src', 'marketplace.js'))
   check('出厂已预置远程插件市场地址', Boolean(marketConfig.url), marketConfig.url || '未配置')
   check('出厂已预置插件市场验签公钥', Boolean(marketConfig.publicKeys))
+  // 仅验证期可指向本地市场（出厂预置地址仍按上面的断言校验），不改变安装包产物
+  const marketUrl = process.env.VERIFY_MARKET_URL || marketConfig.url
 
   const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'financial-verify-'))
   // 全新安装 = 插件目录为空（不铺任何种子）
@@ -261,7 +263,6 @@ async function main() {
     DB_DATABASE: path.join(dataRoot, 'data', 'financial.db'),
     DB_SYNCHRONIZE: 'true',
     UPLOAD_DIR: path.join(dataRoot, 'data', 'uploads'),
-    OCR_MODEL_DIR: path.join(serverDir, 'models', 'ocr'),
     WEB_DIST_DIR: path.join(resources, 'web'),
     JWT_SECRET: 'verify-only-secret-not-for-production',
     JWT_EXPIRES_IN: '8h',
@@ -269,7 +270,7 @@ async function main() {
     // 与 desktop/src/server.js buildEnv 保持一致：可写插件目录 + 依赖解析链 + 远程市场
     BOKI_PLUGINS_DIR: pluginsDir,
     NODE_PATH: path.join(serverDir, 'node_modules'),
-    PLUGIN_MARKET_URL: marketConfig.url,
+    PLUGIN_MARKET_URL: marketUrl,
     PLUGIN_MARKET_PUBLIC_KEYS: marketConfig.publicKeys,
   }
 
@@ -321,7 +322,7 @@ async function main() {
 
   try {
     console.log('[0/6] 插件市场前置检查')
-    await ensureMarket(String(marketConfig.url || ''))
+    await ensureMarket(String(marketUrl || ''))
 
     console.log('\n[1/6] 启动打包后的后端（node.exe + dist/main.js，零插件）')
     await start('首次启动')
@@ -380,11 +381,39 @@ async function main() {
     check('会计科目种子已就绪', accounts.status === 200 && Array.isArray(accountTree) && accountTree.length > 0,
       `一级科目 ${Array.isArray(accountTree) ? accountTree.length : '-'} 个`)
 
-    console.log('\n[6/6] 离线 OCR 与票据识别（验证 onnxruntime 与模型裁剪后仍可用）')
+    console.log('\n[6/6] 离线 OCR / ASR（验证运行时与模型已下沉到插件）')
     const ocr = token ? await request('/ocr/status', { token }) : { status: 0 }
     const ocrData = unwrap(ocr.json)
     check('OCR 状态就绪', ocr.status === 200 && ocrData?.ready === true,
       `ready=${ocrData?.ready} missing=${JSON.stringify(ocrData?.missing ?? [])}`)
+
+    const voice = token ? await request('/voice/status', { token }) : { status: 0 }
+    const voiceData = unwrap(voice.json)
+    // ASR 模型是懒加载的：status.ready 要等首次识别后才为 true，这里先校验模型文件齐全
+    check('ASR 模型已随插件就位', voice.status === 200 && Array.isArray(voiceData?.missing) && voiceData.missing.length === 0,
+      `missing=${JSON.stringify(voiceData?.missing ?? [])}`)
+
+    const testWav = path.join(repoRoot, 'backend', 'models', 'asr', 'zipformer-zh-streaming-int8', 'test_wavs', '0.wav')
+    if (token && fs.existsSync(testWav)) {
+      const form = new FormData()
+      form.append('audio', new Blob([fs.readFileSync(testWav)], { type: 'audio/wav' }), '0.wav')
+      const res = await fetch(`${BASE}/voice/transcribe`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      })
+      const body = await res.json().catch(() => null)
+      const text = unwrap(body)?.text ?? ''
+      check('语音识别端到端（真实 WAV）', res.status === 200 && text.length > 0,
+        res.status === 200 ? `转写「${text}」` : `status=${res.status} ${JSON.stringify(body).slice(0, 200)}`)
+    } else {
+      warn('语音识别端到端', `未找到测试音频 ${testWav}，本项跳过（生产安装后会做真实语音测试）`)
+    }
+
+    const leakedRuntime = ['models', 'node_modules/onnxruntime-node', 'node_modules/sherpa-onnx-node']
+      .filter((rel) => fs.existsSync(path.join(serverDir, rel)))
+    check('安装包不含 AI 运行时与模型', leakedRuntime.length === 0,
+      leakedRuntime.join(', ') || '已全部下沉到插件')
 
     // 票据冒烟测试原在 backend/test（源码瘦身 307b3f8 时移出仓库），
     // 现仅存于打包机的 desktop/scripts/receipts-verify.mjs（desktop/ 不进库）；

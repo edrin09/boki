@@ -35,6 +35,8 @@ import type {
 
 const PLUGIN_ID_RE = /^[a-z0-9][a-z0-9-]*$/
 const FETCH_TIMEOUT_MS = 15_000
+/** 插件包（含模型）可达数百 MB，下载单独放宽超时，避免 15 秒误杀 */
+const DOWNLOAD_TIMEOUT_MS = 600_000
 
 /** Ed25519 raw 32 字节公钥 → SPKI DER 包装 */
 const SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex')
@@ -346,7 +348,7 @@ export class RemoteMarketService implements OnModuleInit {
       url += (url.includes('?') ? '&' : '?') + `license=${encodeURIComponent(licenseKey)}`
     }
 
-    const res = await request(url)
+    const res = await request(url, undefined, DOWNLOAD_TIMEOUT_MS)
     if (res.status === 402) throw new BadRequestException('授权码无效或已失效（市场返回 402）')
     if (res.status !== 200) throw new BadRequestException(`下载插件包失败：HTTP ${res.status}`)
 
@@ -420,8 +422,8 @@ export class RemoteMarketService implements OnModuleInit {
 
 // ==================== 工具 ====================
 
-async function request(url: string, init?: RequestInit): Promise<Response> {
-  return fetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+async function request(url: string, init?: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) })
 }
 
 function header(res: Response, name: string): string | undefined {

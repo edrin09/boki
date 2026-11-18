@@ -25,7 +25,6 @@ function resolveLayout(isPackaged) {
       webDir: path.join(process.resourcesPath, 'web'),
       nodeExe: path.join(serverDir, 'node.exe'),
       entry: path.join(serverDir, 'dist', 'main.js'),
-      modelDir: path.join(serverDir, 'models', 'ocr'),
     }
   }
 
@@ -37,7 +36,6 @@ function resolveLayout(isPackaged) {
     // 开发期不能用 Electron 内置 Node：其 ABI 与 better-sqlite3 预编译包不一致
     nodeExe: process.env.NODE_EXE || 'node',
     entry: path.join(serverDir, 'dist', 'main.js'),
-    modelDir: path.join(serverDir, 'models', 'ocr'),
   }
 }
 
@@ -135,7 +133,6 @@ class ServerProcess {
       DB_SYNCHRONIZE: 'true',
       DB_LOGGING: 'false',
       UPLOAD_DIR: paths.uploads,
-      OCR_MODEL_DIR: layout.modelDir,
       WEB_DIST_DIR: layout.webDir,
       JWT_SECRET: jwtSecret,
       JWT_EXPIRES_IN: '8h',
