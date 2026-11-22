@@ -1,7 +1,7 @@
 /**
  * 打包产物端到端验证
  *
- * 直接以打包后的 node.exe + dist 启动后端（与 Electron 壳的拉起方式一致），
+ * 直接以打包后的 node.exe + dist 启动后端（与桌面壳的拉起方式一致），
  * 在临时数据目录上复刻**全新安装**：插件目录为空 → 从远程插件市场安装 →
  * 重启后端 → 跑通「静态托管 → 登录 → 建账 → OCR 就绪 → 票据上传识别」。
  *
@@ -27,7 +27,13 @@ const repoRoot = path.resolve(desktopDir, '..')
 const releaseDir = process.env.RELEASE_DIR
   ? path.resolve(desktopDir, process.env.RELEASE_DIR)
   : path.join(desktopDir, 'release')
-const resources = path.join(releaseDir, 'win-unpacked', 'resources')
+// 新安装包不再产出 win-unpacked：轻壳安装目录就是 desktop/stage-shell。
+// 两种布局都支持，旧 release/win-unpacked 仍可用于回归旧产物。
+const stagedResources = path.join(desktopDir, 'stage-shell', 'resources')
+const unpackedResources = path.join(releaseDir, 'win-unpacked', 'resources')
+const resources = fs.existsSync(path.join(stagedResources, 'server'))
+  ? stagedResources
+  : unpackedResources
 const serverDir = path.join(resources, 'server')
 const PORT = Number(process.env.VERIFY_PORT || 19300)
 const BASE = `http://127.0.0.1:${PORT}/api`
@@ -267,7 +273,7 @@ async function main() {
     JWT_SECRET: 'verify-only-secret-not-for-production',
     JWT_EXPIRES_IN: '8h',
     CORS_ORIGIN: '*',
-    // 与 desktop/src/server.js buildEnv 保持一致：可写插件目录 + 依赖解析链 + 远程市场
+    // 与 desktop/shell/BackendProcess.cs 的环境变量保持一致：可写插件目录 + 依赖解析链 + 远程市场
     BOKI_PLUGINS_DIR: pluginsDir,
     NODE_PATH: path.join(serverDir, 'node_modules'),
     PLUGIN_MARKET_URL: marketUrl,

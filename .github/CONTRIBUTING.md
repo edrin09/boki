@@ -18,7 +18,7 @@
 
 ## 环境搭建
 
-**技术栈**：前端 Vue 3 + Vite；后端 NestJS + TypeORM + SQLite；桌面 Electron。
+**技术栈**：前端 Vue 3 + Vite；后端 NestJS + TypeORM + SQLite；桌面壳 WebView2（C# WinForms）。
 
 ```bash
 # 前端

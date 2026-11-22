@@ -39,7 +39,7 @@
 
 - `backend/`：认证（JWT）、RBAC 权限、SQL（SQLite）、文件上传与导入解析
 - `frontend/`：XSS、越权操作、敏感信息泄露
-- `desktop/`：Electron 配置（nodeIntegration / contextIsolation / 协议注册）、自动更新链路、安装包完整性
+- `desktop/`：WebView2 轻壳（进程边界 / 本地服务通信）、NSIS 安装包完整性
 - 插件运行时：插件隔离边界、manifest 校验、插件可访问的 API 面
 - 构建脚本与 CI：供应链（依赖注入、构建产物篡改）
 

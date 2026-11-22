@@ -89,14 +89,18 @@ boki-market/
 # 品牌 / 商标资产（含内部知识产权方案）
 brand/
 
-# 桌面版（Electron 壳 + 打包 / 发布脚本，仅本地）
+# 桌面版（WebView2 轻壳 + 打包 / 发布脚本，仅本地）
 desktop/*
 !desktop/src
 !desktop/scripts
 !desktop/package.json
 !desktop/package-lock.json
-!desktop/electron-builder.yml
 !desktop/installer-hooks.nsh
+# WebView2 轻壳源码与 NSIS 安装脚本
+!desktop/shell/
+!desktop/installer.nsi
+# 轻壳构建期按仓库根 .env 生成的 Brand/AssemblyVersion，不入库
+desktop/shell/generated/
 # 出厂市场配置：由 scripts/build-package.mjs 依据仓库根 .env 生成，不入库
 desktop/src/marketplace.js
 # 打包机上的本地验证脚本与它生成的样本（不是产品代码，不入库）

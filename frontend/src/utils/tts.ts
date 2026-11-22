@@ -1,5 +1,5 @@
 /**
- * 语音播报：Electron Chromium 的 speechSynthesis 走 Windows SAPI，
+ * 语音播报：WebView2 Chromium 的 speechSynthesis 走 Windows SAPI，
  * 中文语音缺失/失败时静默降级为仅展示文字（不弹错误）。
  */
 

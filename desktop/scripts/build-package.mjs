@@ -1,7 +1,7 @@
 /**
  * 一键出免环境安装包（Setup.exe）
  *
- * 流程：构建前端 → 构建后端 → 裁剪生产依赖 → 暂存 resources → 生成图标 → electron-builder
+ * 流程：构建前端 → 构建后端 → 裁剪生产依赖 → 暂存 resources → 生成图标 → WebView2 轻壳 → NSIS
  *
  * 用法：
  *   node scripts/build-package.mjs              # 全量
@@ -12,6 +12,14 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import {
+  ensureWebView2Sdk,
+  generateBrand,
+  compileShell,
+  stageShell,
+  writeInstallerVars,
+  resolveMakensis,
+} from './build-shell.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const desktopDir = path.resolve(__dirname, '..')
@@ -21,7 +29,11 @@ const frontendDir = path.join(repoRoot, 'frontend')
 const stageDir = path.join(desktopDir, 'stage')
 const stageServer = path.join(stageDir, 'server')
 const stageWeb = path.join(stageDir, 'web')
-const releaseDir = path.join(desktopDir, 'release')
+// 产物目录默认 release/；RELEASE_DIR 可指向别处，用于旧产物被杀软/索引器长期占用
+// 无法清理时换目录出包（verify-package.mjs / release.mjs 认同一个变量，路径不分叉）。
+const releaseDir = process.env.RELEASE_DIR
+  ? path.resolve(process.env.RELEASE_DIR)
+  : path.join(desktopDir, 'release')
 
 const args = process.argv.slice(2)
 const skipWeb = args.includes('--skip-web')
@@ -31,8 +43,6 @@ const MIRROR = 'https://registry.npmmirror.com'
 const NPM_ENV = {
   ...process.env,
   npm_config_registry: MIRROR,
-  ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/',
-  ELECTRON_BUILDER_BINARIES_MIRROR: 'https://npmmirror.com/mirrors/electron-builder-binaries/',
   // better-sqlite3 的 prebuild-install 默认从 GitHub Releases 取预编译包，
   // 国内网络经代理时常被掐断（socket hang up）。一旦取不到，就会退化成
   // node-gyp 现场编译，或从不可靠来源拿到错版二进制（实测拿到过 ABI 127 的，
@@ -272,20 +282,11 @@ const MARKET = {
   publicKeys: contactEnv.PLUGIN_MARKET_PUBLIC_KEYS.trim(),
 }
 
-// installer-hooks.nsh / electron-builder.yml 的展示行由本脚本以 .env 值重写，
+// installer-hooks.nsh 的展示行由本脚本以 .env 值重写，
 // 从机制上杜绝两处漂移（旧机制是"校验不一致就报错"，改成"以 .env 为准直接写入"）。
 const hooksPath = path.join(desktopDir, 'installer-hooks.nsh')
 if (!fs.existsSync(hooksPath)) {
-  fail(`缺少 ${hooksPath}（NSIS 自定义安装页，electron-builder.yml 的 nsis.include 指向它）`)
-}
-// 防呆：删除 build/ 下的同名残留。electron-builder 的 getResource 只要在
-// buildResourcesDir（build/）里看到同名文件，就用 basename 拼路径优先返回它，
-// 根本不看 projectDir 下的源文件——build/installer-hooks.nsh 一旦残留，
-// 上面所有重写都会被静默忽略（实测：联系页没进安装包，打包还显示成功）。
-const staleHooks = path.join(desktopDir, 'build', 'installer-hooks.nsh')
-if (fs.existsSync(staleHooks)) {
-  rmrf(staleHooks)
-  log(`已删除 build/installer-hooks.nsh 残留（它会优先于源文件被 electron-builder 引用）`)
+  fail(`缺少 ${hooksPath}（NSIS 自定义安装页，installer.nsi 通过 !include 引用）`)
 }
 // 安装页 logo 位图由 make-icon.mjs 生成；路径在打包时写入 hooks 的 File 行，
 // makensis 编译期把该文件压缩进安装包，运行期释放到 $PLUGINSDIR 供 nsDialogs 显示。
@@ -308,38 +309,10 @@ hooksSrc = hooksSrc
     `$1${CONTACT.publisher}$2`,
   )
   // 官网行是 Link 控件：链接文本即 URL，点击由 ContactOpenSite ExecShell 打开
+  // （安装页为精简版，邮箱/电话/微信不再上页，联系方式一律走官网）
   .replace(/(\$\{NSD_CreateLink\}[^\n]*")[^"\n]*("\s*\r?\n\s*Pop \$ContactValSite)/, `$1${CONTACT.officialSite}$2`)
-  .replace(/(\$\{NSD_CreateLabel\}[^\n]*")[^"\n]*("\s*\r?\n\s*Pop \$ContactValEmail)/, `$1${CONTACT.email}$2`)
-  .replace(/(\$\{NSD_CreateLabel\}[^\n]*")[^"\n]*("\s*\r?\n\s*Pop \$ContactValPhone)/, `$1${CONTACT.phone}$2`)
-  .replace(/(\$\{NSD_CreateLabel\}[^\n]*")[^"\n]*("\s*\r?\n\s*Pop \$ContactValWechat)/, `$1${CONTACT.wechat}$2`)
   .replace(/"BOKI_LOGO_PATH_PLACEHOLDER"/, `"${logoPath}"`)
 fs.writeFileSync(hooksPath, UTF8_BOM + hooksSrc)
-
-const builderYmlPath = path.join(desktopDir, 'electron-builder.yml')
-let builderYml = fs.readFileSync(builderYmlPath, 'utf8')
-builderYml = builderYml
-  .replace(/^copyright: .*$/m, `copyright: Copyright © ${new Date().getFullYear()} ${CONTACT.publisher}`)
-  .replace(/^(\s*)publisherName: .*$/m, `$1publisherName: ${CONTACT.publisher}`)
-fs.writeFileSync(builderYmlPath, builderYml)
-
-// 「关于 BOKI」对话框的数据源：每次打包从 .env 重新生成，杜绝两处漂移
-const contactJs = [
-  '/**',
-  ' * 应用身份与联系方式（由 scripts/build-package.mjs 依据仓库根 .env 自动生成，请勿手改）',
-  ' * 改配置：编辑仓库根 .env → 重新执行 node scripts/build-package.mjs',
-  ' */',
-  'module.exports = {',
-  `  appTitle: ${JSON.stringify(CONTACT.appTitle)},`,
-  `  officialSite: ${JSON.stringify(CONTACT.officialSite)},`,
-  `  windowTitle: ${JSON.stringify(CONTACT.windowTitle)},`,
-  `  publisher: ${JSON.stringify(CONTACT.publisher)},`,
-  `  email: ${JSON.stringify(CONTACT.email)},`,
-  `  phone: ${JSON.stringify(CONTACT.phone)},`,
-  `  wechat: ${JSON.stringify(CONTACT.wechat)},`,
-  '}',
-  '',
-].join('\n')
-fs.writeFileSync(path.join(desktopDir, 'src', 'contact.js'), contactJs)
 
 // 远程插件市场配置：同样每次打包从 .env 重新生成，随包带到用户机器上
 const marketplaceJs = [
@@ -356,7 +329,7 @@ const marketplaceJs = [
 ].join('\n')
 fs.writeFileSync(path.join(desktopDir, 'src', 'marketplace.js'), marketplaceJs)
 log(`插件市场配置已从根 .env 分发（src/marketplace.js → ${MARKET.url}）`)
-log(`身份与联系方式已从根 .env 分发（installer-hooks.nsh / electron-builder.yml / src/contact.js）`)
+log(`身份与联系方式已从根 .env 分发（installer-hooks.nsh → Brand.g.cs）`)
 
 // ---------- 0. 前置检查 ----------
 
@@ -508,68 +481,44 @@ console.log(`  server 暂存体积 ${dirSizeMB(stageServer).toFixed(1)} MB`)
 log('生成应用图标')
 run(process.execPath, [path.join(desktopDir, 'scripts', 'make-icon.mjs')])
 
-// ---------- 5.5 Electron 运行时（electronDist 通道） ----------
+// ---------- 5.5 WebView2 轻壳 ----------
 //
-// electron-builder.yml 配了 electronDist: build/electron-dist，让 electron-builder
-// 用 copyDir 而不是 rename 铺 Electron 运行时——本机安全垫片会拦截大目录 rename
-// （实测 EPERM：73 个文件的 win-unpacked.tmp → win-unpacked 被拒，而同样内容的
-// cp -r 放行）。默认行为（下载 zip → 解压到 .tmp → rename）在这里必然失败。
-//
-// 本段负责目录缺失时从 @electron/get 的缓存里找 zip 并解压生成；
-// 缓存也没有时放行让 electron-builder 自己下载，届时若 rename 被拒会报错，
-// 重跑一次即可（第二次命中缓存，走本段的解压逻辑）。
-const electronDistDir = path.join(desktopDir, 'build', 'electron-dist')
-if (!fs.existsSync(path.join(electronDistDir, 'electron.exe'))) {
-  const electronVersion = JSON.parse(
-    fs.readFileSync(path.join(desktopDir, 'package.json'), 'utf8'),
-  ).devDependencies.electron.replace(/^[\^~]/, '')
-  // @electron/get 的缓存布局：%LOCALAPPDATA%/electron/Cache/<hash>/electron-v<ver>-win32-x64.zip
-  const cacheRoot = path.join(process.env.LOCALAPPDATA || '', 'electron', 'Cache')
-  let zipPath = null
-  if (fs.existsSync(cacheRoot)) {
-    for (const dir of fs.readdirSync(cacheRoot)) {
-      const candidate = path.join(cacheRoot, dir, `electron-v${electronVersion}-win32-x64.zip`)
-      if (fs.existsSync(candidate)) {
-        zipPath = candidate
-        break
-      }
-    }
-  }
-  if (zipPath) {
-    log(`准备 Electron 运行时（解压 ${path.basename(zipPath)} → build/electron-dist）`)
-    fs.mkdirSync(electronDistDir, { recursive: true })
-    // Windows 自带 Expand-Archive，不引入额外解压依赖
-    run('powershell', [
-      '-NoProfile',
-      '-Command',
-      `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${electronDistDir}' -Force`,
-    ])
-    if (!fs.existsSync(path.join(electronDistDir, 'electron.exe'))) {
-      fail(`Expand-Archive 解压成功但 ${electronDistDir} 里没有 electron.exe，请检查 zip 内容结构`)
-    }
-  } else {
-    log('  ⚠ 未找到 Electron 缓存 zip，交由 electron-builder 自行下载（若后续 rename 受限报错，重跑一次即可命中缓存）')
-  }
-} else {
-  log('Electron 运行时已就绪（build/electron-dist）')
-}
+// 应用本身只是「本地 Node 服务 + 浏览器窗口」。壳用 WinForms + 系统 WebView2：
+// 壳本体不到 5 MB，浏览器内核由系统 Edge 提供，安装包整体可压到 100 MB 以内。
 
-// ---------- 6. 安装壳依赖并打包 ----------
+log('准备 WebView2 SDK')
+const webviewSdk = ensureWebView2Sdk(desktopDir, log, fail)
 
-const electronBuilderPkg = path.join(desktopDir, 'node_modules', 'electron-builder', 'package.json')
-if (!fs.existsSync(electronBuilderPkg)) {
-  log('安装 Electron 壳依赖（首次约 3-5 分钟，需下载 Electron 运行时）')
-  runNpm(['install', '--no-audit', '--no-fund'], desktopDir)
-}
+const appVersion = JSON.parse(
+  fs.readFileSync(path.join(desktopDir, 'package.json'), 'utf8'),
+).version
 
-log('electron-builder 出安装包')
-// release 被其他程序占用（杀毒扫描 / 索引器 / 资源管理器预览）时降级：
-// 换用备用输出目录继续构建，不让整个打包卡死在清理步骤。
-// 旧 release/ 留给用户重启或关闭占用程序后手动清理。
-// 每轮打包先把 release/ 彻底清空（旧安装包、旧 win-unpacked 全部不留，全量重建）。
-// 被杀软/索引器等瞬时锁定时自动重试 3 轮（间隔 2 秒）；仍清不掉就直接失败——
-// 不再降级到 release-<时间戳>/：降级会让验证与交付路径分叉、问题后移
-//（实测 2026-10-29：降级目录搬回 release 时 EPERM，verify 找不到产物）。
+generateBrand(desktopDir, {
+  appTitle: CONTACT.appTitle,
+  windowTitle: CONTACT.windowTitle,
+  officialSite: CONTACT.officialSite,
+  publisher: CONTACT.publisher,
+  email: CONTACT.email,
+  phone: CONTACT.phone,
+  wechat: CONTACT.wechat,
+  version: appVersion,
+  marketUrl: MARKET.url,
+  marketPublicKeys: MARKET.publicKeys,
+})
+
+const stageShellDir = path.join(desktopDir, 'stage-shell')
+log('暂存安装目录 → stage-shell')
+rmrf(stageShellDir)
+compileShell(desktopDir, stageShellDir, webviewSdk, log, fail)
+stageShell(desktopDir, stageShellDir, stageServer, stageWeb, log, fail)
+console.log(`  stage-shell 体积 ${dirSizeMB(stageShellDir).toFixed(1)} MB`)
+
+// ---------- 6. NSIS 出安装包 ----------
+
+const makensis = resolveMakensis(desktopDir, log, fail)
+
+// release 被其他程序占用（杀毒扫描 / 索引器 / 资源管理器预览）时重试 3 轮，
+// 仍清不掉就直接失败——降级到其他目录会让交付路径分叉。
 let cleaned = false
 for (let attempt = 1; attempt <= 3; attempt++) {
   if (rmrf(releaseDir, true)) {
@@ -585,78 +534,81 @@ if (!cleaned) {
   const stale = fs.existsSync(releaseDir) ? fs.readdirSync(releaseDir).join(', ') : ''
   fail(
     `release/ 清理失败，已停止打包（残留：${stale || '未知'}）。\n` +
-      `  常见原因：杀毒软件正在扫描旧产物，或某程序打开了其中的文件（旧 asar 最典型）。\n` +
-      `  处理：关闭占用程序后重试（资源监视器 → CPU → 关联的句柄，搜 win-unpacked 可定位占用进程）；\n` +
-      `  仍不行则重启电脑后再打包。`,
+      `  常见原因：杀毒软件正在扫描旧产物，或某程序打开了其中的文件。\n` +
+      `  处理：关闭占用程序后重试；仍不行则重启电脑后再打包。`,
   )
 }
+
 const outputDir = releaseDir
-const ebBin = JSON.parse(fs.readFileSync(electronBuilderPkg, 'utf8')).bin
-const ebCli = path.join(
-  desktopDir,
-  'node_modules',
-  'electron-builder',
-  typeof ebBin === 'string' ? ebBin : ebBin['electron-builder'],
-)
-run(process.execPath, [ebCli, '--win', 'nsis', '--x64', `-c.directories.output=${outputDir}`], { cwd: desktopDir })
+fs.mkdirSync(outputDir, { recursive: true })
+const setupFile = path.join(outputDir, `BOKI-Setup-${appVersion}.exe`)
+writeInstallerVars(desktopDir, {
+  version: appVersion,
+  publisher: CONTACT.publisher,
+  stageDir: stageShellDir,
+  outFile: setupFile,
+})
+
+log('NSIS 出安装包')
+run(makensis, ['/INPUTCHARSET', 'UTF8', path.join(desktopDir, 'installer.nsi')], {
+  cwd: desktopDir,
+})
 
 // ---------- 7. 产物校验 ----------
 
-// electron-builder 的默认忽略规则含 !**/node_modules/**，配置漏写 filter 时
-// 依赖目录会被静默丢弃，装完才崩。必须在这里拦住。
 log('校验打包产物')
-const unpacked = path.join(outputDir, 'win-unpacked', 'resources')
 const requiredInPackage = [
-  'server/node.exe',
-  'server/dist/main.js',
-  'server/dist/config/database.config.js',
-  'server/node_modules/@nestjs/core/package.json',
-  'server/node_modules/better-sqlite3/build/Release/better_sqlite3.node',
-  'server/node_modules/sharp/package.json',
-  'web/index.html',
+  'BOKI.exe',
+  'WebView2Loader.dll',
+  'Microsoft.Web.WebView2.Core.dll',
+  'Microsoft.Web.WebView2.WinForms.dll',
   'icon.ico',
+  'resources/server/node.exe',
+  'resources/server/dist/main.js',
+  'resources/server/dist/config/database.config.js',
+  'resources/server/node_modules/@nestjs/core/package.json',
+  'resources/server/node_modules/better-sqlite3/build/Release/better_sqlite3.node',
+  'resources/server/node_modules/sharp/package.json',
+  'resources/web/index.html',
 ]
-const missing = requiredInPackage.filter((rel) => !fs.existsSync(path.join(unpacked, rel)))
+const missing = requiredInPackage.filter((rel) => !fs.existsSync(path.join(stageShellDir, rel)))
 if (missing.length) {
-  fail(`打包产物缺少以下文件，安装后无法运行：\n  ${missing.join('\n  ')}`)
+  fail(`安装目录缺少以下文件，安装后无法运行：\n  ${missing.join('\n  ')}`)
 }
+
 // AI 运行时与模型必须由插件市场分发：一旦重新混入安装包，瘦身成果会被静默回退
 const forbiddenInPackage = [
-  'server/models',
-  'server/node_modules/onnxruntime-node',
-  'server/node_modules/onnxruntime-common',
-  'server/node_modules/sherpa-onnx-node',
-  'server/node_modules/sherpa-onnx-win-x64',
+  'resources/server/models',
+  'resources/server/node_modules/onnxruntime-node',
+  'resources/server/node_modules/onnxruntime-common',
+  'resources/server/node_modules/sherpa-onnx-node',
+  'resources/server/node_modules/sherpa-onnx-win-x64',
 ]
-const leakedAi = forbiddenInPackage.filter((rel) => fs.existsSync(path.join(unpacked, rel)))
+const leakedAi = forbiddenInPackage.filter((rel) => fs.existsSync(path.join(stageShellDir, rel)))
 if (leakedAi.length) {
-  fail(`打包产物混入了应由插件分发的 AI 运行时/模型：\n  ${leakedAi.join('\n  ')}`)
+  fail(`安装目录混入了应由插件分发的 AI 运行时/模型：\n  ${leakedAi.join('\n  ')}`)
 }
+
 // 出厂包必须是零插件：残留种子目录会让新装机器带上「自己的包」，掩盖市场问题
 const bundledPluginDirs = [
-  path.join(unpacked, 'server', 'data', 'plugins'),
-  path.join(unpacked, 'server', 'marketplace'),
+  path.join(stageShellDir, 'resources', 'server', 'data', 'plugins'),
+  path.join(stageShellDir, 'resources', 'server', 'marketplace'),
 ]
 const leaked = bundledPluginDirs.filter((dir) => fs.existsSync(dir))
 if (leaked.length) {
-  fail(
-    `打包产物里仍有随包插件/市场目录（新客户端必须是空插件）：\n  ${leaked.join('\n  ')}`,
-  )
+  fail(`安装目录里仍有随包插件/市场目录（新客户端必须是空插件）：\n  ${leaked.join('\n  ')}`)
 }
-// 远程市场地址必须已烘进安装包，否则用户打开插件市场只会看到空列表
-const marketplaceModule = path.join(desktopDir, 'src', 'marketplace.js')
-if (!fs.existsSync(marketplaceModule)) {
-  fail(`缺少 ${marketplaceModule}（出厂必须预置远程插件市场地址）`)
+
+if (!fs.existsSync(setupFile)) {
+  fail(`未生成安装包：${setupFile}`)
 }
-console.log(`  产物完整（校验 ${requiredInPackage.length} 项，零随包插件）`)
 
 // ---------- 8. 汇总 ----------
 
 log('完成')
-console.log(`  win-unpacked: ${dirSizeMB(path.join(outputDir, 'win-unpacked')).toFixed(1)} MB`)
-for (const file of fs.readdirSync(outputDir)) {
-  if (file.endsWith('.exe')) {
-    const size = fs.statSync(path.join(outputDir, file)).size / 1024 / 1024
-    console.log(`  安装包: desktop/${path.basename(outputDir)}/${file}  (${size.toFixed(1)} MB)`)
-  }
+const setupSizeMB = fs.statSync(setupFile).size / 1024 / 1024
+console.log(`  stage-shell: ${dirSizeMB(stageShellDir).toFixed(1)} MB`)
+console.log(`  安装包: desktop/${path.basename(outputDir)}/${path.basename(setupFile)}  (${setupSizeMB.toFixed(1)} MB)`)
+if (setupSizeMB > 100) {
+  console.log(`  ⚠ 安装包 ${setupSizeMB.toFixed(1)} MB，超过 100 MB 目标`)
 }

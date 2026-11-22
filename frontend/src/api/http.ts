@@ -167,6 +167,14 @@ export async function downloadPost(url: string, data?: any, filename?: string) {
   URL.revokeObjectURL(link.href)
 }
 
+/** POST 请求并返回 Blob（用于打印等需要在页内直接消费二进制的接口） */
+export async function postBlob(url: string, data?: any): Promise<Blob> {
+  const res = await service.post(url, data, { responseType: 'blob' })
+  return new Blob([res.data], {
+    type: (res.headers?.['content-type'] as string) || 'application/pdf',
+  })
+}
+
 /** 当前时间戳（文件名用） */
 export function fileStamp(): string {
   const d = new Date()

@@ -1,4 +1,4 @@
-import { get, post, put, del, download, downloadPost, fileStamp, type ApiResult } from './http'
+import { get, post, put, del, download, downloadPost, postBlob, fileStamp, type ApiResult } from './http'
 
 /** 统一导出，业务模块从这里引用 */
 export * from './http'
@@ -456,6 +456,8 @@ export const expenseClaimApi = {
   /** 批量生成原始凭证 PDF 压缩包（ids 优先，否则按筛选条件） */
   downloadPdfPackage: (data?: Record<string, any>) =>
     downloadPost('/expense-claims/pdf-package', data, `报销单原始凭证_${fileStamp()}.zip`),
+  /** 批量打印：合并为单个 A5 横向 PDF 返回 Blob（ids 优先，否则按筛选条件） */
+  printMergedPdf: (data?: Record<string, any>) => postBlob('/expense-claims/pdf-merged', data),
 }
 
 // ============ 借款单 ============
@@ -482,6 +484,8 @@ export const loanApi = {
   /** 批量生成原始凭证 PDF 压缩包（ids 优先，否则按筛选条件） */
   downloadPdfPackage: (data?: Record<string, any>) =>
     downloadPost('/loans/pdf-package', data, `借款单原始凭证_${fileStamp()}.zip`),
+  /** 批量打印：合并为单个 A5 横向 PDF 返回 Blob（ids 优先，否则按筛选条件） */
+  printMergedPdf: (data?: Record<string, any>) => postBlob('/loans/pdf-merged', data),
 }
 
 export const payrollApi = {
@@ -505,6 +509,8 @@ export const payrollApi = {
   /** 批量生成原始凭证 PDF 压缩包（ids 优先，否则按筛选条件） */
   downloadPdfPackage: (data?: Record<string, any>) =>
     downloadPost('/payrolls/pdf-package', data, `工资表原始凭证_${fileStamp()}.zip`),
+  /** 批量打印：合并为单个 A5 横向 PDF 返回 Blob（ids 优先，否则按筛选条件） */
+  printMergedPdf: (data?: Record<string, any>) => postBlob('/payrolls/pdf-merged', data),
 }
 
 export const booksApi = {

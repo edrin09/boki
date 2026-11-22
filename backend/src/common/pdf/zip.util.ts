@@ -37,3 +37,13 @@ export function sendZipResponse(res: Response, buffer: Buffer, filename: string)
   )
   res.send(buffer)
 }
+
+/** 以内联方式响应 PDF（前端隐藏 iframe 直接调起打印用） */
+export function sendPdfResponse(res: Response, buffer: Buffer, filename: string) {
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader(
+    'Content-Disposition',
+    `inline; filename="print.pdf"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+  )
+  res.send(buffer)
+}

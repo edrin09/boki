@@ -4,6 +4,7 @@
 - **开发环境**：`D:\wwwroot\financial`（本仓库，改代码只在这里）。
 - **生产环境**：`C:\ProgramData\BOKI`，含 `config.json`、`data`（SQLite 主库 + backup）、`logs`、`plugins`、`vault.key`。**禁止在开发调试时写入或覆盖该目录**；只有发布安装包后由用户实际运行才会用到。
 - 启动/构建脚本在 `starts/`（开发启动、启动插件市场、清数据、构建市场镜像、生成安装包）。
+- **打包壳**：`desktop/shell`（C# WinForms + 系统 WebView2）+ `desktop/installer.nsi`（NSIS 3）。`build-package.mjs` 首次会下载 WebView2 SDK 与 NSIS 到 `desktop/.cache`（解压 NSIS 需 7-Zip）。目标机需 WebView2 运行时（Win10 1803+/Win11 自带，安装包内置在线安装器兜底）。打包只走 WebView2 轻壳。安装包体积目标 ≤100MB（当前约 44MB）。
 
 ## 硬约束
 1. Node 必须用 24.4.1：`C:\Users\yuepeng\AppData\Local\Author Software\nvm\installs\v24.4.1\node.exe`（PATH 上的 node 22 跑 better-sqlite3/sharp 会 ABI 报错）。本机 curl 自测加 `--noproxy '*'`。

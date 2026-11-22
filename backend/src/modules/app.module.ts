@@ -69,8 +69,8 @@ export class AppModule {
       imports: [
         ConfigModule.forRoot({
           isGlobal: true,
-          // 应用身份与联系方式的统一源在仓库根 .env；桌面 sidecar 由 Electron 主进程
-          // 经 spawn env 注入（见 desktop/src/server.js buildEnv），此处按 cwd 逐级回退
+          // 应用身份与联系方式的统一源在仓库根 .env；桌面 sidecar 由桌面壳
+          // 经 spawn env 注入（见 desktop/shell/BackendProcess.cs），此处按 cwd 逐级回退
           envFilePath: ['.env.local', '.env', '../.env'],
           ignoreEnvFile: false,
         }),

@@ -12,7 +12,7 @@ export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET
   if (secret) return secret
 
-  // 打包版由 Electron 壳注入随机密钥，正常不会走到这里；
+  // 打包版由桌面壳（desktop/shell/BackendProcess.cs）注入随机密钥，正常不会走到这里；
   // 若走到，说明是直接手跑 dist/main.js，局域网部署下默认密钥可被伪造 token。
   if (!warned) {
     warned = true

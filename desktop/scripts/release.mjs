@@ -6,7 +6,6 @@
  *   - git 远程已配好（origin=GitHub, gitee=Gitee）且可推送
  *   - GitHub CLI `gh` 已登录：gh auth login
  *   - Gitee 令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：令牌：desktop/.env 或仓库根 .env，或全局共享 D:\wwwroot\.git-tokens.env：GITEE_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
- *   - 如需签名：设置 CSC_LINK / CSC_KEY_PASSWORD（或系统证书库已有匹配 publisherName 的证书）
  *
  * 用法：
  *   node scripts/release.mjs                 # 全量：构建 + 发布
@@ -22,7 +21,9 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const desktopDir = path.resolve(__dirname, '..')
 const repoRoot = path.resolve(desktopDir, '..')
-const releaseDir = path.join(desktopDir, 'release')
+const releaseDir = process.env.RELEASE_DIR
+  ? path.resolve(process.env.RELEASE_DIR)
+  : path.join(desktopDir, 'release')
 
 const args = process.argv.slice(2)
 const skipBuild = args.includes('--skip-build')

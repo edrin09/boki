@@ -160,8 +160,30 @@ export class HrDocPdfService {
 
   /** 费用报销单（A5 横向，绿色主题） */
   async expenseClaimPdf(claim: ExpenseClaim, items: ExpenseClaimItem[]): Promise<Buffer> {
-    const companyName = await this.companyNameOf(claim.companyId)
     const doc = this.createDoc(A5_LANDSCAPE)
+    await this.renderExpenseClaim(doc, claim, items)
+    return this.collect(doc)
+  }
+
+  /** 多张报销单合并为一个 A5 横向 PDF（每张一页起，批量打印用） */
+  async expenseClaimsMergedPdf(
+    docs: Array<{ claim: ExpenseClaim; items: ExpenseClaimItem[] }>,
+  ): Promise<Buffer> {
+    const doc = this.createDoc(A5_LANDSCAPE)
+    for (let i = 0; i < docs.length; i++) {
+      if (i > 0) doc.addPage()
+      await this.renderExpenseClaim(doc, docs[i].claim, docs[i].items)
+    }
+    return this.collect(doc)
+  }
+
+  /** 报销单内容绘制（写入传入的文档，合并打印与单张导出共用） */
+  private async renderExpenseClaim(
+    doc: PDFKit.PDFDocument,
+    claim: ExpenseClaim,
+    items: ExpenseClaimItem[],
+  ): Promise<void> {
+    const companyName = await this.companyNameOf(claim.companyId)
     const W = doc.page.width - LM * 2
     let y = this.drawHeader(doc, 'claim', companyName, '费　用　报　销　单', claim.claimNo) + 4
 
@@ -221,14 +243,28 @@ export class HrDocPdfService {
       doc.text(`备注：${claim.remark}`, LM, y, { width: W, lineBreak: false })
       doc.fillColor('#000000')
     }
-
-    return this.collect(doc)
   }
 
   /** 借款单（A5 横向，蓝色主题） */
   async loanPdf(loan: Loan): Promise<Buffer> {
-    const companyName = await this.companyNameOf(loan.companyId)
     const doc = this.createDoc(A5_LANDSCAPE)
+    await this.renderLoan(doc, loan)
+    return this.collect(doc)
+  }
+
+  /** 多张借款单合并为一个 A5 横向 PDF（每张一页起，批量打印用） */
+  async loansMergedPdf(loans: Loan[]): Promise<Buffer> {
+    const doc = this.createDoc(A5_LANDSCAPE)
+    for (let i = 0; i < loans.length; i++) {
+      if (i > 0) doc.addPage()
+      await this.renderLoan(doc, loans[i])
+    }
+    return this.collect(doc)
+  }
+
+  /** 借款单内容绘制（写入传入的文档，合并打印与单张导出共用） */
+  private async renderLoan(doc: PDFKit.PDFDocument, loan: Loan): Promise<void> {
+    const companyName = await this.companyNameOf(loan.companyId)
     const W = doc.page.width - LM * 2
     let y = this.drawHeader(doc, 'loan', companyName, '借　款　单', loan.loanNo) + 4
 
@@ -277,14 +313,34 @@ export class HrDocPdfService {
       doc.text(`备注：${loan.remark}`, LM, y, { width: W, lineBreak: false })
       doc.fillColor('#000000')
     }
-
-    return this.collect(doc)
   }
 
   /** 工资表（A5 横向，青色主题，支持多行跨页） */
   async payrollPdf(payroll: Payroll, items: PayrollItem[]): Promise<Buffer> {
-    const companyName = await this.companyNameOf(payroll.companyId)
     const doc = this.createDoc(A5_LANDSCAPE)
+    await this.renderPayroll(doc, payroll, items)
+    return this.collect(doc)
+  }
+
+  /** 多张工资表合并为一个 A5 横向 PDF（批量打印用，单表内部仍可跨页） */
+  async payrollsMergedPdf(
+    docs: Array<{ payroll: Payroll; items: PayrollItem[] }>,
+  ): Promise<Buffer> {
+    const doc = this.createDoc(A5_LANDSCAPE)
+    for (let i = 0; i < docs.length; i++) {
+      if (i > 0) doc.addPage()
+      await this.renderPayroll(doc, docs[i].payroll, docs[i].items)
+    }
+    return this.collect(doc)
+  }
+
+  /** 工资表内容绘制（写入传入的文档，合并打印与单张导出共用） */
+  private async renderPayroll(
+    doc: PDFKit.PDFDocument,
+    payroll: Payroll,
+    items: PayrollItem[],
+  ): Promise<void> {
+    const companyName = await this.companyNameOf(payroll.companyId)
     const W = doc.page.width - LM * 2
     const periodText = `${Math.floor(payroll.period / 100)} 年 ${payroll.period % 100} 月`
     let y = this.drawHeader(doc, 'payroll', companyName, `${periodText} 工　资　表`) + 10
@@ -409,8 +465,6 @@ export class HrDocPdfService {
       { width: W, lineBreak: false },
     )
     doc.fillColor('#000000')
-
-    return this.collect(doc)
   }
 
   // ==================== 绘制工具 ====================

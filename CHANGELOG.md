@@ -103,5 +103,5 @@
 首个对外打包的桌面版（内部编号，未公开发布）：
 
 - Vue 3 前端 + NestJS 后端 + SQLite 单文件数据库
-- Electron 桌面壳（Windows 优先，含 macOS / Linux 构建配置）
+- 原生桌面壳（Windows 优先）
 - 免环境安装包（自带运行时，断网可安装使用）
