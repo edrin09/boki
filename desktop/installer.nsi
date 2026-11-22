@@ -18,6 +18,9 @@ SetCompressorDictSize 64
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "FileFunc.nsh"
+; 打包脚本每次构建重新生成的变量（版本号/发布者/stage 目录/输出文件）。
+; 必须在下方 !ifndef 兜底定义之前引入，否则版本号永远落到 1.1.2 兜底值。
+!include "build\installer-vars.nsh"
 !include "installer-hooks.nsh"
 
 !ifndef APP_VERSION
